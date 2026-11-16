@@ -35,9 +35,9 @@
 | ID | 메서드 | 경로 | 입력 | 출력 | 권한 | 오류 |
 |---|---|---|---|---|---|---|
 | W-01 | POST | `/worker/v1/jobs/claim` | — (폴링, 간격 가정 5~10초) | `job{id, kind:"collect", profiles[]{id, market, format, category, min_views, keywords, cc_only, include_broadcast}, resume_from_profile_id?, limit}` 또는 204(작업 없음) | 워커 토큰(자기 워크스페이스 큐만) | 401 토큰 무효·폐기 |
-| W-02 | POST | `/worker/v1/heartbeat` | `job_id?`, `chrome[]{profile_id, state(`ready`·`resize_needed`·`login_needed`·`error`), detail}` | `stop_requested`(bool) (←`jobs.stop_requested`). `worker_heartbeats`·`job_profile_runs` 갱신 | 워커 토큰 | 401 · 404 job 없음 |
-| W-03 | POST | `/worker/v1/jobs/{id}/candidates` | `profile_id`, `items[]{video_id, title, thumbnail_url, genre, category, format, market, channel_id, channel_title}`(형식 검증, 신뢰 안 함. 요청당 ≤200) | `accepted`, `duplicates`. 신규는 YouTube 1차 관측 후 근거 대기 판정 | 워커 토큰 | 400 형식 · 404 · 409 중지됨·종료됨 · 502 |
-| W-04 | POST | `/worker/v1/jobs/{id}/finish` | `status`(`done`·`failed`), `error?`(쿠키·경로 금지) | `job{status}` | 워커 토큰 | 404 · 409 이미 종료 |
+| W-02 | POST | `/worker/v1/heartbeat` | `job_id?`, `chrome[]{profile_id, state(`ready`·`resize_needed`·`login_needed`·`error`), detail(코드: `window_small`·`login_required`·`profile_locked`·`network`·`unknown`)}` | `stop_requested`(bool) (←`jobs.stop_requested`). `worker_heartbeats`·`job_profile_runs` 갱신 | 워커 토큰 | 401 · 404 job 없음 |
+| W-03 | POST | `/worker/v1/jobs/{id}/candidates` | `profile_id`, `items[]{video_id, title, thumbnail_url, genre, category, format, market, channel_id, channel_title}`(형식 검증, 신뢰 안 함. 요청당 ≤200) | `accepted`, `duplicates`(요청 안 중복+기존 후보), `unavailable`(YouTube 응답에 없음). 신규는 YouTube 1차 관측 후 판정, 제목·채널·라이선스·썸네일은 YouTube 값 | 워커 토큰 | 400 형식 · 404 · 409 중지됨·종료됨 · 502 |
+| W-04 | POST | `/worker/v1/jobs/{id}/finish` | `status`(`done`·`failed`·`stopped`(stop_requested일 때만)), `error?`(코드: `chrome_failed`·`vidiq_changed`·`network`·`stopped_by_user`·`unknown`) | `job{status}` | 워커 토큰 | 404 · 409 이미 종료 |
 
 ## 03 추적
 | 화면 | API ID | 비고 |

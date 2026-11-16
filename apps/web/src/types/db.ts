@@ -173,14 +173,14 @@ isOneToOne: false
                   ]
                 },"jobs": {
                   Row: {
-                    "claimed_by": string | null,"created_at": string,"error": string | null,"finished_at": string | null,"id": string,"idempotency_key": string,"kind": string,"params": NonNullable<Json>,"profile_ids": (string)[],"requested_by": string | null,"result": Json | null,"retry_count": number,"started_at": string | null,"status": string,"stop_requested": boolean,"workspace_id": string
+                    "claimed_by": string | null,"created_at": string,"error": string | null,"finished_at": string | null,"id": string,"idempotency_key": string,"kind": string,"lookup_count": number,"params": NonNullable<Json>,"profile_ids": (string)[],"requested_by": string | null,"result": Json | null,"retry_count": number,"started_at": string | null,"status": string,"stop_requested": boolean,"workspace_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "claimed_by"?: string | null,"created_at"?: string,"error"?: string | null,"finished_at"?: string | null,"id"?: string,"idempotency_key": string,"kind": string,"params"?: NonNullable<Json>,"profile_ids"?: (string)[],"requested_by"?: string | null,"result"?: Json | null,"retry_count"?: number,"started_at"?: string | null,"status"?: string,"stop_requested"?: boolean,"workspace_id": string
+                    "claimed_by"?: string | null,"created_at"?: string,"error"?: string | null,"finished_at"?: string | null,"id"?: string,"idempotency_key": string,"kind": string,"lookup_count"?: number,"params"?: NonNullable<Json>,"profile_ids"?: (string)[],"requested_by"?: string | null,"result"?: Json | null,"retry_count"?: number,"started_at"?: string | null,"status"?: string,"stop_requested"?: boolean,"workspace_id": string
                   }
                   Update: {
-                    "claimed_by"?: string | null,"created_at"?: string,"error"?: string | null,"finished_at"?: string | null,"id"?: string,"idempotency_key"?: string,"kind"?: string,"params"?: NonNullable<Json>,"profile_ids"?: (string)[],"requested_by"?: string | null,"result"?: Json | null,"retry_count"?: number,"started_at"?: string | null,"status"?: string,"stop_requested"?: boolean,"workspace_id"?: string
+                    "claimed_by"?: string | null,"created_at"?: string,"error"?: string | null,"finished_at"?: string | null,"id"?: string,"idempotency_key"?: string,"kind"?: string,"lookup_count"?: number,"params"?: NonNullable<Json>,"profile_ids"?: (string)[],"requested_by"?: string | null,"result"?: Json | null,"retry_count"?: number,"started_at"?: string | null,"status"?: string,"stop_requested"?: boolean,"workspace_id"?: string
                   }
                   Relationships: [
                     {
@@ -373,7 +373,10 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "apply_verify_batch":
+            "apply_collect_batch":
+{ Args: { "p_job": string,"p_payload": Json,"p_profile": string,"p_worker": string,"p_workspace": string }; Returns: number
+                           },
+"apply_verify_batch":
 { Args: { "p_job": string,"p_payload": Json,"p_workspace": string }; Returns: number
                            },
 "is_workspace_member":
@@ -381,6 +384,9 @@ isOneToOne: false
                            },
 "quota_day":
 { Args: { "p_ts": string }; Returns: string
+                           },
+"reserve_collect_lookup":
+{ Args: { "p_job": string,"p_n": number,"p_worker": string,"p_workspace": string }; Returns: number
                            },
 "reserve_quota":
 { Args: { "p_limit": number,"p_units": number }; Returns: boolean

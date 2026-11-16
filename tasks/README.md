@@ -9,7 +9,7 @@
 | task-018 | 공통 레이아웃(앱 셸) | W1 | 001 | 낮음 | builder | 완료 |
 | task-005 | 판정 엔진 | W2 | 003 | 보통 | builder + tester | 완료 |
 | task-006 | YouTube 관측 · A-07 · 할당량 방어선 | W2 | 005 | 높음 | builder + tester | 완료 |
-| task-007 | 워커 API W-01~W-04 · job 상태 | W2 | 006 | 높음 | builder + tester | 대기 |
+| task-007 | 워커 API W-01~W-04 · job 상태 | W2 | 006 | 높음 | builder + tester | 완료 |
 | task-008 | 수집 작업 API A-05 | W2 | 007 | 높음 | builder + tester | 대기 |
 | task-009 | 로컬 워커 (Playwright · vidIQ) | W2 | 007, vidIQ 약관 확인 | 높음 | builder | 보류 |
 | task-010 | 프로필 API A-03 | W2 | 003 | 높음 | builder + tester | 완료 |
@@ -37,6 +37,8 @@
 | 2026-11-16 | A-04 q 검색 | ilike는 `*`를 와일드카드로 바꿔 `*`를 `_`로 대체 → 약간 넓게 일치 | 정확 일치가 필요하면 imatch(정규식) 전환 |
 | 2026-11-17 | 배포(API 서버) | 워커 라우트 본문 1MB 제한은 앱 수준. 서버 수신 타임아웃·동시 연결 제한은 없음 | 08 배포 체크리스트(uvicorn/프록시 timeout·limit-concurrency) |
 | 2026-11-17 | DASH-01 빈 상태 | 첫 사용 판정이 근사(기간 수집+제작 가능+근거 대기=0) → 제외·사용됨 후보만 있으면 첫 사용으로 보임 | A-02에 전체 후보 수 필드 추가 |
+| 2026-11-17 | ERD 생성(sql2erd) | ALTER TABLE ADD COLUMN을 읽지 못해 `jobs.lookup_count`가 erd.mmd에 빠짐 | 도구 보강 또는 ERD에 주석 한 줄 |
+| 2026-11-17 | jobs.error 제약 | 허용 코드가 check로 고정 → 008 등에서 새 오류 코드를 쓰면 새 마이그레이션 필요 | 코드 추가 시 함께 마이그레이션 |
 | 2026-11-16 | 앱 셸 | 로그아웃 버튼(SignOutButton)이 셸에 아직 없음 | DASH-01(task-016) 또는 셸 보강 때 상단 바에 배치 |
 
 ## 교훈 (다음 작업에 그대로 적용할 것만, 20줄 이내 유지)

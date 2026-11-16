@@ -66,6 +66,19 @@
 
 수치 정본(가정): 재시도 상한 3회(초과 시 재시도 불가) · 하트비트 3분 미수신 = 워커 오프라인. 04·05는 이 절을 링크한다.
 
+수집 job 상태 전이 (collect, 정본 — 팀장 결정 2026-11-17):
+| 현재 | 다음 | 주체 | 조건 |
+|---|---|---|---|
+| (없음) | queued | A-05 POST | 워크스페이스·kind당 활성 1건 |
+| queued·retrying | running | W-01 claim | 조건부 갱신 1회(원자적). 같은 워커가 이미 running인 job이 있으면 그 job을 다시 돌려줌(재시작 복구) |
+| queued·retrying | stopped | A-05 stop | 워커가 없으므로 즉시 |
+| running | stopped | W-04(status=stopped) | `stop_requested`=true일 때만. A-05 stop은 `stop_requested`만 켬(W-02 응답으로 전달) |
+| running | done·failed | W-04 | claim한 워커만 |
+| running | failed | 오프라인 지연 평가 | claim한 워커 `last_seen_at` 3분 초과. W-01·W-02·A-05 GET/POST 때 평가(error=`worker_offline`) |
+| failed | retrying | A-05 retry | `retry_count` < 3, +1, `resume_from_profile_id` = 첫 failed 프로필 |
+| done·stopped | — | — | 종료(그 뒤 W-02~04는 409) |
+- job_profile_runs: 다음 프로필의 후보가 들어오면 앞 프로필의 running 행은 done. job이 done이면 남은 running 행도 done, failed·stopped면 running 행만 failed. 재시도는 position 순으로 처음 done이 아닌 프로필부터. 워커 없이 queued로 남은 job은 자동 실패하지 않고 화면이 "워커 오프라인"을 보여 준다(사용자가 중지).
+
 > 그림: [`diagrams/flow-3.mmd`](diagrams/flow-3.mmd)
 
 ## 다이어그램 요청 (diagrammer)
