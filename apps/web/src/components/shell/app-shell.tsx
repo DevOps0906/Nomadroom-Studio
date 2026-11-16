@@ -6,6 +6,7 @@ import { Menu, X } from "lucide-react";
 import { SidebarNav } from "./sidebar-nav";
 import { NavLink } from "./nav-link";
 import { CRUMBS, TABS } from "./nav-config";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 
 export function AppShell({ children, opsUrl }: { children: ReactNode; opsUrl?: string }) {
   const pathname = usePathname();
@@ -86,6 +87,9 @@ export function AppShell({ children, opsUrl }: { children: ReactNode; opsUrl?: s
                 ))}
               </ol>
             </nav>
+            <div className="ml-auto">
+              <SignOutButton />
+            </div>
           </div>
           <nav aria-label="작업 탭" className="flex min-w-0 gap-2 overflow-x-auto px-4 pb-3 tablet:gap-4 tablet:px-6 tablet:pb-0">
             {TABS.map((t) => (

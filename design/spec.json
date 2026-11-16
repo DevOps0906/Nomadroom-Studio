@@ -1,20 +1,14 @@
 {
  "version": "1",
- "generated": "2026-11-16T12:57:26+00:00",
+ "generated": "2026-11-16T15:22:49+00:00",
  "docs": "docs",
  "tokens": ".\\apps\\web\\src\\styles\\tokens.css",
  "sources": {
   "docs/03_SCREENS_UX.md": "56c8f567ebda",
-  "docs/04_API.md": "c57ea47e2e63",
-  "docs/05_DATA_MODEL.md": "7db37a80145d"
+  "docs/04_API.md": "1ea4f6f0ce66",
+  "docs/05_DATA_MODEL.md": "54d41fb7f57b"
  },
- "changed": [
-  "AUTH-01",
-  "DASH-01",
-  "MON-01",
-  "MON-D1",
-  "MON-D2"
- ],
+ "changed": [],
  "removed": [],
  "screens": {
   "AUTH-01": {
@@ -338,7 +332,7 @@
     "저장된 보기·열 설정"
    ],
    "states_missing": [],
-   "hash": "5a3fe606f86d",
+   "hash": "8b10b85b891a",
    "wireframe": "design/wireframes/MON-01.html"
   },
   "MON-D1": {
@@ -402,7 +396,7 @@
     "임시 저장(긴 폼)"
    ],
    "states_missing": [],
-   "hash": "fd74083bd2d3",
+   "hash": "542e503b30c0",
    "wireframe": "design/wireframes/MON-D1.html"
   },
   "MON-D2": {
@@ -486,7 +480,7 @@
     "활동·변경 이력"
    ],
    "states_missing": [],
-   "hash": "219a99bb73c3",
+   "hash": "2727932453e9",
    "wireframe": "design/wireframes/MON-D2.html"
   }
  },
@@ -595,9 +589,9 @@
     "메서드": "PUT",
     "경로": "/v1/profiles/selection",
     "입력": "selected_ids[]`(최대 3)",
-    "출력": "selected_ids[]` (←`profiles.selected`)",
+    "출력": "selected_ids[]` (←`profiles.selected`, 원자적 갱신·빈 배열=전부 해제)",
     "권한": "로그인",
-    "오류": "400 3개 초과·없는 id"
+    "오류": "400 3개 초과·없는 id(타 워크스페이스 포함)"
    },
    "source": "docs/04_API.md"
   },
@@ -612,7 +606,7 @@
     "입력": "status`(`all`·`producible`·`pending`·`excluded`·`used`), `category`, `format`, `profile_id`, `license`(`cc`·`any`), `q`(제목·채널), `sort`(`growth`·`views`·`recent`), `page`, `size",
     "출력": "counts{total, producible, pending, excluded, used}`, `categories[]`, `items[]{id, thumbnail_url, status(←`rep_status`, `used`면 `used`), genre, title, format, profile_names[], license_cc, prev{observed_at, view_count}, curr{observed_at, view_count}, growth_pct, period_days, next_observation_at(근거 대기만), used}`, `updated_at",
     "권한": "로그인",
-    "오류": "400 파라미터"
+    "오류": "400 파라미터(size 61 이상·page 1001 이상·q 100자 초과·제어 문자, 공백뿐인 q는 필터 없음). 규칙: counts는 status 외 필터 반영·total=네 상태 합, 판정 전 후보는 `pending`, 정렬 tie-breaker id, 썸네일은 `i.ytimg.com`만(아니면 null). 상세 `tasks/task-011.md#구현 결정"
    },
    "source": "docs/04_API.md"
   },
@@ -642,7 +636,7 @@
     "입력": "—",
     "출력": "candidate{id, title, status}`, `prev{observed_at, view_count}`(없으면 null), `curr{observed_at, view_count}`, `growth_pct`, `reason`(←`candidate_verdicts.reason`), `needs_prev`(이전 관측 없음), `next_observation_at`. 대표 판정 프로필 기준",
     "권한": "로그인",
-    "오류": "404 후보 없음"
+    "오류": "404 후보 없음(타 워크스페이스 포함). 대표 판정 없음 → 200·prev/curr null·`needs_prev` true"
    },
    "source": "docs/04_API.md"
   },
@@ -657,7 +651,7 @@
     "입력": "Idempotency-Key`, `profile_ids[]`(생략 시 선택된 프로필)",
     "출력": "job{id, kind:\"verify\", status}`, `checked`, `skipped_recent`(24시간 미만), `failed`, `counts{total, producible, pending, excluded, used}`(워커 불필요, 동기 응답)",
     "권한": "로그인",
-    "오류": "400 · 409 검증 진행 중 · 429 `QUOTA_EXCEEDED`(남은 후보는 이전 판정 유지) · 502"
+    "오류": "400 · 409 검증 진행 중·같은 키의 다른 kind job · 429 `QUOTA_EXCEEDED`(남은 후보는 이전 판정 유지)·`RATE_LIMITED`(같은 워크스페이스 직전 실행 후 60초 이내 새 키) · 502(YouTube 오류·키 미설정). 같은 `Idempotency-Key` 재요청은 200으로 기존 job과 저장된 결과 반환(본문이 달라도). 10분 넘은 실행 중 job은 새 요청 때 `failed` 정리. 대상: used 제외·최신 관측 24시간 이상·상한 200"
    },
    "source": "docs/04_API.md"
   },
@@ -699,7 +693,7 @@
     "ID": "W-02",
     "메서드": "POST",
     "경로": "/worker/v1/heartbeat",
-    "입력": "job_id?`, `chrome[]{profile_id, state(`ready`·`resize_needed`·`login_needed`·`error`), detail}",
+    "입력": "job_id?`, `chrome[]{profile_id, state(`ready`·`resize_needed`·`login_needed`·`error`), detail(코드: `window_small`·`login_required`·`profile_locked`·`network`·`unknown`)}",
     "출력": "stop_requested`(bool) (←`jobs.stop_requested`). `worker_heartbeats`·`job_profile_runs` 갱신",
     "권한": "워커 토큰",
     "오류": "401 · 404 job 없음"
@@ -715,7 +709,7 @@
     "메서드": "POST",
     "경로": "/worker/v1/jobs/{id}/candidates",
     "입력": "profile_id`, `items[]{video_id, title, thumbnail_url, genre, category, format, market, channel_id, channel_title}`(형식 검증, 신뢰 안 함. 요청당 ≤200)",
-    "출력": "accepted`, `duplicates`. 신규는 YouTube 1차 관측 후 근거 대기 판정",
+    "출력": "accepted`, `duplicates`(요청 안 중복+기존 후보), `unavailable`(YouTube 응답에 없음). 신규는 YouTube 1차 관측 후 판정, 제목·채널·라이선스·썸네일은 YouTube 값",
     "권한": "워커 토큰",
     "오류": "400 형식 · 404 · 409 중지됨·종료됨 · 502"
    },
@@ -729,7 +723,7 @@
     "ID": "W-04",
     "메서드": "POST",
     "경로": "/worker/v1/jobs/{id}/finish",
-    "입력": "status`(`done`·`failed`), `error?`(쿠키·경로 금지)",
+    "입력": "status`(`done`·`failed`·`stopped`(stop_requested일 때만)), `error?`(코드: `chrome_failed`·`vidiq_changed`·`network`·`stopped_by_user`·`unknown`)",
     "출력": "job{status}",
     "권한": "워커 토큰",
     "오류": "404 · 409 이미 종료"
@@ -856,6 +850,17 @@
     "주요 컬럼": "worker_id(PK), workspace_id, last_seen_at, current_job_id, chrome(jsonb: 프로필별 state 요약)",
     "RLS 기준": "읽기: 구성원. 쓰기: API만",
     "비고": "워커당 1행 upsert. `last_seen_at` 오프라인 기준·job `failed` 처리는 `02_ARCHITECTURE.md#3-3"
+   },
+   "source": "docs/05_DATA_MODEL.md"
+  },
+  "api_quota_daily": {
+   "name": "api_quota_daily",
+   "row": {
+    "테이블": "api_quota_daily",
+    "목적": "YouTube API 일 사용량(서버 전체 1개 카운터)",
+    "주요 컬럼": "day(date PK, America/Los_Angeles 기준), units(int)",
+    "RLS 기준": "일반 사용자 접근 없음(정책 없음). API만(`reserve_quota` RPC로 원자적 예약)",
+    "비고": "상한 8,000 unit(`adr/0002`). 워크스페이스 열 없음(키가 서버 전체 1개) — 공통 규칙의 예외"
    },
    "source": "docs/05_DATA_MODEL.md"
   }

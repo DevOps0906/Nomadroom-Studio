@@ -7,7 +7,7 @@ export function SignOutButton({ className }: { className?: string }) {
       <button
         type="submit"
         className={cn(
-          "inline-flex min-h-11 items-center justify-center rounded-control border border-input bg-surface px-4 text-body font-semibold text-text hover:bg-surface-alt outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "inline-flex min-h-11 items-center justify-center rounded-control border border-input bg-surface px-4 text-body font-semibold text-text hover:bg-surface-alt outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-3",
           className,
         )}
       >

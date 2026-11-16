@@ -19,5 +19,12 @@
 - 셸 재구현 금지(task-018 사용).
 
 ## 완료 조건 (실행 가능한 확인)
-- [ ] `pnpm typecheck && pnpm lint && pnpm test` 통과(빈 데이터·로딩·오류, null 3칸 라벨)
-- [ ] `shot`으로 3구간 캡처 확인
+- [x] `pnpm typecheck && pnpm lint && pnpm test` 통과(빈 데이터·로딩·오류, null 3칸 라벨)
+- [x] `shot`으로 3구간 캡처 확인
+
+## 구현 결정 (팀장, 2026-11-17)
+- 웹→API 공용 클라이언트 `apps/web/src/server/api/client.ts`(server-only)를 이 작업에서 만든다: 환경변수 `API_BASE_URL`(서버 전용), 현재 세션 access token을 `Authorization: Bearer`로 전달(getClaims로 검증한 뒤 getSession의 토큰 사용), 타임아웃 10초, 응답 `{code,message,field?}`를 타입 있는 오류로 변환, 401이면 /login, 403 FORBIDDEN이면 소속 없음 안내. 014가 이 클라이언트를 재사용한다.
+- 읽기는 Server Component에서 호출(`/api/**` Route Handler 만들지 않음). 쓰기는 Server Action(Next Origin 검사).
+- 미연동 3칸은 "—" + "운영 사이트 연동 전". 외부 링크는 `NEXT_PUBLIC_OPS_SITE_URL`(기본값은 시안의 운영 사이트 주소), `target=_blank rel="noopener noreferrer"`.
+- 로그아웃 버튼(SignOutButton, task-012)을 상단 바 사용자 영역에 배치(셸 파일에서 버튼 1개만 추가, 구조 변경 금지).
+- 쓰기 허용 확장: `apps/web/src/server/api/**`, `apps/web/src/components/shell/**`(로그아웃 버튼 배치만), `.env.example`(이름만 `cat >>`).
