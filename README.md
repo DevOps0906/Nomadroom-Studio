@@ -18,14 +18,15 @@ Chrome·vidIQ 연결 상태는 화면 검토용 예시입니다.
 
 ## 진행 현황 (2026-11-16 기준)
 
-기획(02)·UX(03)·기술 설계(05) 문서를 마쳤고, 구현은 아직 시작하지 않았습니다. MVP는 로그인 · 대시보드 · 소재수집(정체) 세 화면이며, 나머지 메뉴는 기존 운영 사이트 링크로 둡니다.
+기획(02)·UX(03)·기술 설계(05) 문서를 마쳤고, 구현 첫 단계 M0(기반·디자인 셸·보안 L1)를 완료했습니다. MVP는 로그인 · 대시보드 · 소재수집(정체) 세 화면이며, 나머지 메뉴는 기존 운영 사이트 링크로 둡니다.
 
 | 영역 | 현재 상태 |
 |---|---|
 | 기획 | PRD·린 검증·판정 규칙(`docs/01_PRD.md#9`) 작성, 문서 리뷰 반영 |
 | UX·화면 | 화면 5개 표·와이어프레임(`design/wireframes/index.html`) |
 | 기술 설계 | 아키텍처·ADR 2건·API 17개·테이블 11개 |
-| 구현 | 진행 중 (task-001·018 완료 · 16개 대기, 단계 M0~M5 — `docs/06_AGENT_PLAN.md`) |
+| 구현 | 진행 중 — M0 완료(task-001·018·004), 15개 대기(task-009 보류). 단계 M0~M5 — `docs/06_AGENT_PLAN.md` |
+| 보안·CI | 보안 L1: 커밋 전 비밀 스캔(gitleaks), GitHub Actions(ci·secrets·sbom), Dependabot, `SECURITY.md` |
 
 제한: 벤치마킹은 실제 화면 확인 전(미확인), vidIQ 자동화 약관 미확인, YouTube API 할당량은 콘솔 재확인 필요.
 
@@ -34,7 +35,7 @@ Chrome·vidIQ 연결 상태는 화면 검토용 예시입니다.
 
 | 단계 | 영역 | 작업 | 완료 / 전체 |
 |---|---|---|---|
-| M0 | 기반·디자인 셸 | 001 · 018 · 004 | 2 / 3 |
+| M0 | 기반·디자인 셸 | 001 · 018 · 004 | 3 / 3 ✅ |
 | M1 | 데이터·인증 | 002 · 003 · 012 | 0 / 3 |
 | M2 | 판정·관측 코어 | 005 · 010 · 011 · 006 | 0 / 4 |
 | M3 | 수집 API + 화면 1차 | 007 · 008 · 014 · 016 | 0 / 4 |
@@ -44,9 +45,13 @@ Chrome·vidIQ 연결 상태는 화면 검토용 예시입니다.
 ### 구현된 주요 항목
 - [x] 대시보드 디자인 시안(HTML)
 - [x] 기획 문서 세트(00~05, ADR)
+- [x] pnpm 모노레포 + `apps/web`(Next.js 16.4.6 · React 19.3.1 · Tailwind CSS 4.3.5) — task-001
+- [x] 디자인 토큰(`apps/web/src/styles/tokens.css`, 3구간 폰트·반응형 `tablet:`/`desktop:`)·[`DESIGN.md`](./DESIGN.md) — task-001
+- [x] 공통 레이아웃(앱 셸): 사이드바·빵부스러기·작업 탭, 모바일 드로어·태블릿 아이콘 레일·데스크톱 펼침 — task-018
+- [x] 보안 L1: gitleaks pre-commit·CI 비밀 스캔, ci(lint·typecheck·test·GPL/AGPL 검사)·sbom 워크플로, Dependabot — task-004
 
 ### 다음 개발 단계
-- [ ] M0 기반·디자인 셸 (001 · 018 · 004)
+- [x] M0 기반·디자인 셸 (001 · 018 · 004)
 - [ ] M1 데이터·인증 (002 · 003 · 012)
 - [ ] M2 판정·관측 코어 (005 · 010 · 011 · 006)
 - [ ] M3 수집 API + 화면 1차 (007 · 008 · 014 · 016)
@@ -55,7 +60,14 @@ Chrome·vidIQ 연결 상태는 화면 검토용 예시입니다.
 
 ## 개발 환경 설정
 
-클론 후 한 번: `git config core.hooksPath .githooks` (커밋 전 gitleaks 비밀 스캔, gitleaks 설치 필요: `scoop install gitleaks` 또는 `brew install gitleaks`).
+| 항목 | 내용 |
+|---|---|
+| 요구 사항 | Node 24, pnpm(`packageManager`에 고정 — 없으면 `corepack pnpm`), gitleaks(`scoop install gitleaks` 또는 `brew install gitleaks`) |
+| 설치 | `pnpm install` — `prepare` 스크립트가 `git config core.hooksPath .githooks`를 설정해 커밋 전 비밀 스캔을 켭니다 |
+| 개발 서버 | `cd apps/web && pnpm dev` → `/dashboard` |
+| 점검 | `cd apps/web && pnpm lint && pnpm typecheck && pnpm test` |
+| 환경 변수 | `.env.example`의 이름만 참고해 `apps/web/.env.local`에 값 입력(커밋 금지). `NEXT_PUBLIC_OPS_SITE_URL`이 없으면 운영 사이트 기본 주소 사용 |
+| CI | push·PR마다 `ci`(lint·typecheck·test·라이선스) · `secrets`(gitleaks 전체 이력) · `sbom` 실행. 의존성 갱신은 Dependabot PR로 받음 |
 
 ## 콘텐츠 바로가기
 
@@ -64,4 +76,5 @@ Chrome·vidIQ 연결 상태는 화면 검토용 예시입니다.
 | 로그인 | `/login` | [03_SCREENS_UX](./docs/03_SCREENS_UX.md) · [와이어](./design/wireframes/AUTH-01.html) | 미구현 |
 | 대시보드 | `/dashboard` | [03_SCREENS_UX](./docs/03_SCREENS_UX.md) · [와이어](./design/wireframes/DASH-01.html) | 미구현 |
 | 소재수집(정체) | `/monitor` | [01_PRD#9 판정 규칙](./docs/01_PRD.md) · [와이어](./design/wireframes/MON-01.html) · [시안](./docs/design/Nomadroom_Dashboard_Design.html) | 미구현 |
+| 공통 레이아웃(앱 셸) | 모든 화면 | [06_AGENT_PLAN](./docs/06_AGENT_PLAN.md) · [DESIGN.md](./DESIGN.md) | [`apps/web/src/components/shell`](./apps/web/src/components/shell) |
 | 기획 전체 | — | [PRD](./docs/01_PRD.md) · [아키텍처](./docs/02_ARCHITECTURE.md) · [API](./docs/04_API.md) · [데이터](./docs/05_DATA_MODEL.md) | — |

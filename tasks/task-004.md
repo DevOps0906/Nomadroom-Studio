@@ -19,6 +19,6 @@
 - L2(배포 파이프라인) 설정, 실제 비밀 값 생성·커밋.
 
 ## 완료 조건 (실행 가능한 확인)
-- [ ] `~/.claude/nomad/bin/secscan` 전 항목 통과
-- [ ] 더미 비밀 문자열을 넣은 커밋이 스캔에서 차단됨(확인 후 제거)
-- [ ] `git ls-files | grep -E "\.env($|\.)"` 가 `.env.example`만 출력
+- [x] `~/.claude/nomad/bin/secscan` 전 항목 통과
+- [x] 더미 비밀 문자열을 넣은 커밋이 스캔에서 차단됨(확인 후 제거)
+- [x] `git ls-files | grep -E "\.env($|\.)"` 가 `.env.example`만 출력
