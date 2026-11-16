@@ -391,8 +391,14 @@ isOneToOne: false
 "reserve_quota":
 { Args: { "p_limit": number,"p_units": number }; Returns: boolean
                            },
+"retry_collect_job":
+{ Args: { "p_job": string,"p_workspace": string }; Returns: Json
+                           },
 "set_profile_selection":
 { Args: { "p_ids": (string)[],"p_workspace": string }; Returns: (string)[]
+                           },
+"stop_collect_job":
+{ Args: { "p_job": string,"p_workspace": string }; Returns: Json
                            }
           }
           Enums: {
