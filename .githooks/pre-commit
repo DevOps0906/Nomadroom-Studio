@@ -1,0 +1,7 @@
+#!/bin/sh
+# 커밋 전 비밀 스캔 (gitleaks). 설정: git config core.hooksPath .githooks
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "gitleaks 가 없습니다. 설치: scoop install gitleaks (Windows) / brew install gitleaks (macOS)" >&2
+  exit 1
+fi
+exec gitleaks git --pre-commit --staged --redact --verbose

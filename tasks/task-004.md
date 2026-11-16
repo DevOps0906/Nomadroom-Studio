@@ -8,7 +8,7 @@
 | 보안 영향 | 의존성 · 키·권한 |
 | 담당 | builder (+ reviewer security) |
 | 근거 | `docs/01_PRD.md#8`, `AGENTS.md#4`, `~/.claude/skills/security-baseline/SKILL.md` |
-| 쓰기 허용 | `.github/**`, `.gitignore`, `.gitleaks*`, `SECURITY.md`, `.claude/settings.json`(deny 규칙만) |
+| 쓰기 허용 | `.github/**`, `.gitignore`, `.gitleaks*`, `SECURITY.md`, `.claude/settings.json`(deny 규칙만), `.githooks/**`, `.gitattributes`, `README.md`(개발 환경 설정 절만), `package.json`(engines만) — challenger 지적으로 확장(2026-11-16) |
 
 ## 할 것
 - `/secure setup` L1 실행: 비밀 스캔(pre-commit·CI), 의존성 취약점·라이선스 점검 워크플로, lockfile 커밋 강제.

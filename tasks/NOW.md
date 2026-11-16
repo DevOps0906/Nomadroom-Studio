@@ -1,7 +1,7 @@
 # NOW — 재진입 스냅샷 (30줄 이내, 매 작업 끝에 덮어쓴다)
 
 - 갱신: 2026-11-16
-- 현재 작업: task-018 완료 → 다음 task-004 보안 L1 설정(`/secure setup`) — 상태: 대기
+- 현재 작업: task-004 보안 L1 — 상태: 진행(구현, builder). challenger REVISE 반영 계획
 - 단계: M0 기반·디자인 셸 2/3 (001·018 완료). 004 끝나면 M1(002 → 003 · 012)
 - 다음 한 걸음: `/next 004` — 위험도 높음 → challenger 착수 전 검토 + code·security 리뷰
 - task-018 결과: apps/web/src/components/shell/**(app-shell·sidebar-nav·nav-link·nav-config), app/(dashboard)/layout.tsx, /dashboard·/monitor 빈 슬롯, / → /dashboard

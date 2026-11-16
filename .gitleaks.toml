@@ -1,0 +1,3 @@
+# 기본 규칙 + 허용 없음(.env.example 포함 전체 스캔, 값은 비워 둔다)
+[extend]
+useDefault = true

@@ -7,6 +7,10 @@
     "build": "pnpm --filter web build",
     "lint": "pnpm --filter web lint",
     "typecheck": "pnpm --filter web typecheck",
-    "test": "pnpm --filter web test"
+    "test": "pnpm --filter web test",
+    "prepare": "git config core.hooksPath .githooks"
+  },
+  "engines": {
+    "node": ">=24 <25"
   }
 }

@@ -1,0 +1,35 @@
+# SBOM 생성 + 취약점 스캔 — `secscan setup --ci` 가 생성. 액션 버전은 Dependabot(github-actions)이 갱신한다.
+name: sbom
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: SBOM 생성 (CycloneDX)
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom.cdx.json
+          upload-artifact: false
+      - name: 취약점 스캔 (리포트만, 빌드는 막지 않음)
+        uses: anchore/scan-action@1638637db639e0ade3258b51db49a9a137574c3e # v6.5.1
+        with:
+          sbom: sbom.cdx.json
+          fail-build: false
+          severity-cutoff: high
+          output-format: table
+      - name: SBOM 보관
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom.cdx.json
+          retention-days: 90

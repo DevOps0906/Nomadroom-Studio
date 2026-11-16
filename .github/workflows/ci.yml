@@ -1,0 +1,36 @@
+# CI — lint · typecheck · test · 라이선스(GPL·AGPL 금지)
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter web lint
+      - run: pnpm --filter web typecheck
+      - run: pnpm --filter web test
+      - name: 라이선스 점검 (GPL·AGPL 거부, LGPL 제외)
+        run: |
+          pnpm -r licenses list --json > "$RUNNER_TEMP/licenses.json"
+          n=$(jq 'keys | length' "$RUNNER_TEMP/licenses.json")
+          if [ "$n" -eq 0 ]; then
+            echo "라이선스 목록이 비어 있음(검사 불가)" >&2
+            exit 1
+          fi
+          bad=$(jq -r 'keys[] | select(gsub("LGPL";"") | test("GPL";"i"))' "$RUNNER_TEMP/licenses.json")
+          if [ -n "$bad" ]; then
+            echo "GPL/AGPL 라이선스 의존성 발견: $bad" >&2
+            exit 1
+          fi

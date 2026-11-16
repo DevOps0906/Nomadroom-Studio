@@ -53,6 +53,10 @@ Chrome·vidIQ 연결 상태는 화면 검토용 예시입니다.
 - [ ] M4 소재수집(정체) 완성 (013 · 015 · 017)
 - [ ] M5 로컬 워커 (009, vidIQ 약관 확인 후)
 
+## 개발 환경 설정
+
+클론 후 한 번: `git config core.hooksPath .githooks` (커밋 전 gitleaks 비밀 스캔, gitleaks 설치 필요: `scoop install gitleaks` 또는 `brew install gitleaks`).
+
 ## 콘텐츠 바로가기
 
 | 콘텐츠 | 화면 경로 | 기획·명세 문서 | 구현 코드 |
