@@ -1,14 +1,16 @@
 {
  "version": "1",
- "generated": "2026-11-16T15:22:49+00:00",
+ "generated": "2026-11-16T17:42:29+00:00",
  "docs": "docs",
  "tokens": ".\\apps\\web\\src\\styles\\tokens.css",
  "sources": {
   "docs/03_SCREENS_UX.md": "56c8f567ebda",
-  "docs/04_API.md": "1ea4f6f0ce66",
+  "docs/04_API.md": "e3f207965612",
   "docs/05_DATA_MODEL.md": "54d41fb7f57b"
  },
- "changed": [],
+ "changed": [
+  "MON-01"
+ ],
  "removed": [],
  "screens": {
   "AUTH-01": {
@@ -332,7 +334,7 @@
     "저장된 보기·열 설정"
    ],
    "states_missing": [],
-   "hash": "8b10b85b891a",
+   "hash": "65bf557db0c5",
    "wireframe": "design/wireframes/MON-01.html"
   },
   "MON-D1": {
@@ -619,7 +621,7 @@
     "메서드": "POST",
     "경로": "/v1/collect-jobs/{id}/stop",
     "입력": "—",
-    "출력": "job{status:\"stopped\"}`(`stop_requested`=true, 수집된 후보 보존)",
+    "출력": "job{status, stop_requested}`(queued·retrying → `stopped`, running → `stop_requested`=true 후 워커가 stopped로 마감. 수집된 후보 보존)",
     "권한": "로그인",
     "오류": "404 · 409 이미 종료"
    },

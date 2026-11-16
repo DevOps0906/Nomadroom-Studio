@@ -19,5 +19,5 @@
 - 셸 재구현 금지(task-018 사용).
 
 ## 완료 조건 (실행 가능한 확인)
-- [ ] `pnpm typecheck && pnpm lint && pnpm test` 통과(범위 초과·4개 선택·409 상태)
-- [ ] `shot`으로 3구간 캡처 확인
+- [x] `pnpm typecheck && pnpm lint && pnpm test` 통과(범위 초과·4개 선택·409 상태)
+- [x] `shot`으로 3구간 캡처 확인

@@ -23,3 +23,7 @@
 - [ ] `pnpm typecheck && pnpm lint && pnpm test` 통과(상태별 컴포넌트 테스트: 빈·로딩·진행·오류·Chrome 실패)
 - [ ] `<script>`가 든 제목이 텍스트로 렌더링되는 테스트 통과, 허용 외 썸네일 호스트 차단 테스트 통과
 - [ ] `shot`으로 3구간 캡처 확인
+
+## 앞 작업에서 넘어온 것 (팀장, 2026-11-17)
+- MON-D1 조건 설정은 spec상 /monitor 안 다이얼로그다. task-014는 `components/profiles/conditions-dialog.tsx`·`profile-list.tsx`와 독립 페이지 `/monitoring/profiles`로 만들었다 → 013에서 MON-01 프로필 영역에 이 다이얼로그를 연결하고, 독립 페이지는 유지하거나 MON-01로 redirect한다.
+- 401은 `SESSION_EXPIRED_PATH`(server/api/client.ts)로 보낸다(루프 방지).

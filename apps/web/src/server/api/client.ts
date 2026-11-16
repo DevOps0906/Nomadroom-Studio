@@ -128,7 +128,8 @@ export function parseApiBaseUrl(value: string | undefined, nodeEnv = process.env
     throw new Error("API_BASE_URL이 올바른 URL이 아닙니다");
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("API_BASE_URL은 http(s)만 허용합니다");
-  if (nodeEnv === "production" && url.protocol !== "https:") throw new Error("운영 환경의 API_BASE_URL은 https여야 합니다");
+  const isLocal = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  if (nodeEnv === "production" && url.protocol !== "https:" && !isLocal) throw new Error("운영 환경의 API_BASE_URL은 https여야 합니다");
   if (url.username || url.password) throw new Error("API_BASE_URL에 사용자 정보를 넣을 수 없습니다");
   return value;
 }

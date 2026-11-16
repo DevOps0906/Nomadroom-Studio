@@ -125,6 +125,10 @@ describe("URL 조립·API_BASE_URL 검증", () => {
     expect(parseApiBaseUrl("https://api.test", "production")).toBe("https://api.test");
     expect(parseApiBaseUrl("http://localhost:8000", "development")).toBe("http://localhost:8000");
     expect(() => parseApiBaseUrl("http://api.test", "production")).toThrow("https");
+    expect(parseApiBaseUrl("http://localhost:8000", "production")).toBe("http://localhost:8000");
+    expect(parseApiBaseUrl("http://127.0.0.1:8000", "production")).toBe("http://127.0.0.1:8000");
+    expect(parseApiBaseUrl("http://[::1]:8000", "production")).toBe("http://[::1]:8000");
+    expect(() => parseApiBaseUrl("http://localhost.evil.test", "production")).toThrow("https");
     expect(() => parseApiBaseUrl("https://u:p@api.test", "production")).toThrow("사용자 정보");
     expect(() => parseApiBaseUrl("https://u@api.test", "development")).toThrow("사용자 정보");
     expect(() => parseApiBaseUrl("ftp://api.test", "development")).toThrow();
