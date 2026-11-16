@@ -4,6 +4,8 @@
 
 **소재수집(정체)** 화면의 인터랙티브 시안입니다. 기존 Nomadroom의 왼쪽 메뉴와 상단 작업 탭을 기준으로 수집 조건과 후보 검증 결과를 배치했습니다.
 
+![메인 대시보드 시안](./docs/design/screenshots/dashboard-1440.png)
+
 [디자인 시안 HTML](./docs/design/Nomadroom_Dashboard_Design.html) · [HTML 내려받기](https://raw.githubusercontent.com/DevOps0906/Nomadroom-Studio/master/docs/design/Nomadroom_Dashboard_Design.html)
 
 HTML을 내려받아 브라우저에서 열면 아래 항목을 예시 데이터로 확인할 수 있습니다.
