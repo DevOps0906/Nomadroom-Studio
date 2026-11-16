@@ -2,7 +2,7 @@
 
 - 갱신: 2026-11-16
 - 현재 작업: task-013 완료 → 다음 M4: task-015 MON-D2 관측 근거 ∥ task-017 A-08 사용한 소재 — 상태: 대기
-- 단계: M4 소재수집 완성(013 완료 → 015 ∥ 017). 둘 다 위험도 높음 → 워커 opus + challenger + code·security(+design)
+- 단계: M4(015 ∥ 017) 다음 M5 = task-019 YouTube 검색 후보 수집(vidIQ 대체). 모두 위험도 높음 → 워커 opus + challenger + code·security(+design)
 - 다음 한 걸음: `/next` (015·017 병렬 가능 — 015는 MON-01의 "관측 근거" 버튼(현재 aria-disabled "준비 중")을 연결)
 - M3 결과: 워커 API(claim·heartbeat·후보·finish, job당 조회 200 상한)·수집 작업 API(retry·stop RPC, 24시간 20건)·대시보드·프로필 조건 화면·웹→API 공용 클라이언트(401 → SESSION_EXPIRED_PATH). 상태 전이 정본 `docs/02_ARCHITECTURE.md#3-3`
 - 013 결과: /monitor(프로필 카드+MON-D1 다이얼로그, 후보 목록·필터·지표 5칸, 수집 진행 폴링·재시도·중지, 기록 검증 60초), API `GET /v1/collect-jobs/active`, /monitoring/profiles → /monitor redirect, proxy /api/* 미인증은 JSON 401
@@ -21,7 +21,7 @@
   - gitleaks는 winget 설치. bash에서는 PATH에 `.../WinGet/Packages/Gitleaks.Gitleaks_Microsoft.Winget.Source_8wekyb3d8bbwe` 추가
   - 테스트의 가짜 JWT·키는 런타임 조립(문자열 리터럴이면 gitleaks에 걸림)
   - pnpm은 `corepack pnpm`, `apps/web`에서 실행 · 반응형은 `tablet:`·`desktop:` · jsdom 없음 · `.env*` 읽기 거부 · Codex CLI 401이라 reviewer로 대체
-- 열린 결정: vidIQ 약관(task-009 보류) · 구간별 폰트 최종값 · Dependabot PR 9건(TS 7은 ci 실패) · GitHub Dependabot alerts·비공개 신고 켜기(사람) · 미확인 방송사 채널(tvN 본채널·SBS NOW·NHK 뉴스·CJ ENM 계열) · .env.example의 API_BASE_URL 중복 줄(사람 확인) · nomad-agent-os 미커밋 변경 21파일
+- 열린 결정: vidIQ는 구현 안 함·준비 중(2026-11-17 사용자 결정: 후보 수집은 YouTube 검색 = task-019) · 구간별 폰트 최종값 · Dependabot PR 9건(TS 7은 ci 실패) · GitHub Dependabot alerts·비공개 신고 켜기(사람) · 미확인 방송사 채널(tvN 본채널·SBS NOW·NHK 뉴스·CJ ENM 계열) · .env.example의 API_BASE_URL 중복 줄(사람 확인) · nomad-agent-os 미커밋 변경 21파일
 - 커밋 안 된 사용자 수정: AGENTS.md·CLAUDE.md·.claude/rules/db.md(건드리지 않음)
 - SDLC 단계: 06 구현
 - 테스트 상태: supabase test db 221 · api pytest 440 + integration 11 · web test 220 · E2E는 scratchpad(미커밋)

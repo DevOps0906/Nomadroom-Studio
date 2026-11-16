@@ -22,7 +22,7 @@
 | 브라우저 | API | 직접 호출 안 함. 웹 서버(Route Handler)가 중계 | 브라우저에서 API 주소·키 노출 |
 | 웹 서버 | API | HTTPS, `Authorization: Bearer <Supabase 사용자 JWT>` 전달. API가 JWT 서명·만료·워크스페이스 소속 검증 | JWT 없는 호출, 웹이 API 대신 YouTube·service_role 사용 |
 | API | Supabase | service_role로 읽기·쓰기 (서버 환경변수) | 사용자 JWT 검증 없이 사용자 데이터 처리 |
-| API | YouTube Data API | 서버에서 키로 호출, 일일 할당량 예산 준수 (`adr/0002-*.md`) | `search.list` 사용(100 unit), 키를 응답·로그에 포함 |
+| API | YouTube Data API | 서버에서 키로 호출, 일일 할당량 예산 준수 (`adr/0002-*.md`) | 후보 발굴 외 용도의 `search.list` 사용(발굴은 일 2,000 unit 상한 안에서만 — 2026-11-17 사용자 결정, `adr/0002`), 키를 응답·로그에 포함 |
 | 워커 | API | 아웃바운드 HTTPS만, 워커 토큰으로 작업 요청 폴링·결과 전송. 로컬 포트 개방 없음 | 워커가 DB 직접 접속, 외부에서 워커 호출 |
 | 워커 | Chrome·vidIQ | 로컬 Playwright, 운영자 로그인 프로필 | vidIQ 계정 정보를 API·DB로 전송 |
 | 웹 | 운영 사이트 | 외부 링크(새 탭) | 토큰·세션을 링크에 실어 보내기 |
