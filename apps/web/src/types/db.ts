@@ -23,7 +23,21 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "broadcaster_channels": {
+            "api_quota_daily": {
+                  Row: {
+                    "day": string,"units": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "day": string,"units"?: number
+                  }
+                  Update: {
+                    "day"?: string,"units"?: number
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"broadcaster_channels": {
                   Row: {
                     "channel_id": string,"channel_title": string,"created_at": string,"id": string,"workspace_id": string
                   }
@@ -359,8 +373,17 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "is_workspace_member":
+            "apply_verify_batch":
+{ Args: { "p_job": string,"p_payload": Json,"p_workspace": string }; Returns: number
+                           },
+"is_workspace_member":
 { Args: { "ws": string }; Returns: boolean
+                           },
+"quota_day":
+{ Args: { "p_ts": string }; Returns: string
+                           },
+"reserve_quota":
+{ Args: { "p_limit": number,"p_units": number }; Returns: boolean
                            },
 "set_profile_selection":
 { Args: { "p_ids": (string)[],"p_workspace": string }; Returns: (string)[]

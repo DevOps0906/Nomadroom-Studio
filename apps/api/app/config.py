@@ -1,5 +1,6 @@
 """설정: 환경변수 한 곳에서 읽는다. 필수 값이 없으면 기동 실패(조용한 기본값 금지)."""
 
+import re
 from functools import cached_property
 from urllib.parse import urlsplit
 
@@ -7,6 +8,7 @@ from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+_GOOGLE_API_KEY_RE = re.compile(r"AIza[0-9A-Za-z_-]{35}")
 
 
 def is_jwt_format(value: str) -> bool:
@@ -22,6 +24,8 @@ class Settings(BaseSettings):
     supabase_service_role_key: SecretStr
     # 비우면 {SUPABASE_URL}/auth/v1
     supabase_jwt_issuer: str | None = None
+    # YouTube Data API v3 키: 서버 환경변수로만. 없으면 기록 검증(A-07)만 502로 거부한다.
+    youtube_api_key: SecretStr | None = None
     # /docs·/redoc·/openapi.json 노출. 기본은 끈다.
     api_docs_enabled: bool = False
 
@@ -44,6 +48,16 @@ class Settings(BaseSettings):
             raise ValueError(
                 "SUPABASE_SERVICE_ROLE_KEY는 sb_secret_ 키 또는 service_role JWT여야 합니다"
             )
+        return v
+
+    @field_validator("youtube_api_key")
+    @classmethod
+    def _check_youtube_key(cls, v: SecretStr | None) -> SecretStr | None:
+        # 값이 있으면 Google API 키 형식만 허용(오류 메시지에 값을 넣지 않는다). 빈 값은 미설정
+        if v is None or v.get_secret_value() == "":
+            return None
+        if not _GOOGLE_API_KEY_RE.fullmatch(v.get_secret_value()):
+            raise ValueError("YOUTUBE_API_KEY 형식이 올바르지 않습니다(AIza로 시작하는 39자)")
         return v
 
     @cached_property

@@ -12,7 +12,7 @@ from app.auth.jwks import JwksCache
 from app.config import Settings
 from app.errors import install_error_handlers
 from app.logging_mask import setup_logging
-from app.routes import candidates, dashboard, profiles
+from app.routes import candidates, dashboard, profiles, verify_runs
 
 HTTP_TIMEOUT_SECONDS = 5.0
 
@@ -47,6 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(profiles.router)
     app.include_router(candidates.router)
     app.include_router(dashboard.router)
+    app.include_router(verify_runs.router)
 
     @app.get("/healthz", response_model=HealthOut)
     async def healthz() -> HealthOut:

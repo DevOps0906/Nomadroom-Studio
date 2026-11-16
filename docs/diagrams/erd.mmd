@@ -112,6 +112,10 @@ erDiagram
     numeric growth_pct
     timestamptz judged_at
   }
+  api_quota_daily {
+    date day PK
+    integer units
+  }
   workspaces ||--o{ workspace_members : "workspace_id"
   workspaces ||--o{ profiles : "workspace_id"
   workspaces ||--o{ broadcaster_channels : "workspace_id"

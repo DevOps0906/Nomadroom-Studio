@@ -12,7 +12,7 @@ select is(
 select is(
   (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r'),
-  11, 'public 테이블 11개(05_DATA_MODEL 표 기준)');
+  12, 'public 테이블 12개(05_DATA_MODEL 표 11개 + task-006 api_quota_daily)');
 
 -- 픽스처: 전용 워크스페이스와 11개 테이블 각 1행, 구성원·비구성원 사용자
 insert into auth.users (id, email, aud, role) values

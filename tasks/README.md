@@ -8,7 +8,7 @@
 | task-004 | 보안 L1 설정 (`/secure setup`) | W1 | 001 | 높음 | builder | 완료 |
 | task-018 | 공통 레이아웃(앱 셸) | W1 | 001 | 낮음 | builder | 완료 |
 | task-005 | 판정 엔진 | W2 | 003 | 보통 | builder + tester | 완료 |
-| task-006 | YouTube 관측 · A-07 · 할당량 방어선 | W2 | 005 | 높음 | builder + tester | 대기 |
+| task-006 | YouTube 관측 · A-07 · 할당량 방어선 | W2 | 005 | 높음 | builder + tester | 완료 |
 | task-007 | 워커 API W-01~W-04 · job 상태 | W2 | 006 | 높음 | builder + tester | 대기 |
 | task-008 | 수집 작업 API A-05 | W2 | 007 | 높음 | builder + tester | 대기 |
 | task-009 | 로컬 워커 (Playwright · vidIQ) | W2 | 007, vidIQ 약관 확인 | 높음 | builder | 보류 |

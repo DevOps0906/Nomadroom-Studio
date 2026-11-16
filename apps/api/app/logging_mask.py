@@ -23,6 +23,9 @@ _PATTERNS: list[tuple[re.Pattern[str], str]] = [
         re.compile(r"(?i)(\b(?:x-)?api[-_]?key['\"]?\s*[:=,]\s*b?['\"]?)[^'\"\s,;)}]+"),
         rf"\1{MASK}",
     ),
+    # Google API 키(AIza + 35자)와 쿼리 key= 값
+    (re.compile(r"AIza[0-9A-Za-z_-]{35}"), MASK),
+    (re.compile(r"(?i)\bkey=\S+"), f"key={MASK}"),
     (
         re.compile(r"(?i)(\b(?:set-)?cookie['\"]?\s*[:=,]\s*b?['\"]?)[^'\"\r\n]+"),
         rf"\1{MASK}",
