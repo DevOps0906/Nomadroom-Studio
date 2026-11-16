@@ -59,6 +59,12 @@ isOneToOne: false
       foreignKeyName: "candidate_verdicts_candidate_id_fkey"
       columns: ["candidate_id"]
 isOneToOne: false
+      referencedRelation: "candidate_list_v"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "candidate_verdicts_candidate_id_fkey"
+      columns: ["candidate_id"]
+isOneToOne: false
       referencedRelation: "candidates"
       referencedColumns: ["id"]
     },{
@@ -193,6 +199,12 @@ isOneToOne: false
       foreignKeyName: "observations_candidate_id_fkey"
       columns: ["candidate_id"]
 isOneToOne: false
+      referencedRelation: "candidate_list_v"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "observations_candidate_id_fkey"
+      columns: ["candidate_id"]
+isOneToOne: false
       referencedRelation: "candidates"
       referencedColumns: ["id"]
     },{
@@ -318,7 +330,33 @@ isOneToOne: false
                 }
           }
           Views: {
-            [_ in never]: never
+            "candidate_list_v": {
+                  Row: {
+                    "category": string | null,"channel_id": string | null,"channel_title": string | null,"created_at": string,"curr_observed_at": string | null,"curr_view_count": number | null,"display_status": string | null,"first_job_id": string | null,"format": string | null,"genre": string | null,"growth_pct": number | null,"id": string,"is_broadcaster": boolean,"latest_observed_at": string | null,"license_cc": boolean | null,"market": string | null,"prev_observed_at": string | null,"prev_view_count": number | null,"reason": string | null,"rep_profile_id": string | null,"rep_status": string | null,"status_changed_at": string | null,"thumbnail_url": string | null,"title": string,"used": boolean,"used_at": string | null,"video_id": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    {
+      foreignKeyName: "candidates_first_job_id_fkey"
+      columns: ["first_job_id"]
+isOneToOne: false
+      referencedRelation: "jobs"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "candidates_rep_profile_id_fkey"
+      columns: ["rep_profile_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "candidates_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                }
           }
           Functions: {
             "is_workspace_member":
