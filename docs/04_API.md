@@ -10,7 +10,7 @@
 | 권한 | "로그인" = JWT 서명·만료 검증 + `workspace_members` 소속. 워크스페이스는 JWT로 결정(입력으로 받지 않음) |
 | 멱등 | 실행류 POST는 `Idempotency-Key` 헤더 필수(`jobs.idempotency_key`). 같은 키 재요청은 기존 job 반환 |
 | 오류 형식 | `{code, message, field?}`. 키·토큰·쿠키·내부 경로는 메시지에 넣지 않는다 |
-| 공통 오류 | 400 `VALIDATION`(필드별) · 401 `UNAUTHENTICATED` · 403 `FORBIDDEN`(소속 없음. 타 워크스페이스 리소스는 404) · 404 `NOT_FOUND` · 409 `CONFLICT` · 429 `RATE_LIMITED`·`QUOTA_EXCEEDED` · 502 `UPSTREAM_ERROR`(YouTube) |
+| 공통 오류 | 400 `VALIDATION`(필드별) · 401 `UNAUTHENTICATED` · 403 `FORBIDDEN`(소속 없음. 타 워크스페이스 리소스는 404) · 404 `NOT_FOUND` · 409 `CONFLICT` · 429 `RATE_LIMITED`·`QUOTA_EXCEEDED` · 405 `METHOD_NOT_ALLOWED` · 500 `INTERNAL` · 502 `UPSTREAM_ERROR`(YouTube) · 503 `UPSTREAM_ERROR`(Supabase 인증 키·DB 조회 실패) |
 | 상한(가정) | 실행당 후보 200(`01_PRD.md#7` Q3) · 검증 대상 프로필 최대 3 · YouTube 조회 `videos.list` 50개/호출(`search.list` 금지) · 재시도 상한·워커 오프라인 기준은 `02_ARCHITECTURE.md#3-3` |
 
 ## 사용자 API (웹 → FastAPI)
