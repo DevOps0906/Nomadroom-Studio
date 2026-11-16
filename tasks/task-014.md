@@ -3,11 +3,11 @@
 | 항목 | 내용 |
 |---|---|
 | 웨이브 | W3 |
-| 선행 | task-010, task-012 |
+| 선행 | task-010, task-012, task-018 |
 | 위험도 | 보통 |
 | 보안 영향 | 없음 (기존 인증 면의 PUT 중계, 서버 검증은 task-010) |
 | 담당 | builder |
-| 근거 | `spec MON-D1`, `docs/04_API.md#A-03`, `design/wireframes/MON-D1.html` |
+| 근거 | `spec MON-D1`, `docs/04_API.md#A-03`, `design/wireframes/MON-D1.html`, `docs/design/Nomadroom_Dashboard_Design.html`(조건 설정 다이얼로그) |
 | 쓰기 허용 | `apps/web/src/app/(dashboard)/monitoring/profiles/**`, `apps/web/src/components/profiles/**`, `apps/web/src/app/api/profiles/**` |
 
 ## 할 것
@@ -16,6 +16,7 @@
 
 ## 하지 않을 것
 - 프로필 생성·삭제·무제한 프로필, 후보 목록(MON-01).
+- 셸 재구현 금지(task-018 사용).
 
 ## 완료 조건 (실행 가능한 확인)
 - [ ] `pnpm typecheck && pnpm lint && pnpm test` 통과(범위 초과·4개 선택·409 상태)

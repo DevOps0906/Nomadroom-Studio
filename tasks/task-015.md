@@ -3,11 +3,11 @@
 | 항목 | 내용 |
 |---|---|
 | 웨이브 | W3 |
-| 선행 | task-011, task-013 |
+| 선행 | task-011, task-013, task-018 |
 | 위험도 | 높음 |
 | 보안 영향 | 노출 면 (비신뢰 값 렌더링) |
 | 담당 | builder |
-| 근거 | `spec MON-D2`, `docs/04_API.md#A-06`, `docs/01_PRD.md#9`, `design/wireframes/MON-D2.html` |
+| 근거 | `spec MON-D2`, `docs/04_API.md#A-06`, `docs/01_PRD.md#9`, `design/wireframes/MON-D2.html`, `docs/design/Nomadroom_Dashboard_Design.html`(관측 근거 다이얼로그) |
 | 쓰기 허용 | `apps/web/src/app/(dashboard)/monitoring/[id]/**`, `apps/web/src/components/evidence/**`, `apps/web/src/app/api/evidence/**` |
 
 ## 할 것
@@ -16,6 +16,7 @@
 
 ## 하지 않을 것
 - 추세 차트·알림(이후), 판정 로직 재계산(서버 값만 표시).
+- 셸 재구현 금지(task-018 사용).
 
 ## 완료 조건 (실행 가능한 확인)
 - [ ] `pnpm typecheck && pnpm lint && pnpm test` 통과(근거 대기·제외·제작 가능·404 상태)

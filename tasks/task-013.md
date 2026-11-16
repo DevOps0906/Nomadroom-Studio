@@ -3,11 +3,11 @@
 | 항목 | 내용 |
 |---|---|
 | 웨이브 | W3 |
-| 선행 | task-006, task-008, task-010, task-011, task-012 |
+| 선행 | task-006, task-008, task-010, task-011, task-012, task-018 |
 | 위험도 | 높음 |
 | 보안 영향 | 노출 면 (vidIQ 유래 비신뢰 값 렌더링, 실행류 호출 중계) |
 | 담당 | builder (+ codex-reviewer design) |
-| 근거 | `spec MON-01`, `docs/04_API.md#03 추적`, `docs/01_PRD.md#8` 웹 열, `design/wireframes/MON-01.html` |
+| 근거 | `spec MON-01`, `docs/04_API.md#03 추적`, `docs/01_PRD.md#8` 웹 열, `design/wireframes/MON-01.html`, `docs/design/Nomadroom_Dashboard_Design.html`(소재수집 섹션) |
 | 쓰기 허용 | `apps/web/src/app/(dashboard)/monitoring/page.tsx`, `apps/web/src/app/api/**`(중계 Route Handler), `apps/web/src/components/monitoring/**` |
 
 ## 할 것
@@ -17,6 +17,7 @@
 
 ## 하지 않을 것
 - 저장된 보기, 예약 실행, "사용한 소재" 토글(task-017), 조건 편집 화면(task-014).
+- 셸 재구현 금지(task-018 사용).
 
 ## 완료 조건 (실행 가능한 확인)
 - [ ] `pnpm typecheck && pnpm lint && pnpm test` 통과(상태별 컴포넌트 테스트: 빈·로딩·진행·오류·Chrome 실패)

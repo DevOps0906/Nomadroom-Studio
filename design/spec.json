@@ -1,10 +1,10 @@
 {
  "version": "1",
- "generated": "2026-11-16T05:19:58+00:00",
+ "generated": "2026-11-16T07:33:41+00:00",
  "docs": "docs",
  "tokens": "기본 시작 토큰(프로젝트 토큰 없음)",
  "sources": {
-  "docs/03_SCREENS_UX.md": "e5308cbcc142",
+  "docs/03_SCREENS_UX.md": "56c8f567ebda",
   "docs/04_API.md": "7bd66ff37655",
   "docs/05_DATA_MODEL.md": "7db37a80145d"
  },
@@ -164,7 +164,8 @@
     }
    ],
    "data": [
-    "candidates"
+    "candidates",
+    "candidate_verdicts"
    ],
    "api": [
     "A-02"
@@ -184,7 +185,7 @@
     "할 일·알림(지표가 행동으로 이어지게)"
    ],
    "states_missing": [],
-   "hash": "1459865fdfb9",
+   "hash": "f6d314db2d65",
    "wireframe": "design/wireframes/DASH-01.html"
   },
   "MON-01": {

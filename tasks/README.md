@@ -6,6 +6,7 @@
 | task-002 | Supabase 스키마 · RLS · 시드 · ERD | W1 | 001 | 높음 | builder | 대기 |
 | task-003 | FastAPI 뼈대 · JWT · 워커 토큰 인증 | W1 | 001, 002 | 높음 | builder | 대기 |
 | task-004 | 보안 L1 설정 (`/secure setup`) | W1 | 001 | 높음 | builder | 대기 |
+| task-018 | 공통 레이아웃(앱 셸) | W1 | 001 | 낮음 | builder | 대기 |
 | task-005 | 판정 엔진 | W2 | 003 | 보통 | builder + tester | 대기 |
 | task-006 | YouTube 관측 · A-07 · 할당량 방어선 | W2 | 005 | 높음 | builder + tester | 대기 |
 | task-007 | 워커 API W-01~W-04 · job 상태 | W2 | 006 | 높음 | builder + tester | 대기 |
@@ -14,13 +15,15 @@
 | task-010 | 프로필 API A-03 | W2 | 003 | 높음 | builder + tester | 대기 |
 | task-011 | 조회 API A-02 · A-04 · A-06 | W2 | 005, 010 | 높음 | builder + tester | 대기 |
 | task-012 | AUTH-01 로그인 | W3 | 001, 002 | 높음 | builder | 대기 |
-| task-013 | MON-01 소재수집 목록 | W3 | 006, 008, 010, 011, 012 | 높음 | builder | 대기 |
-| task-014 | MON-D1 프로필 조건 | W3 | 010, 012 | 보통 | builder | 대기 |
-| task-015 | MON-D2 관측 근거 | W3 | 011, 013 | 높음 | builder | 대기 |
-| task-016 | DASH-01 대시보드 | W3 | 011, 012 | 보통 | builder | 대기 |
+| task-013 | MON-01 소재수집 목록 | W3 | 006, 008, 010, 011, 012, 018 | 높음 | builder | 대기 |
+| task-014 | MON-D1 프로필 조건 | W3 | 010, 012, 018 | 보통 | builder | 대기 |
+| task-015 | MON-D2 관측 근거 | W3 | 011, 013, 018 | 높음 | builder | 대기 |
+| task-016 | DASH-01 대시보드 | W3 | 011, 012, 018 | 보통 | builder | 대기 |
 | task-017 | A-08 사용한 소재 | W3 | 011, 013 | 높음 | builder + tester | 대기 |
 
 상태: 대기 / 진행 / 완료 / 보류
+
+개발 단계(M0~M5)·병렬 묶음·단계별 데모: `docs/06_AGENT_PLAN.md`
 
 수익·검증 1줄 요약: 내부 도구라 수익 없음(제작 시간 절감 가치), 가장 싼 검증은 운영자가 MVP를 직접 써서 제작 가능 판정 비율·제작 전환을 재는 것(`docs/01_PRD.md#5`), 정부지원사업 연결은 `미확인`.
 
