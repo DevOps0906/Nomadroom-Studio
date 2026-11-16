@@ -1,0 +1,885 @@
+{
+ "version": "1",
+ "generated": "2026-11-16T05:19:58+00:00",
+ "docs": "docs",
+ "tokens": "기본 시작 토큰(프로젝트 토큰 없음)",
+ "sources": {
+  "docs/03_SCREENS_UX.md": "e5308cbcc142",
+  "docs/04_API.md": "7bd66ff37655",
+  "docs/05_DATA_MODEL.md": "7db37a80145d"
+ },
+ "changed": [
+  "DASH-01"
+ ],
+ "removed": [],
+ "screens": {
+  "AUTH-01": {
+   "id": "AUTH-01",
+   "name": "로그인",
+   "type_raw": "로그인",
+   "route": "/login",
+   "purpose": "이메일로 로그인",
+   "blocks": [
+    {
+     "type": "text",
+     "label": "Nomadroom Studio",
+     "items": [
+      "Nomadroom Studio"
+     ]
+    },
+    {
+     "type": "form",
+     "label": "이메일*·비밀번호*",
+     "items": [
+      "이메일*",
+      "비밀번호*"
+     ]
+    },
+    {
+     "type": "button",
+     "label": "로그인",
+     "items": [
+      "로그인"
+     ]
+    },
+    {
+     "type": "link",
+     "label": "비밀번호 찾기",
+     "items": [
+      "비밀번호 찾기"
+     ]
+    },
+    {
+     "type": "link",
+     "label": "이용약관·개인정보",
+     "items": [
+      "이용약관",
+      "개인정보"
+     ]
+    }
+   ],
+   "data": [
+    "auth.users"
+   ],
+   "api": [
+    "A-01"
+   ],
+   "role": "비로그인",
+   "next": [
+    "DASH-01"
+   ],
+   "states_combined": "",
+   "source": "docs/03_SCREENS_UX.md",
+   "type": "auth",
+   "must_missing": [],
+   "should_missing": [],
+   "states_missing": [],
+   "hash": "a25c06f7ccdc",
+   "wireframe": "design/wireframes/AUTH-01.html"
+  },
+  "DASH-01": {
+   "id": "DASH-01",
+   "name": "대시보드",
+   "type_raw": "대시보드",
+   "route": "/dashboard",
+   "purpose": "오늘 수집·제작 현황 확인, 새 영상 만들기",
+   "blocks": [
+    {
+     "type": "sidebar",
+     "label": "대시보드·소재수집(정체)",
+     "items": [
+      "대시보드",
+      "소재수집(정체)"
+     ]
+    },
+    {
+     "type": "tabs",
+     "label": "대시보드·소재수집(정체)",
+     "items": [
+      "대시보드",
+      "소재수집(정체)"
+     ]
+    },
+    {
+     "type": "breadcrumb",
+     "label": "",
+     "items": []
+    },
+    {
+     "type": "hero",
+     "label": "인사·button:새 영상 만들기",
+     "items": [
+      "인사",
+      "button:새 영상 만들기"
+     ]
+    },
+    {
+     "type": "stat",
+     "label": "수집 소재·작업 중·검수 완료·업로드 대기(3칸은 \"—\"+\"운영 사이트 연동 전\" 라벨)",
+     "items": [
+      "수집 소재",
+      "작업 중",
+      "검수 완료",
+      "업로드 대기(3칸은 \"—\"+\"운영 사이트 연동 전\" 라벨)"
+     ]
+    },
+    {
+     "type": "card",
+     "label": "소재수집(정체) 요약(제작 가능 N·근거 대기 N)",
+     "items": [
+      "소재수집(정체) 요약(제작 가능 N",
+      "근거 대기 N)"
+     ]
+    },
+    {
+     "type": "link",
+     "label": "정체 후보 보기",
+     "items": [
+      "정체 후보 보기"
+     ]
+    },
+    {
+     "type": "daterange",
+     "label": "최근 24시간·7일(요약·표 기준 기간)",
+     "items": [
+      "최근 24시간",
+      "7일(요약",
+      "표 기준 기간)"
+     ]
+    },
+    {
+     "type": "table",
+     "label": "최근 제작 가능 후보 5건(제목·프로필·증가율·판정 시각)",
+     "items": [
+      "최근 제작 가능 후보 5건(제목",
+      "프로필",
+      "증가율",
+      "판정 시각)"
+     ]
+    },
+    {
+     "type": "updated",
+     "label": "",
+     "items": []
+    }
+   ],
+   "data": [
+    "candidates"
+   ],
+   "api": [
+    "A-02"
+   ],
+   "role": "로그인",
+   "next": [
+    "MON-01"
+   ],
+   "states_combined": "",
+   "source": "docs/03_SCREENS_UX.md",
+   "type": "dashboard",
+   "must_missing": [],
+   "should_missing": [
+    "이전 기간 대비(증감)",
+    "내보내기(CSV·PDF)",
+    "세그먼트·담당자 필터",
+    "할 일·알림(지표가 행동으로 이어지게)"
+   ],
+   "states_missing": [],
+   "hash": "1459865fdfb9",
+   "wireframe": "design/wireframes/DASH-01.html"
+  },
+  "MON-01": {
+   "id": "MON-01",
+   "name": "소재수집(정체)",
+   "type_raw": "목록",
+   "route": "/monitor",
+   "purpose": "후보를 가져와 기록으로 검증하고 제작 가능 소재를 고른다",
+   "blocks": [
+    {
+     "type": "breadcrumb",
+     "label": "",
+     "items": []
+    },
+    {
+     "type": "header",
+     "label": "",
+     "items": []
+    },
+    {
+     "type": "button",
+     "label": "후보 가져오기",
+     "items": [
+      "후보 가져오기"
+     ]
+    },
+    {
+     "type": "button",
+     "label": "기록 검증 실행",
+     "items": [
+      "기록 검증 실행"
+     ]
+    },
+    {
+     "type": "updated",
+     "label": "",
+     "items": []
+    },
+    {
+     "type": "card",
+     "label": "프로필별 수집 조건(체크 최대 3·button:조건 설정)",
+     "items": [
+      "프로필별 수집 조건(체크 최대 3",
+      "button:조건 설정)"
+     ]
+    },
+    {
+     "type": "card",
+     "label": "Chrome 준비 결과(프로필별 상태·button:해당 후보부터 재시도·button:수집 중지)",
+     "items": [
+      "Chrome 준비 결과(프로필별 상태",
+      "button:해당 후보부터 재시도",
+      "button:수집 중지)"
+     ]
+    },
+    {
+     "type": "stat",
+     "label": "전체·제작 가능·근거 대기·조건 제외·사용한 소재(누르면 필터)",
+     "items": [
+      "전체",
+      "제작 가능",
+      "근거 대기",
+      "조건 제외",
+      "사용한 소재(누르면 필터)"
+     ]
+    },
+    {
+     "type": "search",
+     "label": "제목·채널",
+     "items": [
+      "제목",
+      "채널"
+     ]
+    },
+    {
+     "type": "filter",
+     "label": "카테고리 칩·형식·프로필·라이선스",
+     "items": [
+      "카테고리 칩",
+      "형식",
+      "프로필",
+      "라이선스"
+     ]
+    },
+    {
+     "type": "sort",
+     "label": "증가율·조회수·최신",
+     "items": [
+      "증가율",
+      "조회수",
+      "최신"
+     ]
+    },
+    {
+     "type": "card",
+     "label": "후보(썸네일·상태·장르·제목·형식·프로필·라이선스·두 시점 미니 차트·기간·증가율·button:관측 근거·button:영상 만들기 →)",
+     "items": [
+      "후보(썸네일",
+      "상태",
+      "장르",
+      "제목",
+      "형식",
+      "프로필",
+      "라이선스",
+      "두 시점 미니 차트",
+      "기간",
+      "증가율",
+      "button:관측 근거",
+      "button:영상 만들기 →)"
+     ]
+    },
+    {
+     "type": "pagination",
+     "label": "",
+     "items": []
+    }
+   ],
+   "data": [
+    "profiles",
+    "candidates",
+    "observations",
+    "candidate_verdicts",
+    "jobs",
+    "job_profile_runs"
+   ],
+   "api": [
+    "A-03",
+    "A-04",
+    "A-05",
+    "A-07",
+    "A-08"
+   ],
+   "role": "로그인",
+   "next": [
+    "MON-D1",
+    "MON-D2",
+    "DASH-01"
+   ],
+   "states_combined": "",
+   "source": "docs/03_SCREENS_UX.md",
+   "type": "list",
+   "must_missing": [],
+   "should_missing": [
+    "새로 만들기",
+    "일괄 작업(선택·삭제·내보내기)",
+    "저장된 보기·열 설정"
+   ],
+   "states_missing": [],
+   "hash": "fd3eb185154b",
+   "wireframe": "design/wireframes/MON-01.html"
+  },
+  "MON-D1": {
+   "id": "MON-D1",
+   "name": "조건 설정",
+   "type_raw": "폼",
+   "route": "/monitor (다이얼로그)",
+   "purpose": "프로필별 수집 조건 저장",
+   "blocks": [
+    {
+     "type": "modal",
+     "label": "조건 설정",
+     "items": [
+      "조건 설정"
+     ]
+    },
+    {
+     "type": "form",
+     "label": "시장*·영상 형식*·카테고리·최소 조회수·허용 증가율(%)*·키워드·C.C만·방송사 포함",
+     "items": [
+      "시장*",
+      "영상 형식*",
+      "카테고리",
+      "최소 조회수",
+      "허용 증가율(%)*",
+      "키워드",
+      "C.C만",
+      "방송사 포함"
+     ]
+    },
+    {
+     "type": "button",
+     "label": "저장",
+     "items": [
+      "저장"
+     ]
+    },
+    {
+     "type": "button",
+     "label": "취소",
+     "items": [
+      "취소"
+     ]
+    }
+   ],
+   "data": [
+    "profiles"
+   ],
+   "api": [
+    "A-03"
+   ],
+   "role": "로그인",
+   "next": [
+    "MON-01"
+   ],
+   "states_combined": "",
+   "source": "docs/03_SCREENS_UX.md",
+   "type": "form",
+   "must_missing": [],
+   "should_missing": [
+    "임시 저장(긴 폼)"
+   ],
+   "states_missing": [],
+   "hash": "96ca2ca93c0a",
+   "wireframe": "design/wireframes/MON-D1.html"
+  },
+  "MON-D2": {
+   "id": "MON-D2",
+   "name": "관측 근거",
+   "type_raw": "상세",
+   "route": "/monitor (다이얼로그)",
+   "purpose": "판정 근거(두 시점 날짜·조회수) 확인",
+   "blocks": [
+    {
+     "type": "modal",
+     "label": "관측 근거",
+     "items": [
+      "관측 근거"
+     ]
+    },
+    {
+     "type": "header",
+     "label": "후보 제목·상태",
+     "items": [
+      "후보 제목",
+      "상태"
+     ]
+    },
+    {
+     "type": "breadcrumb",
+     "label": "",
+     "items": []
+    },
+    {
+     "type": "table",
+     "label": "시점·날짜(KST)·조회수",
+     "items": [
+      "시점",
+      "날짜(KST)",
+      "조회수"
+     ]
+    },
+    {
+     "type": "text",
+     "label": "증가율·판정 사유·이전 관측값 필요",
+     "items": [
+      "증가율",
+      "판정 사유",
+      "이전 관측값 필요"
+     ]
+    },
+    {
+     "type": "button",
+     "label": "영상 만들기 →",
+     "items": [
+      "영상 만들기 →"
+     ]
+    },
+    {
+     "type": "button",
+     "label": "닫기",
+     "items": [
+      "닫기"
+     ]
+    }
+   ],
+   "data": [
+    "observations",
+    "candidate_verdicts",
+    "candidates"
+   ],
+   "api": [
+    "A-06"
+   ],
+   "role": "로그인",
+   "next": [
+    "MON-01"
+   ],
+   "states_combined": "",
+   "source": "docs/03_SCREENS_UX.md",
+   "type": "detail",
+   "must_missing": [],
+   "should_missing": [
+    "관련 항목 탭",
+    "활동·변경 이력"
+   ],
+   "states_missing": [],
+   "hash": "909204afe46f",
+   "wireframe": "design/wireframes/MON-D2.html"
+  }
+ },
+ "states": {
+  "AUTH-01": {
+   "빈": "—",
+   "로딩": "로그인 버튼 비활성 + 스피너",
+   "오류": "이메일·비밀번호 불일치 안내, 입력 유지",
+   "성공": "대시보드로 이동"
+  },
+  "DASH-01": {
+   "빈": "첫 사용 안내 + \"소재수집(정체) 열기\" 버튼",
+   "로딩": "지표 스켈레톤",
+   "오류": "\"다시 시도\" 버튼, 마지막 갱신 시각 유지. 권한 없음(세션 만료): 로그인 화면으로 이동",
+   "성공": "수집 소재는 숫자, 나머지 3칸은 \"—\" + \"운영 사이트 연동 전\" 라벨(전주 대비 없음)"
+  },
+  "MON-01": {
+   "빈": "후보 없음: \"후보 가져오기\" 안내. 조건 미설정: \"조건 설정\" 안내. 근거 대기: 후보 카드에 \"이전 관측값 필요\" + 다음 관측 예정 시각(24시간~7일)",
+   "로딩": "후보 가져오는 중 진행 표시(프로필별), 카드 스켈레톤, 두 버튼 비활성",
+   "오류": "수집 실패 \"다시 시도\". Chrome 준비 실패(창 확대 필요·로그인 만료 등): 프로필별 원인 + \"해당 후보부터 재시도\" 또는 \"수집 중지\". YouTube API 할당량 초과: 안내 후 다음 날 재시도. 권한 없음: 로그인 화면으로 이동",
+   "성공": "후보 N개 가져옴 · 제작 가능 N · 근거 대기 N 토스트"
+  },
+  "MON-D1": {
+   "빈": "첫 설정: 기본값 채운 폼",
+   "로딩": "저장 중 버튼 비활성",
+   "오류": "필드별 오류(최소 조회수·허용 증가율 숫자 범위), 저장 실패 \"다시 시도\"",
+   "성공": "저장됨 표시 후 닫힘"
+  },
+  "MON-D2": {
+   "빈": "근거 대기: \"이전 관측값 필요\" + 현재 조회수만 표시",
+   "로딩": "근거 스켈레톤",
+   "오류": "불러오기 실패 \"다시 시도\". 없는 후보(404): 목록으로 돌아가기",
+   "성공": "—"
+  }
+ },
+ "flows": {
+  "F-01": {
+   "id": "F-01",
+   "name": "로그인",
+   "steps": [
+    "AUTH-01",
+    "DASH-01"
+   ],
+   "source": "docs/03_SCREENS_UX.md"
+  },
+  "F-02": {
+   "id": "F-02",
+   "name": "후보 가져오기 → 검증 → 제작 이동",
+   "steps": [
+    "DASH-01",
+    "MON-01",
+    "MON-D1",
+    "MON-01",
+    "MON-D2"
+   ],
+   "source": "docs/03_SCREENS_UX.md"
+  },
+  "F-03": {
+   "id": "F-03",
+   "name": "근거 대기 해소",
+   "steps": [
+    "DASH-01",
+    "MON-01",
+    "MON-D2"
+   ],
+   "source": "docs/03_SCREENS_UX.md"
+  }
+ },
+ "apis": {
+  "A-01": {
+   "id": "A-01",
+   "method": "(Supabase Auth, FastAPI 아님)",
+   "path": "signInWithPassword` · `resetPasswordForEmail",
+   "row": {
+    "ID": "A-01",
+    "메서드": "(Supabase Auth, FastAPI 아님)",
+    "경로": "signInWithPassword` · `resetPasswordForEmail",
+    "입력": "email, password",
+    "출력": "세션(서버 쿠키 httpOnly). 사용자 `auth.users.email",
+    "권한": "비로그인",
+    "오류": "400 자격 불일치(입력 유지) · 429 시도 제한"
+   },
+   "source": "docs/04_API.md"
+  },
+  "A-02": {
+   "id": "A-02",
+   "method": "GET",
+   "path": "/v1/dashboard/summary",
+   "row": {
+    "ID": "A-02",
+    "메서드": "GET",
+    "경로": "/v1/dashboard/summary",
+    "입력": "period`(`24h`·`7d`, 기본 `7d`)",
+    "출력": "stats.collected`(←`candidates` 건수), `stats.in_progress`·`reviewed`·`upload_pending`(MVP: 항상 null → 화면 \"—\"+\"운영 사이트 연동 전\"), `stealth{producible, pending}`(←`candidates.rep_status`), `recent_ready[≤5]{id,title,profile_name,growth_pct,status_changed_at}`(←`candidates`·`candidate_verdicts`, 기간 내 제작 가능 판정), `updated_at",
+    "권한": "로그인",
+    "오류": "401"
+   },
+   "source": "docs/04_API.md"
+  },
+  "A-03": {
+   "id": "A-03",
+   "method": "PUT",
+   "path": "/v1/profiles/selection",
+   "row": {
+    "ID": "A-03",
+    "메서드": "PUT",
+    "경로": "/v1/profiles/selection",
+    "입력": "selected_ids[]`(최대 3)",
+    "출력": "selected_ids[]` (←`profiles.selected`)",
+    "권한": "로그인",
+    "오류": "400 3개 초과·없는 id"
+   },
+   "source": "docs/04_API.md"
+  },
+  "A-04": {
+   "id": "A-04",
+   "method": "GET",
+   "path": "/v1/candidates",
+   "row": {
+    "ID": "A-04",
+    "메서드": "GET",
+    "경로": "/v1/candidates",
+    "입력": "status`(`all`·`producible`·`pending`·`excluded`·`used`), `category`, `format`, `profile_id`, `license`(`cc`·`any`), `q`(제목·채널), `sort`(`growth`·`views`·`recent`), `page`, `size",
+    "출력": "counts{total, producible, pending, excluded, used}`, `categories[]`, `items[]{id, thumbnail_url, status(←`rep_status`, `used`면 `used`), genre, title, format, profile_names[], license_cc, prev{observed_at, view_count}, curr{observed_at, view_count}, growth_pct, period_days, next_observation_at(근거 대기만), used}`, `updated_at",
+    "권한": "로그인",
+    "오류": "400 파라미터"
+   },
+   "source": "docs/04_API.md"
+  },
+  "A-05": {
+   "id": "A-05",
+   "method": "POST",
+   "path": "/v1/collect-jobs/{id}/stop",
+   "row": {
+    "ID": "A-05",
+    "메서드": "POST",
+    "경로": "/v1/collect-jobs/{id}/stop",
+    "입력": "—",
+    "출력": "job{status:\"stopped\"}`(`stop_requested`=true, 수집된 후보 보존)",
+    "권한": "로그인",
+    "오류": "404 · 409 이미 종료"
+   },
+   "source": "docs/04_API.md"
+  },
+  "A-06": {
+   "id": "A-06",
+   "method": "GET",
+   "path": "/v1/candidates/{id}/evidence",
+   "row": {
+    "ID": "A-06",
+    "메서드": "GET",
+    "경로": "/v1/candidates/{id}/evidence",
+    "입력": "—",
+    "출력": "candidate{id, title, status}`, `prev{observed_at, view_count}`(없으면 null), `curr{observed_at, view_count}`, `growth_pct`, `reason`(←`candidate_verdicts.reason`), `needs_prev`(이전 관측 없음), `next_observation_at`. 대표 판정 프로필 기준",
+    "권한": "로그인",
+    "오류": "404 후보 없음"
+   },
+   "source": "docs/04_API.md"
+  },
+  "A-07": {
+   "id": "A-07",
+   "method": "POST",
+   "path": "/v1/verify-runs",
+   "row": {
+    "ID": "A-07",
+    "메서드": "POST",
+    "경로": "/v1/verify-runs",
+    "입력": "Idempotency-Key`, `profile_ids[]`(생략 시 선택된 프로필)",
+    "출력": "job{id, kind:\"verify\", status}`, `checked`, `skipped_recent`(24시간 미만), `failed`, `counts{total, producible, pending, excluded, used}`(워커 불필요, 동기 응답)",
+    "권한": "로그인",
+    "오류": "400 · 409 검증 진행 중 · 429 `QUOTA_EXCEEDED`(남은 후보는 이전 판정 유지) · 502"
+   },
+   "source": "docs/04_API.md"
+  },
+  "A-08": {
+   "id": "A-08",
+   "method": "PATCH",
+   "path": "/v1/candidates/{id}/used",
+   "row": {
+    "ID": "A-08",
+    "메서드": "PATCH",
+    "경로": "/v1/candidates/{id}/used",
+    "입력": "used`(bool)",
+    "출력": "id`, `used`, `used_at`(Q4 수동 표시 제안). 제작 전환 지표 측정원(`01_PRD.md#5`)",
+    "권한": "로그인",
+    "오류": "404"
+   },
+   "source": "docs/04_API.md"
+  },
+  "W-01": {
+   "id": "W-01",
+   "method": "POST",
+   "path": "/worker/v1/jobs/claim",
+   "row": {
+    "ID": "W-01",
+    "메서드": "POST",
+    "경로": "/worker/v1/jobs/claim",
+    "입력": "— (폴링, 간격 가정 5~10초)",
+    "출력": "job{id, kind:\"collect\", profiles[]{id, market, format, category, min_views, keywords, cc_only, include_broadcast}, resume_from_profile_id?, limit}` 또는 204(작업 없음)",
+    "권한": "워커 토큰(자기 워크스페이스 큐만)",
+    "오류": "401 토큰 무효·폐기"
+   },
+   "source": "docs/04_API.md"
+  },
+  "W-02": {
+   "id": "W-02",
+   "method": "POST",
+   "path": "/worker/v1/heartbeat",
+   "row": {
+    "ID": "W-02",
+    "메서드": "POST",
+    "경로": "/worker/v1/heartbeat",
+    "입력": "job_id?`, `chrome[]{profile_id, state(`ready`·`resize_needed`·`login_needed`·`error`), detail}",
+    "출력": "stop_requested`(bool) (←`jobs.stop_requested`). `worker_heartbeats`·`job_profile_runs` 갱신",
+    "권한": "워커 토큰",
+    "오류": "401 · 404 job 없음"
+   },
+   "source": "docs/04_API.md"
+  },
+  "W-03": {
+   "id": "W-03",
+   "method": "POST",
+   "path": "/worker/v1/jobs/{id}/candidates",
+   "row": {
+    "ID": "W-03",
+    "메서드": "POST",
+    "경로": "/worker/v1/jobs/{id}/candidates",
+    "입력": "profile_id`, `items[]{video_id, title, thumbnail_url, genre, category, format, market, channel_id, channel_title}`(형식 검증, 신뢰 안 함. 요청당 ≤200)",
+    "출력": "accepted`, `duplicates`. 신규는 YouTube 1차 관측 후 근거 대기 판정",
+    "권한": "워커 토큰",
+    "오류": "400 형식 · 404 · 409 중지됨·종료됨 · 502"
+   },
+   "source": "docs/04_API.md"
+  },
+  "W-04": {
+   "id": "W-04",
+   "method": "POST",
+   "path": "/worker/v1/jobs/{id}/finish",
+   "row": {
+    "ID": "W-04",
+    "메서드": "POST",
+    "경로": "/worker/v1/jobs/{id}/finish",
+    "입력": "status`(`done`·`failed`), `error?`(쿠키·경로 금지)",
+    "출력": "job{status}",
+    "권한": "워커 토큰",
+    "오류": "404 · 409 이미 종료"
+   },
+   "source": "docs/04_API.md"
+  }
+ },
+ "tables": {
+  "workspaces": {
+   "name": "workspaces",
+   "row": {
+    "테이블": "workspaces",
+    "목적": "워크스페이스(MVP 1개)",
+    "주요 컬럼": "id, name, created_at",
+    "RLS 기준": "읽기: 구성원. 쓰기 없음",
+    "비고": "시드로 1행"
+   },
+   "source": "docs/05_DATA_MODEL.md"
+  },
+  "workspace_members": {
+   "name": "workspace_members",
+   "row": {
+    "테이블": "workspace_members",
+    "목적": "사용자-워크스페이스 소속",
+    "주요 컬럼": "workspace_id, user_id(→auth.users), role(`owner`·`member`) , created_at",
+    "RLS 기준": "읽기: 본인 행만. 쓰기 없음",
+    "비고": "이후 다중 워크스페이스·역할 확장. PK(workspace_id, user_id)"
+   },
+   "source": "docs/05_DATA_MODEL.md"
+  },
+  "profiles": {
+   "name": "profiles",
+   "row": {
+    "테이블": "profiles",
+    "목적": "프로필별 수집 조건",
+    "주요 컬럼": "id, workspace_id, name, market, format(`all`·`short`·`long`), category, min_views(int ≥0), max_growth_pct(허용 증가율, numeric 0~1000 가정), keywords(text[] ≤5개 가정), cc_only(bool), include_broadcast(bool), selected(bool, 검증 대상 체크), updated_at",
+    "RLS 기준": "읽기: 구성원. 쓰기: API만(Pydantic 검증)",
+    "비고": "워크스페이스당 selected 최대 3(API가 강제). `market` 허용 값: MVP는 `KR`·`JP`(팀장 결정 2026-11-16), 추가는 이후"
+   },
+   "source": "docs/05_DATA_MODEL.md"
+  },
+  "broadcaster_channels": {
+   "name": "broadcaster_channels",
+   "row": {
+    "테이블": "broadcaster_channels",
+    "목적": "방송사 목록(Q2 확정)",
+    "주요 컬럼": "id, workspace_id, channel_id, channel_title, created_at",
+    "RLS 기준": "읽기: 구성원. 쓰기: API만",
+    "비고": "unique(workspace_id, channel_id). 목록에 있으면 `candidates.is_broadcaster`=true, 없으면 false(\"방송사 아님\", 미확인 없음). 관리 화면은 MVP 밖 → 초기 시드는 구현 작업에서"
+   },
+   "source": "docs/05_DATA_MODEL.md"
+  },
+  "candidates": {
+   "name": "candidates",
+   "row": {
+    "테이블": "candidates",
+    "목적": "수집된 후보 영상(영상 단위 1행)",
+    "주요 컬럼": "id, workspace_id, video_id, title, thumbnail_url, genre, category, format, market, channel_id, channel_title, license_cc(bool·null=미확인), is_broadcaster(bool), used(bool, 수동 표시, Q4 제안), used_at, rep_status(`producible`·`pending`·`excluded`), rep_profile_id, status_changed_at, first_job_id, created_at",
+    "RLS 기준": "읽기: 구성원. 쓰기: API만(`used`도 API 경유)",
+    "비고": "unique(workspace_id, video_id)로 중복 제거. 표시 상태: `used`=true면 판정보다 우선"
+   },
+   "source": "docs/05_DATA_MODEL.md"
+  },
+  "observations": {
+   "name": "observations",
+   "row": {
+    "테이블": "observations",
+    "목적": "시점별 관측값(조회수 등)",
+    "주요 컬럼": "id, workspace_id, candidate_id, observed_at, view_count(bigint), license_cc, channel_id, source(`youtube_api`), job_id",
+    "RLS 기준": "읽기: 구성원. 쓰기: API만, 추가 전용(수정 없음). 180일 초과분만 정리 삭제(가정, `01_PRD.md#8`)",
+    "비고": "index(candidate_id, observed_at desc). 판정은 직전 관측 ≥24시간 간격만 새로 기록(간격 24시간~7일)"
+   },
+   "source": "docs/05_DATA_MODEL.md"
+  },
+  "candidate_verdicts": {
+   "name": "candidate_verdicts",
+   "row": {
+    "테이블": "candidate_verdicts",
+    "목적": "프로필별 판정 + 근거",
+    "주요 컬럼": "id, workspace_id, candidate_id, profile_id, status(`producible`·`pending`·`excluded`), reason(코드 정본 `01_PRD.md#9`), growth_pct(numeric·null), prev_observation_id, curr_observation_id, judged_at",
+    "RLS 기준": "읽기: 구성원. 쓰기: API만",
+    "비고": "unique(candidate_id, profile_id) 최신 1행 덮어씀(이력은 observations). 대표 판정은 `candidates.rep_status`에 반영(제작 가능 > 근거 대기 > 첫 프로필)"
+   },
+   "source": "docs/05_DATA_MODEL.md"
+  },
+  "jobs": {
+   "name": "jobs",
+   "row": {
+    "테이블": "jobs",
+    "목적": "작업 큐(수집·검증 실행)",
+    "주요 컬럼": "id, workspace_id, kind(`collect`·`verify`), status(`queued`·`running`·`retrying`·`stopped`·`failed`·`done`), profile_ids(uuid[]), params(jsonb: 후보 상한 등), idempotency_key, retry_count(상한 `02_ARCHITECTURE.md#3-3`), stop_requested(bool), requested_by, claimed_by(→workers), result(jsonb: 후보 수·제작 가능 N·근거 대기 N·건너뜀·실패 사유), error, created_at, started_at, finished_at",
+    "RLS 기준": "읽기: 구성원. 쓰기: API만(워커는 API 경유)",
+    "비고": "unique(workspace_id, idempotency_key). 같은 kind `queued`·`running`은 워크스페이스당 1개(409). 상태 전이 `02_ARCHITECTURE.md#3-3`. 03의 `collect_runs`는 이 테이블"
+   },
+   "source": "docs/05_DATA_MODEL.md"
+  },
+  "job_profile_runs": {
+   "name": "job_profile_runs",
+   "row": {
+    "테이블": "job_profile_runs",
+    "목적": "작업 안의 프로필별 진행·Chrome 준비 상태",
+    "주요 컬럼": "id, workspace_id, job_id, profile_id, position(순서), chrome_state(`ready`·`resize_needed`·`login_needed`·`error`), detail(원인 문구, 쿠키·경로 금지), collected_count, status(`pending`·`running`·`done`·`failed`), updated_at",
+    "RLS 기준": "읽기: 구성원. 쓰기: API만",
+    "비고": "unique(job_id, profile_id). \"해당 후보부터 재시도\"는 `failed` 프로필의 position부터"
+   },
+   "source": "docs/05_DATA_MODEL.md"
+  },
+  "workers": {
+   "name": "workers",
+   "row": {
+    "테이블": "workers",
+    "목적": "수집 워커 등록·토큰",
+    "주요 컬럼": "id, workspace_id, name, token_hash(해시만), revoked_at, created_at",
+    "RLS 기준": "일반 사용자 접근 없음(정책 없음 = 전부 거부). API만 읽기·쓰기",
+    "비고": "토큰 원문은 PC에만. 워크스페이스 범위. 발급·폐기·회전은 운영 절차(화면 없음, 회전 90일 가정, `01_PRD.md#8`)"
+   },
+   "source": "docs/05_DATA_MODEL.md"
+  },
+  "worker_heartbeats": {
+   "name": "worker_heartbeats",
+   "row": {
+    "테이블": "worker_heartbeats",
+    "목적": "워커 생존·현재 작업",
+    "주요 컬럼": "worker_id(PK), workspace_id, last_seen_at, current_job_id, chrome(jsonb: 프로필별 state 요약)",
+    "RLS 기준": "읽기: 구성원. 쓰기: API만",
+    "비고": "워커당 1행 upsert. `last_seen_at` 오프라인 기준·job `failed` 처리는 `02_ARCHITECTURE.md#3-3"
+   },
+   "source": "docs/05_DATA_MODEL.md"
+  }
+ },
+ "issues": [
+  [
+   "🟡",
+   "AUTH-01",
+   "데이터 'auth.users' — 05_DATA_MODEL 표에 없음"
+  ],
+  [
+   "🟡",
+   "DASH-01",
+   "대시보드 권장: 이전 기간 대비(증감), 내보내기(CSV·PDF), 세그먼트·담당자 필터, 할 일·알림(지표가 행동으로 이어지게)"
+  ],
+  [
+   "🟡",
+   "MON-01",
+   "소재수집(정체) 권장: 새로 만들기, 일괄 작업(선택·삭제·내보내기), 저장된 보기·열 설정"
+  ],
+  [
+   "🟡",
+   "MON-D1",
+   "조건 설정 권장: 임시 저장(긴 폼)"
+  ],
+  [
+   "🟡",
+   "MON-D2",
+   "관측 근거 권장: 관련 항목 탭, 활동·변경 이력"
+  ]
+ ]
+}

@@ -1,0 +1,22 @@
+sequenceDiagram
+  participant U as 사용자
+  participant W as 웹
+  participant A as API
+  participant D as DB (Supabase)
+  participant Y as YouTube API
+  Note over W,A: 워커 불필요
+  U->>W: 기록 검증 실행 클릭
+  W->>A: 호출 (Bearer JWT)
+  A->>D: 대상 후보 조회 (마지막 관측 24시간 미만은 건너뜀)
+  loop 50개 단위
+    A->>Y: 대상 후보 조회 (할당량 예산 준수)
+    Y-->>A: 관측값
+    A->>D: 두 시점 관측값 저장
+  end
+  alt 할당량 소진 또는 API 오류
+    A->>D: 남은 후보는 이전 판정 유지, 실패 사유 기록
+  else 정상 완료
+    A->>D: 프로필별 판정 후 대표 판정 저장
+  end
+  A-->>W: 결과 응답
+  W-->>U: 상태 지표 5개·후보 카드 갱신

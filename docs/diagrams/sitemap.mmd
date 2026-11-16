@@ -1,0 +1,17 @@
+flowchart LR
+  subgraph g0["비로그인"]
+    n_AUTH_01["AUTH-01 로그인<br/>/login"]
+  end
+  subgraph g1["로그인"]
+    n_DASH_01["DASH-01 대시보드<br/>/dashboard"]
+    n_MON_01["MON-01 소재수집(정체)<br/>/monitor"]
+    n_MON_D1["MON-D1 조건 설정<br/>/monitor (다이얼로그)"]
+    n_MON_D2["MON-D2 관측 근거<br/>/monitor (다이얼로그)"]
+  end
+  n_AUTH_01 --> n_DASH_01
+  n_DASH_01 --> n_MON_01
+  n_MON_01 --> n_MON_D1
+  n_MON_01 --> n_MON_D2
+  n_MON_01 --> n_DASH_01
+  n_MON_D1 --> n_MON_01
+  n_MON_D2 --> n_MON_01

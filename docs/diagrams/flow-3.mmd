@@ -1,0 +1,23 @@
+stateDiagram-v2
+  [*] --> waiting
+  state "대기" as waiting
+  state "진행" as running
+  state "Chrome 준비 점검" as check
+  state "Chrome 준비 실패" as prepfail
+  state "재시도" as retry
+  state "중지" as stopped
+  state "실패" as failed
+  state "완료" as done
+  waiting --> running: 워커가 작업 수령
+  running --> check: Chrome 준비 확인
+  check --> running: 준비 완료
+  check --> prepfail: 창 확대 필요 · 로그인 필요 등
+  prepfail --> retry: 해당 후보부터 재시도
+  prepfail --> stopped: 수집 중지
+  retry --> running: 실패 지점부터 이어서 수집
+  running --> done: 수집 완료
+  running --> failed: 하트비트 끊김
+  retry --> failed: 하트비트 끊김
+  stopped --> [*]: 수집된 후보 보존
+  done --> [*]
+  failed --> [*]

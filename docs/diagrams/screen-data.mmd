@@ -1,0 +1,48 @@
+flowchart LR
+  subgraph SC["화면"]
+    n_AUTH_01["AUTH-01 로그인"]
+    n_DASH_01["DASH-01 대시보드"]
+    n_MON_01["MON-01 소재수집(정체)"]
+    n_MON_D1["MON-D1 조건 설정"]
+    n_MON_D2["MON-D2 관측 근거"]
+  end
+  subgraph AP["API"]
+    n_api_A_01["A-01 (Supabase Auth, FastAPI 아님) signInWithPassword` · `resetPasswordForEmail"]
+    n_api_A_02["A-02 GET /v1/dashboard/summary"]
+    n_api_A_03["A-03 PUT /v1/profiles/selection"]
+    n_api_A_04["A-04 GET /v1/candidates"]
+    n_api_A_05["A-05 POST /v1/collect-jobs/{id}/stop"]
+    n_api_A_06["A-06 GET /v1/candidates/{id}/evidence"]
+    n_api_A_07["A-07 POST /v1/verify-runs"]
+    n_api_A_08["A-08 PATCH /v1/candidates/{id}/used"]
+  end
+  subgraph DB["데이터"]
+    n_t_auth_users[("auth.users")]
+    n_t_candidate_verdicts[("candidate_verdicts")]
+    n_t_candidates[("candidates")]
+    n_t_job_profile_runs[("job_profile_runs")]
+    n_t_jobs[("jobs")]
+    n_t_observations[("observations")]
+    n_t_profiles[("profiles")]
+  end
+  n_AUTH_01 --> n_api_A_01
+  n_AUTH_01 -.-> n_t_auth_users
+  n_DASH_01 --> n_api_A_02
+  n_DASH_01 -.-> n_t_candidates
+  n_MON_01 --> n_api_A_03
+  n_MON_01 --> n_api_A_04
+  n_MON_01 --> n_api_A_05
+  n_MON_01 --> n_api_A_07
+  n_MON_01 --> n_api_A_08
+  n_MON_01 -.-> n_t_profiles
+  n_MON_01 -.-> n_t_candidates
+  n_MON_01 -.-> n_t_observations
+  n_MON_01 -.-> n_t_candidate_verdicts
+  n_MON_01 -.-> n_t_jobs
+  n_MON_01 -.-> n_t_job_profile_runs
+  n_MON_D1 --> n_api_A_03
+  n_MON_D1 -.-> n_t_profiles
+  n_MON_D2 --> n_api_A_06
+  n_MON_D2 -.-> n_t_observations
+  n_MON_D2 -.-> n_t_candidate_verdicts
+  n_MON_D2 -.-> n_t_candidates

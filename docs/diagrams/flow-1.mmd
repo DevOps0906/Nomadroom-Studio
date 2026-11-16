@@ -1,0 +1,21 @@
+sequenceDiagram
+  participant U as 사용자
+  participant W as 웹
+  participant A as API
+  participant D as DB (Supabase)
+  participant K as 수집 워커
+  participant Y as YouTube API
+  U->>W: 후보 가져오기 클릭 (프로필 최대 3)
+  W->>A: 선택 프로필 조건 포함 호출 (Bearer JWT)
+  A->>D: collect 작업 등록 (대기)
+  A-->>W: job id 반환
+  K->>A: 폴링으로 작업 수령 (워커 토큰)
+  Note over K: Chrome 준비 점검 (3-3 분기)
+  Note over K: vidIQ로 프로필별 후보 수집
+  K->>A: 후보 묶음 전송
+  A->>D: 중복 제거 후 후보 저장
+  A->>Y: 신규 후보 1차 관측 (키는 서버에서만)
+  Y-->>A: 조회수·라이선스·채널
+  A->>D: 관측값 저장, 판정은 근거 대기
+  W->>A: job 상태 조회
+  W-->>U: 진행·완료 표시, 후보 목록 갱신

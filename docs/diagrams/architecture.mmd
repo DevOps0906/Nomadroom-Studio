@@ -1,0 +1,21 @@
+flowchart LR
+  user["운영자"]
+  ext["운영 사이트 (외부)"]
+  subgraph cloud["클라우드 (신뢰 경계 A)"]
+    web["웹 (Next.js 16)<br/>비밀: 없음 (anon 키·URL만)"]
+    api["API (FastAPI)<br/>비밀: YouTube 키 · service_role"]
+    db[("Supabase Postgres · Auth<br/>비밀: service_role")]
+    yt["YouTube Data API v3"]
+  end
+  subgraph pc["운영자 PC (신뢰 경계 B)"]
+    worker["수집 워커 (Python · Playwright)<br/>비밀: 워커 토큰만"]
+    chrome["Chrome · vidIQ<br/>로그인 프로필 (PC 로컬만)"]
+  end
+  user --> web
+  web -.->|"새 탭 링크"| ext
+  web -->|"JWT 전달"| api
+  web -->|"anon 키 + 사용자 JWT, RLS"| db
+  api -->|"service_role"| db
+  api -->|"서버 키"| yt
+  worker -->|"아웃바운드 HTTPS 폴링·결과"| api
+  worker --> chrome
