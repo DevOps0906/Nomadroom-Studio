@@ -3,7 +3,7 @@
 | 번호 | 제목 | 웨이브 | 선행 | 위험도 | 담당 | 상태 |
 |---|---|---|---|---|---|---|
 | task-001 | 프로젝트 생성 · 토큰 | W1 | — | 낮음 | builder | 완료 |
-| task-002 | Supabase 스키마 · RLS · 시드 · ERD | W1 | 001 | 높음 | builder | 대기 |
+| task-002 | Supabase 스키마 · RLS · 시드 · ERD | W1 | 001 | 높음 | builder | 완료 |
 | task-003 | FastAPI 뼈대 · JWT · 워커 토큰 인증 | W1 | 001, 002 | 높음 | builder | 대기 |
 | task-004 | 보안 L1 설정 (`/secure setup`) | W1 | 001 | 높음 | builder | 완료 |
 | task-018 | 공통 레이아웃(앱 셸) | W1 | 001 | 낮음 | builder | 완료 |

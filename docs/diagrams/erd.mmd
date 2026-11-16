@@ -1,0 +1,137 @@
+erDiagram
+  workspaces {
+    uuid id PK
+    text name
+    timestamptz created_at
+  }
+  workspace_members {
+    uuid workspace_id PK,FK
+    uuid user_id PK,FK
+    text role
+    timestamptz created_at
+  }
+  profiles {
+    uuid id PK
+    uuid workspace_id FK
+    text name
+    text market
+    text format
+    text category
+    integer min_views
+    numeric max_growth_pct
+    text__ keywords
+    boolean cc_only
+    boolean include_broadcast
+    boolean selected
+    string more_1_cols
+  }
+  broadcaster_channels {
+    uuid id PK
+    uuid workspace_id FK
+    text channel_id
+    text channel_title
+    timestamptz created_at
+  }
+  workers {
+    uuid id PK
+    uuid workspace_id FK
+    text name
+    text token_hash
+    timestamptz revoked_at
+    timestamptz created_at
+  }
+  jobs {
+    uuid id PK
+    uuid workspace_id FK
+    uuid requested_by FK
+    uuid claimed_by FK
+    text kind
+    text status
+    uuid__ profile_ids
+    jsonb params
+    text idempotency_key
+    integer retry_count
+    boolean stop_requested
+    jsonb result
+    string more_4_cols
+  }
+  job_profile_runs {
+    uuid id PK
+    uuid workspace_id FK
+    uuid job_id FK
+    uuid profile_id FK
+    integer position
+    text chrome_state
+    text detail
+    integer collected_count
+    text status
+    timestamptz updated_at
+  }
+  worker_heartbeats {
+    uuid worker_id PK,FK
+    uuid workspace_id FK
+    uuid current_job_id FK
+    timestamptz last_seen_at
+    jsonb chrome
+  }
+  candidates {
+    uuid id PK
+    uuid workspace_id FK
+    uuid rep_profile_id FK
+    uuid first_job_id FK
+    text video_id
+    text title
+    text thumbnail_url
+    text genre
+    text category
+    text format
+    text market
+    text channel_id
+    string more_8_cols
+  }
+  observations {
+    uuid id PK
+    uuid workspace_id FK
+    uuid candidate_id FK
+    uuid job_id FK
+    timestamptz observed_at
+    bigint view_count
+    boolean license_cc
+    text channel_id
+    text source
+  }
+  candidate_verdicts {
+    uuid id PK
+    uuid workspace_id FK
+    uuid candidate_id FK
+    uuid profile_id FK
+    uuid prev_observation_id FK
+    uuid curr_observation_id FK
+    text status
+    text reason
+    numeric growth_pct
+    timestamptz judged_at
+  }
+  workspaces ||--o{ workspace_members : "workspace_id"
+  workspaces ||--o{ profiles : "workspace_id"
+  workspaces ||--o{ broadcaster_channels : "workspace_id"
+  workspaces ||--o{ workers : "workspace_id"
+  workspaces ||--o{ jobs : "workspace_id"
+  workers ||--o{ jobs : "claimed_by"
+  workspaces ||--o{ job_profile_runs : "workspace_id"
+  jobs ||--o{ job_profile_runs : "job_id"
+  profiles ||--o{ job_profile_runs : "profile_id"
+  workers ||--o{ worker_heartbeats : "worker_id"
+  workspaces ||--o{ worker_heartbeats : "workspace_id"
+  jobs ||--o{ worker_heartbeats : "current_job_id"
+  workspaces ||--o{ candidates : "workspace_id"
+  profiles ||--o{ candidates : "rep_profile_id"
+  jobs ||--o{ candidates : "first_job_id"
+  workspaces ||--o{ observations : "workspace_id"
+  candidates ||--o{ observations : "candidate_id"
+  jobs ||--o{ observations : "job_id"
+  workspaces ||--o{ candidate_verdicts : "workspace_id"
+  candidates ||--o{ candidate_verdicts : "candidate_id"
+  profiles ||--o{ candidate_verdicts : "profile_id"
+  observations ||--o{ candidate_verdicts : "prev_observation_id"
+  observations ||--o{ candidate_verdicts : "curr_observation_id"
