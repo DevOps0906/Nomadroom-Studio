@@ -6,7 +6,7 @@
 
 ![메인 대시보드 시안](./docs/design/screenshots/dashboard-1440.png)
 
-[디자인 시안 HTML](./docs/design/Nomadroom_Dashboard_Design.html) · [HTML 내려받기](https://raw.githubusercontent.com/DevOps0906/Nomadroom-Studio/master/docs/design/Nomadroom_Dashboard_Design.html)
+[디자인 시안 HTML](./docs/design/Nomadroom_Dashboard_Design.html) · [HTML 내려받기](https://raw.githubusercontent.com/DevOps0906/Nomadroom-Studio/main/docs/design/Nomadroom_Dashboard_Design.html)
 
 HTML을 내려받아 브라우저에서 열면 아래 항목을 예시 데이터로 확인할 수 있습니다.
 
