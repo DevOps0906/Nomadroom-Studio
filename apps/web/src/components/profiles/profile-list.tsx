@@ -96,7 +96,7 @@ export function ProfileList({ profiles, saveConditions, saveSelection }: Props) 
     <section aria-labelledby="profiles-title" className="rounded-panel border border-border bg-surface p-4 tablet:p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 id="profiles-title" className="text-h2 font-bold">
-          검증 대상 프로필
+          프로필별 수집 조건
         </h2>
         <span aria-live="polite" className="text-body text-text-muted">
           {selected.length}/{MAX_SELECTED}개 선택{selPending ? " · 저장 중…" : ""}

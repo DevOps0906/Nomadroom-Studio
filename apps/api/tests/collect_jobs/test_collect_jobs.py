@@ -190,7 +190,7 @@ def test_get_job_detail(api: TestClient, auth: dict, db: FakeDB):
     assert resp.status_code == 200, resp.json()
     out = resp.json()["job"]
     assert out["status"] == "running"
-    assert out["result"] == {"candidates": 3, "producible": 1, "pending": 1}
+    assert out["result"] is None  # 진행 중이면 집계 생략
     assert [p["profile_id"] for p in out["profiles"]] == [P1, P2]
     assert out["profiles"][0] == {
         "profile_id": P1,
@@ -378,6 +378,7 @@ def test_openapi_matches_04():
     paths = {p: set(v) for p, v in spec["paths"].items() if p.startswith("/v1/collect-jobs")}
     assert paths == {
         "/v1/collect-jobs": {"post"},
+        "/v1/collect-jobs/active": {"get"},
         "/v1/collect-jobs/{job_id}": {"get"},
         "/v1/collect-jobs/{job_id}/retry": {"post"},
         "/v1/collect-jobs/{job_id}/stop": {"post"},
@@ -431,3 +432,86 @@ def test_openapi_retry_stop_200():
     for p in ("/v1/collect-jobs/{job_id}/retry", "/v1/collect-jobs/{job_id}/stop"):
         assert "200" in spec["paths"][p]["post"]["responses"]
     assert "200" in spec["paths"]["/v1/collect-jobs/{job_id}"]["get"]["responses"]
+
+
+# --- active (task-013) ----------------------------------------------------------
+
+
+def test_active_returns_detail_200(api: TestClient, auth: dict, db: FakeDB):
+    db.jobs += [
+        job(OTHER_JOB, status="done", idempotency_key="old"),
+        job(status="queued"),
+    ]
+    db.runs.append(run(JOB, P1, 0, "pending"))
+    resp = api.get("/v1/collect-jobs/active", headers=auth)
+    assert resp.status_code == 200, resp.json()
+    out = resp.json()["job"]
+    assert out["id"] == JOB and out["status"] == "queued"
+    assert set(out) >= {"result", "profiles", "worker_last_seen_at", "worker_online"}
+    assert out == api.get(f"/v1/collect-jobs/{JOB}", headers=auth).json()["job"]
+
+
+def test_active_none_204(api: TestClient, auth: dict, db: FakeDB):
+    db.jobs += [job(status="done"), job(OTHER_JOB, status="stopped", idempotency_key="s")]
+    resp = api.get("/v1/collect-jobs/active", headers=auth)
+    assert resp.status_code == 204 and resp.content == b""
+
+
+def test_active_ignores_other_workspace_and_kind(api: TestClient, auth: dict, db: FakeDB):
+    db.jobs += [
+        job(status="running", workspace_id=OTHER_WS),
+        job(OTHER_JOB, status="queued", kind="verify", idempotency_key="v"),
+    ]
+    assert api.get("/v1/collect-jobs/active", headers=auth).status_code == 204
+
+
+def test_active_retrying_200(api: TestClient, auth: dict, db: FakeDB):
+    db.jobs.append(job(status="retrying"))
+    out = api.get("/v1/collect-jobs/active", headers=auth).json()["job"]
+    assert out["status"] == "retrying"
+
+
+def test_active_offline_running_expired_first_204(api: TestClient, auth: dict, db: FakeDB):
+    old = datetime.now(UTC) - timedelta(minutes=5)
+    db.jobs.append(job(status="running", claimed_by=WORKER, started_at=old.isoformat()))
+    db.heartbeats.append(
+        {
+            "worker_id": WORKER,
+            "workspace_id": db.jobs[0]["workspace_id"],
+            "last_seen_at": old.isoformat(),
+        }
+    )
+    assert api.get("/v1/collect-jobs/active", headers=auth).status_code == 204
+    assert db.jobs[0]["status"] == "failed"
+
+
+def test_active_unauthenticated_401(api: TestClient):
+    assert api.get("/v1/collect-jobs/active").status_code == 401
+
+
+def test_detail_result_only_when_finished(api: TestClient, auth: dict, db: FakeDB):
+    """종료 상태에서만 결과 집계(candidates HEAD 3회). 진행 중은 null·집계 호출 없음."""
+    db.jobs.append(job(status="queued"))
+    db.candidates.append(
+        {
+            "id": "c1",
+            "workspace_id": db.jobs[0]["workspace_id"],
+            "first_job_id": JOB,
+            "used": False,
+            "rep_status": "producible",
+        }
+    )
+    now = datetime.now(UTC).isoformat()
+    db.jobs[0].update(claimed_by=WORKER, started_at=now)
+    db.heartbeats.append(
+        {"worker_id": WORKER, "workspace_id": db.jobs[0]["workspace_id"], "last_seen_at": now}
+    )
+    for status in ("queued", "running", "retrying"):
+        db.jobs[0]["status"] = status
+        out = api.get(f"/v1/collect-jobs/{JOB}", headers=auth).json()["job"]
+        assert out["result"] is None, status
+    assert api.get("/v1/collect-jobs/active", headers=auth).json()["job"]["result"] is None
+    for status in ("done", "failed", "stopped"):
+        db.jobs[0]["status"] = status
+        out = api.get(f"/v1/collect-jobs/{JOB}", headers=auth).json()["job"]
+        assert out["result"] == {"candidates": 1, "producible": 1, "pending": 0}, status

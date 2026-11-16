@@ -39,6 +39,7 @@ DAILY_JOB_LIMIT = 20  # 워크스페이스당 최근 24시간 collect job 생성
 DAILY_WINDOW = timedelta(hours=24)
 
 JobStatus = Literal["queued", "running", "retrying", "stopped", "failed", "done"]
+ACTIVE_STATUSES = ("queued", "running", "retrying")
 
 
 # --- 입출력 모델 ---------------------------------------------------------------
@@ -84,7 +85,7 @@ class CollectJobOut(BaseModel):
 
 
 class CollectJobDetailOut(CollectJobOut):
-    result: JobResultOut
+    result: JobResultOut | None  # 종료 상태(done·failed·stopped)일 때만 집계, 진행 중이면 null
     worker_last_seen_at: datetime | None
     worker_online: bool
 
@@ -395,16 +396,16 @@ async def post_collect_job(
     return CollectJobEnvelope(job=await _job_out(request, ws, job))
 
 
-@router.get("/{job_id}", response_model=CollectJobDetailEnvelope)
-async def get_collect_job(
-    job_id: uuid.UUID, request: Request, user: CurrentUser = Depends(get_current_user)
-) -> CollectJobDetailEnvelope:
-    ws = user.workspace_id
-    await expire_offline_jobs(request, ws)
-    job = await _get_job(request, ws, job_id)
+async def _no_result() -> None:
+    return None
+
+
+async def _detail(request: Request, ws: uuid.UUID, job: dict) -> CollectJobDetailEnvelope:
+    # 폴링(3초) 비용: 진행 중 job은 결과 집계(count 3회)를 생략한다.
+    finished = job["status"] not in ACTIVE_STATUSES
     base, result, last_seen = await asyncio.gather(
         _job_out(request, ws, job),
-        _result(request, ws, str(job["id"])),
+        _result(request, ws, str(job["id"])) if finished else _no_result(),
         _worker_last_seen(request, ws, job),
     )
     online = last_seen is not None and datetime.now(UTC) - last_seen <= OFFLINE_AFTER
@@ -416,6 +417,41 @@ async def get_collect_job(
             worker_online=online,
         )
     )
+
+
+# /active는 /{job_id}보다 먼저 등록해야 UUID 검증에 걸리지 않는다.
+@router.get(
+    "/active",
+    response_model=CollectJobDetailEnvelope,
+    responses={204: {"description": "활성 collect job 없음"}},
+)
+async def get_active_collect_job(
+    request: Request, user: CurrentUser = Depends(get_current_user)
+) -> CollectJobDetailEnvelope | Response:
+    """이 워크스페이스의 활성 collect job 1건(화면 재진입 복구용). 없으면 204."""
+    ws = user.workspace_id
+    await expire_offline_jobs(request, ws)
+    params = {
+        "select": JOB_COLUMNS,
+        "workspace_id": f"eq.{ws}",
+        "kind": "eq.collect",
+        "status": f"in.({','.join(ACTIVE_STATUSES)})",
+        "order": "created_at.desc,id.desc",
+        "limit": "1",
+    }
+    rows = _json_list(await _send(request, "GET", "jobs", params=params), "GET", "jobs")
+    if not rows:
+        return Response(status_code=204)
+    return await _detail(request, ws, rows[0])
+
+
+@router.get("/{job_id}", response_model=CollectJobDetailEnvelope)
+async def get_collect_job(
+    job_id: uuid.UUID, request: Request, user: CurrentUser = Depends(get_current_user)
+) -> CollectJobDetailEnvelope:
+    ws = user.workspace_id
+    await expire_offline_jobs(request, ws)
+    return await _detail(request, ws, await _get_job(request, ws, job_id))
 
 
 @router.post("/{job_id}/retry", response_model=CollectJobEnvelope)

@@ -26,6 +26,15 @@ export async function proxy(request: NextRequest) {
   };
 
   if (!claims && !matchesPath(pathname, PUBLIC_PATHS)) {
+    // /api/*(폴링 중계)는 리다이렉트 대신 JSON 401. 클라이언트가 세션 정리 경로로 이동한다.
+    if (matchesPath(pathname, ["/api"])) {
+      const res = NextResponse.json(
+        { code: "UNAUTHENTICATED", message: "로그인이 필요합니다." },
+        { status: 401, headers: { "Cache-Control": "no-store" } },
+      );
+      for (const cookie of response.cookies.getAll()) res.cookies.set(cookie);
+      return res;
+    }
     const next = safeNext(`${pathname}${search}`, getAppOrigin());
     return redirectTo(next === "/" ? "/login" : `/login?next=${encodeURIComponent(next)}`);
   }

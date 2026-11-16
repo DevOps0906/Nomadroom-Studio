@@ -1,16 +1,14 @@
 {
  "version": "1",
- "generated": "2026-11-16T17:42:29+00:00",
+ "generated": "2026-11-16T18:32:03+00:00",
  "docs": "docs",
  "tokens": ".\\apps\\web\\src\\styles\\tokens.css",
  "sources": {
   "docs/03_SCREENS_UX.md": "56c8f567ebda",
-  "docs/04_API.md": "e3f207965612",
+  "docs/04_API.md": "fd7f66c5f213",
   "docs/05_DATA_MODEL.md": "54d41fb7f57b"
  },
- "changed": [
-  "MON-01"
- ],
+ "changed": [],
  "removed": [],
  "screens": {
   "AUTH-01": {

@@ -59,6 +59,10 @@ export type ApiRequest = {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   query?: Record<string, string | undefined>;
   body?: unknown;
+  /** 실행류 요청의 Idempotency-Key 헤더(task-013). */
+  idempotencyKey?: string;
+  /** 기본 API_TIMEOUT_MS 대신 쓸 제한 시간(task-013: 기록 검증 60초). */
+  timeoutMs?: number;
 };
 
 type Transport = { baseUrl: string; token: string; fetchImpl?: typeof fetch; timeoutMs?: number };
@@ -89,6 +93,7 @@ export async function sendApiRequest<T>(path: string, req: ApiRequest, t: Transp
 
   const headers: Record<string, string> = { Authorization: `Bearer ${t.token}`, Accept: "application/json" };
   if (req.body !== undefined) headers["Content-Type"] = "application/json";
+  if (req.idempotencyKey !== undefined) headers["Idempotency-Key"] = req.idempotencyKey;
 
   let res: Response;
   try {
@@ -97,7 +102,7 @@ export async function sendApiRequest<T>(path: string, req: ApiRequest, t: Transp
       headers,
       body: req.body === undefined ? undefined : JSON.stringify(req.body),
       cache: "no-store",
-      signal: AbortSignal.timeout(t.timeoutMs ?? API_TIMEOUT_MS),
+      signal: AbortSignal.timeout(req.timeoutMs ?? t.timeoutMs ?? API_TIMEOUT_MS),
     });
   } catch (e) {
     if (isTimeout(e)) throw new ApiError(0, "TIMEOUT", DEFAULT_MESSAGES.TIMEOUT);

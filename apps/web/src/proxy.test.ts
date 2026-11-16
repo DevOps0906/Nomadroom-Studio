@@ -38,6 +38,16 @@ describe("proxy", () => {
     expect(res.headers.get("location")).toBe(`${ORIGIN}/login?next=${encodeURIComponent("/monitor?tab=a")}`);
   });
 
+  it("미로그인 /api/* → 리다이렉트 대신 JSON 401(no-store)", async () => {
+    const res = await proxy(req("/api/collect-jobs/00000000-0000-4000-8000-0000000000f1"));
+    expect(res.status).toBe(401);
+    expect(res.headers.get("location")).toBeNull();
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(await res.json()).toMatchObject({ code: "UNAUTHENTICATED" });
+    // /apifoo 같은 경로는 /api로 보지 않는다
+    expect((await proxy(req("/apifoo"))).status).toBe(307);
+  });
+
   it("미로그인 / → next 없이 /login", async () => {
     expect((await proxy(req("/"))).headers.get("location")).toBe(`${ORIGIN}/login`);
   });

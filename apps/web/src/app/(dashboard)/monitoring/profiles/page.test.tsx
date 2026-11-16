@@ -39,11 +39,9 @@ describe("MON-D1 401 → 세션 정리 경로", () => {
     setProfileSelection.mockReset();
   });
 
-  it("목록 401 → SESSION_EXPIRED_PATH (/login 아님)", async () => {
-    listProfiles.mockRejectedValue(unauth());
-    await expect(ProfilesPage()).rejects.toThrow(`REDIRECT:${SESSION_EXPIRED_PATH}`);
-    expect(redirect).toHaveBeenCalledWith(SESSION_EXPIRED_PATH);
-    expect(redirect).not.toHaveBeenCalledWith("/login");
+  it("독립 페이지는 /monitor로 보낸다(MON-D1은 /monitor 안 다이얼로그)", () => {
+    expect(() => ProfilesPage()).toThrow("REDIRECT:/monitor");
+    expect(listProfiles).not.toHaveBeenCalled();
   });
 
   it("조건 저장 401 → SESSION_EXPIRED_PATH", async () => {

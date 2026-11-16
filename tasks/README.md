@@ -15,7 +15,7 @@
 | task-010 | 프로필 API A-03 | W2 | 003 | 높음 | builder + tester | 완료 |
 | task-011 | 조회 API A-02 · A-04 · A-06 | W2 | 005, 010 | 높음 | builder + tester | 완료 |
 | task-012 | AUTH-01 로그인 | W3 | 001, 002 | 높음 | builder | 완료 |
-| task-013 | MON-01 소재수집 목록 | W3 | 006, 008, 010, 011, 012, 018 | 높음 | builder | 대기 |
+| task-013 | MON-01 소재수집 목록 | W3 | 006, 008, 010, 011, 012, 018 | 높음 | builder | 완료 |
 | task-014 | MON-D1 프로필 조건 | W3 | 010, 012, 018 | 보통 | builder | 완료 |
 | task-015 | MON-D2 관측 근거 | W3 | 011, 013, 018 | 높음 | builder | 대기 |
 | task-016 | DASH-01 대시보드 | W3 | 011, 012, 018 | 보통 | builder | 완료 |
@@ -39,6 +39,8 @@
 | 2026-11-17 | DASH-01 빈 상태 | 첫 사용 판정이 근사(기간 수집+제작 가능+근거 대기=0) → 제외·사용됨 후보만 있으면 첫 사용으로 보임 | A-02에 전체 후보 수 필드 추가 |
 | 2026-11-17 | ERD 생성(sql2erd) | ALTER TABLE ADD COLUMN을 읽지 못해 `jobs.lookup_count`가 erd.mmd에 빠짐 | 도구 보강 또는 ERD에 주석 한 줄 |
 | 2026-11-17 | jobs.error 제약 | 허용 코드가 check로 고정 → 008 등에서 새 오류 코드를 쓰면 새 마이그레이션 필요 | 코드 추가 시 함께 마이그레이션 |
+| 2026-11-17 | 웹 테스트 도구 | jsdom·testing-library 없음 → 클릭 배선(MonitorWorkbench 통합)·포커스 이동을 자동 테스트 못 함 | 테스트 의존성 추가 작업(새 의존성 → secscan) |
+| 2026-11-17 | 웹 CSP | Content-Security-Policy(img-src 등) 미설정, 썸네일 host 검사가 유일한 방어선 | 배포 전 CSP 헤더 작업 |
 | 2026-11-16 | 앱 셸 | 로그아웃 버튼(SignOutButton)이 셸에 아직 없음 | DASH-01(task-016) 또는 셸 보강 때 상단 바에 배치 |
 
 ## 교훈 (다음 작업에 그대로 적용할 것만, 20줄 이내 유지)
