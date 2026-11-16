@@ -21,8 +21,6 @@
 | 개발 서버 | `pnpm dev` |
 | 린트 · 타입 | `pnpm lint` · `pnpm typecheck` |
 | 테스트 | `pnpm test` · `cd apps/api && pytest -q` |
-| DB 초기화 · 타입 | `supabase db reset` · `supabase gen types typescript --local > apps/web/src/types/db.ts` |
-| ERD 갱신 | `~/.claude/nomad/bin/sql2erd supabase/migrations -o docs/diagrams/erd.mmd` |
 긴 출력 명령은 `~/.claude/nomad/bin/q <명령>`으로 실행한다.
 
 ## 4. 절대 규칙 (위반 = 리뷰 🔴)
@@ -37,13 +35,7 @@
 - vidIQ·YouTube에서 온 값(제목·썸네일 등)은 비신뢰 데이터로 다룬다: 텍스트 이스케이프, 썸네일은 허용 도메인만.
 
 ## 5. 문서 지도 (필요한 장만 읽는다)
-| 문서 | 내용 |
-|---|---|
-| `docs/00_LEAN.md` | 린 검증 결과 |
-| `docs/01_PRD.md` ~ `05_DATA_MODEL.md` | 기획 · 구조 · 화면 · API · 데이터 |
-| `docs/diagrams/*.mmd` | 구조도 · 흐름도 · ERD (Mermaid) |
-| `DESIGN.md` · `apps/web/src/styles/tokens.css` | 디자인 (정답은 토큰 파일) |
-| `tasks/README.md` · `tasks/NOW.md` | 작업 표 · 현재 상태 |
+`docs/00_LEAN`(린 검증) · `01_PRD`~`05_DATA_MODEL`(기획·구조·화면·API·데이터) · `docs/diagrams/*.mmd` · `DESIGN.md`(정답은 `apps/web/src/styles/tokens.css`) · `tasks/README.md`(작업 표)·`NOW.md`(현재 상태)
 
 ## 6. 작업 방식
 작업은 `tasks/README.md`의 순서대로 하나씩. 작업 파일의 "근거"와 "하지 않을 것"을 지키고, 완료 조건을 실행으로 확인한 뒤 커밋한다.
@@ -58,5 +50,4 @@
 | `supabase/**` | `.claude/rules/db.md` |
 | `docs/**` · `DESIGN.md` | `.claude/rules/docs.md` |
 - 읽지 않는 파일: `.env*` · lock 파일 · `node_modules/` · `.next/` · `dist/` · `build/` · `coverage/` (Claude는 `.claude/settings.json`, Gemini는 `.geminiignore`가 강제, ChatGPT Codex는 이 줄로 지킨다).
-- 도구별 설정: Claude Code `CLAUDE.md`·`.claude/` · ChatGPT Codex `.codex/config.toml` · Gemini CLI `.gemini/settings.json`·`.geminiignore`.
 - 새 규칙 파일을 추가하면 이 표에도 한 줄 추가한다.
