@@ -46,6 +46,11 @@ def upstream_error() -> ApiError:
     return ApiError(503, "UPSTREAM_ERROR", "인증 서버에 일시적으로 연결할 수 없습니다.")
 
 
+def db_error() -> ApiError:
+    """PostgREST(데이터 저장소) 4xx·5xx·연결 실패. 인증 문구와 분리한다."""
+    return ApiError(503, "UPSTREAM_ERROR", "데이터 저장소 요청에 실패했습니다.")
+
+
 _HTTP_CODES = {
     400: ("VALIDATION", "요청이 올바르지 않습니다."),
     401: ("UNAUTHENTICATED", "인증이 필요합니다."),

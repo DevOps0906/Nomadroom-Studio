@@ -323,6 +323,9 @@ isOneToOne: false
           Functions: {
             "is_workspace_member":
 { Args: { "ws": string }; Returns: boolean
+                           },
+"set_profile_selection":
+{ Args: { "p_ids": (string)[],"p_workspace": string }; Returns: (string)[]
                            }
           }
           Enums: {

@@ -12,7 +12,7 @@
 | task-007 | 워커 API W-01~W-04 · job 상태 | W2 | 006 | 높음 | builder + tester | 대기 |
 | task-008 | 수집 작업 API A-05 | W2 | 007 | 높음 | builder + tester | 대기 |
 | task-009 | 로컬 워커 (Playwright · vidIQ) | W2 | 007, vidIQ 약관 확인 | 높음 | builder | 보류 |
-| task-010 | 프로필 API A-03 | W2 | 003 | 높음 | builder + tester | 대기 |
+| task-010 | 프로필 API A-03 | W2 | 003 | 높음 | builder + tester | 완료 |
 | task-011 | 조회 API A-02 · A-04 · A-06 | W2 | 005, 010 | 높음 | builder + tester | 대기 |
 | task-012 | AUTH-01 로그인 | W3 | 001, 002 | 높음 | builder | 완료 |
 | task-013 | MON-01 소재수집 목록 | W3 | 006, 008, 010, 011, 012, 018 | 높음 | builder | 대기 |
