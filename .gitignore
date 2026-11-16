@@ -10,3 +10,10 @@ node_modules/
 *.pfx
 id_rsa*
 id_ed25519*
+
+# build outputs
+dist/
+build/
+coverage/
+*.tsbuildinfo
+next-env.d.ts

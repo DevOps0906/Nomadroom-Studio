@@ -19,7 +19,7 @@
 - 화면 구현·Supabase 연동·API 코드(이후 작업). hex·px를 컴포넌트에 직접 쓰지 않는다.
 
 ## 완료 조건 (실행 가능한 확인)
-- [ ] `pnpm install && pnpm lint && pnpm typecheck` 통과
-- [ ] `pnpm dev` 기동 후 홈 200 응답
-- [ ] `~/.claude/nomad/bin/secscan license` GPL·AGPL 0건
-- [ ] `grep -rE "#[0-9a-fA-F]{3,6}\b" apps/web/src --include=*.tsx` 결과 0건
+- [x] `pnpm install && pnpm lint && pnpm typecheck` 통과
+- [x] `pnpm dev` 기동 후 홈 200 응답
+- [x] `~/.claude/nomad/bin/secscan license` GPL·AGPL 0건
+- [x] `grep -rE "#[0-9a-fA-F]{3,6}\b" apps/web/src --include=*.tsx` 결과 0건

@@ -1,0 +1,97 @@
+/* tokens.css — 디자인 시스템 정답 소스 (Tailwind CSS v4). DESIGN.md 표는 design-preview --md 로 재생성.
+   tailwindcss·tw-animate-css import 는 globals.css 가 한다(여기서 중복 import 금지). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* 반응형 접두사는 tablet: · desktop: 만 쓴다 (sm/md/lg 비활성) */
+  --breakpoint-*: initial;
+  --breakpoint-tablet: 768px;
+  --breakpoint-desktop: 1200px;
+
+  /* 색 (의미 이름) — 시안 :root 값에서 옮김 */
+  --color-bg: #f5f7f3;              /* 시안 --canvas */
+  --color-surface: #ffffff;         /* 패널·카드·사이드바 */
+  --color-surface-alt: #f7f9f6;     /* 설정 박스 등 옅은 면 */
+  --color-text: #172d22;            /* 시안 --ink */
+  --color-text-muted: #5d6e63;
+  --color-border: #dce5de;          /* 장식 구분선 */
+  --color-input: #78907f;           /* 입력창·체크박스 경계 3:1 */
+  --color-primary: #245c3f;         /* 시안 --green */
+  --color-primary-fg: #ffffff;
+  --color-primary-hover: #17422e;   /* 시안 --forest */
+  --color-primary-soft: #e9f3e9;    /* 시안 --mint: 선택·태그 배경 */
+  --color-primary-soft-fg: #17422e;
+  --color-ring: #478663;            /* 포커스 링 */
+  --color-success: #1d6b3d;
+  --color-success-fg: #ffffff;
+  --color-success-soft: #e9f3e9;
+  --color-success-soft-fg: #245c3f;
+  --color-warning: #81551a;         /* 시안 --amber */
+  --color-warning-fg: #ffffff;
+  --color-warning-soft: #fff4df;    /* 시안 --shade */
+  --color-warning-soft-fg: #81551a;
+  --color-neutral-soft: #edf0ec;    /* 시안 .gray 태그 */
+  --color-neutral-soft-fg: #4f6256;
+  --color-danger: #b3261e;
+  --color-danger-fg: #ffffff;
+  --color-danger-soft: #fdeceb;
+  --color-danger-soft-fg: #8c1d18;
+
+  /* 서체 */
+  --font-sans: "Pretendard Variable", Pretendard, "Inter", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* 글자 크기 — 모바일(~767) 기준값, 태블릿·데스크톱은 아래 @media (1rem = 16px) */
+  --text-display: 1.875rem;  /* 30px */
+  --text-h1: 1.5rem;         /* 24px */
+  --text-h2: 1.125rem;       /* 18px */
+  --text-body: 0.9375rem;    /* 15px */
+  --text-caption: 0.75rem;   /* 12px */
+  --text-input: 1rem;        /* 16px 고정 — iOS 입력 확대 방지 */
+
+  /* 간격 · 반경 · 그림자 */
+  --spacing: 0.25rem;   /* 4px */
+  --radius-control: 8px;            /* 버튼·입력·내비 항목 */
+  --radius-chip: 999px;             /* 태그·칩 */
+  --radius-card: 12px;              /* 후보 카드·지표 */
+  --radius-panel: 15px;             /* 패널 (시안 --radius) */
+  --radius-dialog: 14px;
+  --shadow-card: 0 1px 2px rgb(23 45 34 / 0.06), 0 4px 12px rgb(23 45 34 / 0.06);
+}
+
+@media (width >= 768px) {
+  :root { --text-display: 2.25rem; --text-h1: 1.75rem; --text-h2: 1.25rem; --text-body: 0.875rem; --text-caption: 0.75rem; --text-input: 1rem; }
+}
+@media (width >= 1200px) {
+  :root { --text-display: 2.625rem; --text-h1: 2.125rem; --text-h2: 1.3125rem; --text-body: 0.875rem; --text-caption: 0.75rem; --text-input: 1rem; }
+}
+
+.dark {
+  --color-bg: #0f1a14;
+  --color-surface: #162219;
+  --color-surface-alt: #1b2a20;
+  --color-text: #e9f1ea;
+  --color-text-muted: #a3b5a9;
+  --color-border: #2a3b30;
+  --color-input: #6f8777;
+  --color-primary: #6fbf8e;
+  --color-primary-fg: #0f1a14;
+  --color-primary-hover: #8dd0a8;
+  --color-primary-soft: #1f3a2a;
+  --color-primary-soft-fg: #bfe3cc;
+  --color-ring: #6fbf8e;
+  --color-success: #6fbf8e;
+  --color-success-fg: #0f1a14;
+  --color-success-soft: #1f3a2a;
+  --color-success-soft-fg: #bfe3cc;
+  --color-warning: #e0b066;
+  --color-warning-fg: #0f1a14;
+  --color-warning-soft: #3a2d14;
+  --color-warning-soft-fg: #f0cf94;
+  --color-neutral-soft: #243128;
+  --color-neutral-soft-fg: #b5c4ba;
+  --color-danger: #f2a39d;
+  --color-danger-fg: #0f1a14;
+  --color-danger-soft: #3f1d1b;
+  --color-danger-soft-fg: #f7c4c0;
+}
