@@ -1,9 +1,11 @@
 # NOW — 재진입 스냅샷 (30줄 이내, 매 작업 끝에 덮어쓴다)
 
 - 갱신: 2026-11-16
-- 현재 작업: task-012 AUTH-01 로그인 — 단계: 검증(reviewer code·security·design 진행 중. test 39·E2E 24 통과)
-- 단계: M1 데이터·인증(002·003 완료 → 012). 012는 위험도 높음 → challenger 착수 전 + code·security(+design) 리뷰
-- 다음 한 걸음: `/next 012`. 그다음 M2: 005 ∥ 010 병렬
+- 현재 작업: M1 완료(task-012 2641327) → 다음 M2: task-005 판정 엔진 ∥ task-010 프로필 API — 상태: 대기
+- 단계: M2 판정·관측 코어(005 ∥ 010 → 011 · 006). 005 보통(code 리뷰), 010 높음(challenger + code·security)
+- 다음 한 걸음: `/next` (005·010 병렬 위임 가능 — 쓰기 경로 겹치지 않게)
+- task-012 결과: 세션 서버 전용(httpOnly, 02#2 갱신)·proxy.ts·safeNext 정규화 재검사·confirm POST·IP 제한 5분 10회·/terms. web test 73·E2E 39. 결정 `tasks/task-012.md#구현 결정·#리뷰 반영 결정`
+  - 남은 일: 로그아웃 버튼 셸 배치(task-016), 배포 체크 항목은 `tasks/README.md#발견한 문제`
 - task-003 결과: apps/api(uv·Python 3.14·fastapi 0.163.1), JWKS ES256 검증·소속 1행·워커 토큰·CLI·로그 마스킹, pytest 69 + integration 2
   - 결정: `tasks/task-003.md#구현 결정`. docs 기본 끔(API_DOCS_ENABLED), 원격 SUPABASE_URL https만, JWKS 실패 60초 쿨다운 503
   - 세션 철회: JWT exp(≤3600초)까지 유효, 소속은 매 요청 확인(팀장 결정)
@@ -17,4 +19,4 @@
 - 열린 결정: vidIQ 약관(task-009 보류) · 구간별 폰트 최종값 · Dependabot PR 9건(TS 7은 ci 실패) · GitHub Dependabot alerts·비공개 신고 켜기(사람) · 미확인 방송사 채널(tvN 본채널·SBS NOW·NHK 뉴스·CJ ENM 계열)
 - 커밋 안 된 사용자 수정: AGENTS.md·CLAUDE.md·.claude/rules/db.md(건드리지 않음)
 - SDLC 단계: 06 구현
-- 테스트 상태: supabase test db 50/50 · api pytest 69 + integration 2 · web lint·typecheck 통과
+- 테스트 상태: supabase test db 50/50 · api pytest 69 + integration 2 · web test 73 · E2E 39(scratchpad, 커밋 안 됨)
