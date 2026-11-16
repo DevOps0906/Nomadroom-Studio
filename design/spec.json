@@ -1,15 +1,19 @@
 {
  "version": "1",
- "generated": "2026-11-16T07:33:41+00:00",
+ "generated": "2026-11-16T12:57:26+00:00",
  "docs": "docs",
- "tokens": "기본 시작 토큰(프로젝트 토큰 없음)",
+ "tokens": ".\\apps\\web\\src\\styles\\tokens.css",
  "sources": {
   "docs/03_SCREENS_UX.md": "56c8f567ebda",
-  "docs/04_API.md": "7bd66ff37655",
+  "docs/04_API.md": "c57ea47e2e63",
   "docs/05_DATA_MODEL.md": "7db37a80145d"
  },
  "changed": [
-  "DASH-01"
+  "AUTH-01",
+  "DASH-01",
+  "MON-01",
+  "MON-D1",
+  "MON-D2"
  ],
  "removed": [],
  "screens": {
@@ -74,7 +78,7 @@
    "must_missing": [],
    "should_missing": [],
    "states_missing": [],
-   "hash": "a25c06f7ccdc",
+   "hash": "fd9c82e2ae01",
    "wireframe": "design/wireframes/AUTH-01.html"
   },
   "DASH-01": {
@@ -185,7 +189,7 @@
     "할 일·알림(지표가 행동으로 이어지게)"
    ],
    "states_missing": [],
-   "hash": "f6d314db2d65",
+   "hash": "83b2f8191ece",
    "wireframe": "design/wireframes/DASH-01.html"
   },
   "MON-01": {
@@ -334,7 +338,7 @@
     "저장된 보기·열 설정"
    ],
    "states_missing": [],
-   "hash": "fd3eb185154b",
+   "hash": "5a3fe606f86d",
    "wireframe": "design/wireframes/MON-01.html"
   },
   "MON-D1": {
@@ -398,7 +402,7 @@
     "임시 저장(긴 폼)"
    ],
    "states_missing": [],
-   "hash": "96ca2ca93c0a",
+   "hash": "fd74083bd2d3",
    "wireframe": "design/wireframes/MON-D1.html"
   },
   "MON-D2": {
@@ -482,7 +486,7 @@
     "활동·변경 이력"
    ],
    "states_missing": [],
-   "hash": "909204afe46f",
+   "hash": "219a99bb73c3",
    "wireframe": "design/wireframes/MON-D2.html"
   }
  },

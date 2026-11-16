@@ -18,7 +18,7 @@
 ## 2. 경계 규칙 (누가 누구를 부르나)
 | 호출자 | 대상 | 방법 | 금지 |
 |---|---|---|---|
-| 브라우저 | Supabase | 로그인·읽기만, anon 키 + 사용자 JWT, 전 테이블 RLS | 쓰기 중 판정·관측값 직접 변경 |
+| 브라우저 | Supabase | 직접 호출 안 함. 로그인·읽기는 웹 서버(Server Action·Server Component)가 anon 키 + 사용자 세션(httpOnly 쿠키)으로 대신, 전 테이블 RLS (사용자 결정 2026-11-16) | 브라우저 Supabase 클라이언트·Realtime, 쓰기 |
 | 브라우저 | API | 직접 호출 안 함. 웹 서버(Route Handler)가 중계 | 브라우저에서 API 주소·키 노출 |
 | 웹 서버 | API | HTTPS, `Authorization: Bearer <Supabase 사용자 JWT>` 전달. API가 JWT 서명·만료·워크스페이스 소속 검증 | JWT 없는 호출, 웹이 API 대신 YouTube·service_role 사용 |
 | API | Supabase | service_role로 읽기·쓰기 (서버 환경변수) | 사용자 JWT 검증 없이 사용자 데이터 처리 |

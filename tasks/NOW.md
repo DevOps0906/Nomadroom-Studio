@@ -1,7 +1,7 @@
 # NOW — 재진입 스냅샷 (30줄 이내, 매 작업 끝에 덮어쓴다)
 
 - 갱신: 2026-11-16
-- 현재 작업: task-003 완료(959dc55) → 다음 task-012 AUTH-01 로그인 — 상태: 대기
+- 현재 작업: task-012 AUTH-01 로그인 — 단계: 검증(reviewer code·security·design 진행 중. test 39·E2E 24 통과)
 - 단계: M1 데이터·인증(002·003 완료 → 012). 012는 위험도 높음 → challenger 착수 전 + code·security(+design) 리뷰
 - 다음 한 걸음: `/next 012`. 그다음 M2: 005 ∥ 010 병렬
 - task-003 결과: apps/api(uv·Python 3.14·fastapi 0.163.1), JWKS ES256 검증·소속 1행·워커 토큰·CLI·로그 마스킹, pytest 69 + integration 2

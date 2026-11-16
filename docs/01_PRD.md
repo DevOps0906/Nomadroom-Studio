@@ -75,7 +75,7 @@
 | 항목 | 후보 가져오기·기록 검증 API (웹→FastAPI) | 로컬 워커 (Chrome·vidIQ) | 웹 (로그인·Route Handler·후보 화면) |
 |---|---|---|---|
 | 노출 면 | 인증된 사용자만 호출하는 API | 외부 노출 없음(아웃바운드: FastAPI `/worker/v1/*`·vidIQ) | 인터넷 공개 `/login`, 로그인 후 Route Handler·화면 |
-| 인증·인가 | Supabase 세션 필수 · 같은 워크스페이스만 · RLS | 워커 토큰으로 `/worker/v1/*`만 호출. DB 직접 접속 없음(`adr/0001-worker-location.md`) | Supabase Auth, 계정은 관리자 초대만. 로그인 시도 제한은 Supabase Auth 기본 제한 사용(팀장 결정 2026-11-16) |
+| 인증·인가 | Supabase 세션 필수 · 같은 워크스페이스만 · RLS | 워커 토큰으로 `/worker/v1/*`만 호출. DB 직접 접속 없음(`adr/0001-worker-location.md`) | Supabase Auth, 계정은 관리자 초대만. 로그인 시도 제한은 웹 서버의 접속 IP별 제한(1차) + Supabase Auth 기본 제한(2차)(사용자 결정 2026-11-16) |
 | 다루는 데이터 | 조건·후보·관측값(공개 데이터) | vidIQ 로그인 세션(쿠키) | 세션 쿠키(httpOnly), vidIQ 유래 제목·채널명·썸네일 URL |
 | 필요한 키·권한 | YouTube API 키(서버 전용, 할당량 제한·API 제한 설정), service_role(서버만) | 워커 토큰만(해시로 저장, 워크스페이스 범위). service_role·DB 접속 정보 없음 | anon 키만(공개 가능) |
 | 입력 | 조건 값 검증(Pydantic), 키워드·수치 범위 제한 | vidIQ 페이지 파싱 결과는 신뢰하지 않고 형식 검증 | vidIQ 유래 값은 비신뢰: 텍스트로 이스케이프해 렌더링(HTML 삽입 금지), 썸네일은 `i.ytimg.com` 허용 목록만 |

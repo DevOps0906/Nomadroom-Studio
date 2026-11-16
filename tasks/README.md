@@ -14,7 +14,7 @@
 | task-009 | 로컬 워커 (Playwright · vidIQ) | W2 | 007, vidIQ 약관 확인 | 높음 | builder | 보류 |
 | task-010 | 프로필 API A-03 | W2 | 003 | 높음 | builder + tester | 대기 |
 | task-011 | 조회 API A-02 · A-04 · A-06 | W2 | 005, 010 | 높음 | builder + tester | 대기 |
-| task-012 | AUTH-01 로그인 | W3 | 001, 002 | 높음 | builder | 대기 |
+| task-012 | AUTH-01 로그인 | W3 | 001, 002 | 높음 | builder | 완료 |
 | task-013 | MON-01 소재수집 목록 | W3 | 006, 008, 010, 011, 012, 018 | 높음 | builder | 대기 |
 | task-014 | MON-D1 프로필 조건 | W3 | 010, 012, 018 | 보통 | builder | 대기 |
 | task-015 | MON-D2 관측 근거 | W3 | 011, 013, 018 | 높음 | builder | 대기 |
@@ -30,6 +30,9 @@
 ## 발견한 문제 (범위 밖 — 나중 작업 후보)
 | 날짜 | 위치 | 내용 | 제안 |
 |---|---|---|---|
+| 2026-11-16 | 배포(운영 Supabase·프록시) | 로컬 config에만 반영한 인증 설정: recovery 메일 템플릿, secure_password_change, 비밀번호 최소 10자, 가입 차단. 프록시의 X-Forwarded-For 덮어쓰기와 Host 전달, 접근 로그의 쿼리 문자열(token_hash) 마스킹 | 08 배포 단계 체크리스트에 포함 |
+| 2026-11-16 | AUTH-01 `/auth/confirm` | 로그인 CSRF 여지: 타인 재설정 링크의 버튼을 누르면 세션이 바뀜(내부 도구라 낮음) | 이미 로그인 상태면 확인 화면에 경고 표시 검토 |
+| 2026-11-16 | 앱 셸 | 로그아웃 버튼(SignOutButton)이 셸에 아직 없음 | DASH-01(task-016) 또는 셸 보강 때 상단 바에 배치 |
 
 ## 교훈 (다음 작업에 그대로 적용할 것만, 20줄 이내 유지)
 - 테스트의 가짜 JWT·키는 문자열 리터럴로 두지 말고 런타임에 조립한다(gitleaks pre-commit 차단).
