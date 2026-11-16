@@ -20,5 +20,5 @@
 - 화면별 본문·데이터 호출, 로그인·세션 처리(task-012), 메뉴 화면 내재화.
 
 ## 완료 조건 (실행 가능한 확인)
-- [ ] `pnpm typecheck` 통과
-- [ ] `~/.claude/nomad/bin/shot`으로 3구간 캡처 확인(시안과 사이드바·탭 비교)
+- [x] `pnpm typecheck` 통과
+- [x] `~/.claude/nomad/bin/shot`으로 3구간 캡처 확인(시안과 사이드바·탭 비교)
