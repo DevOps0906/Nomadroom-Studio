@@ -1,9 +1,11 @@
 # NOW — 재진입 스냅샷 (30줄 이내, 매 작업 끝에 덮어쓴다)
 
 - 갱신: 2026-11-16
-- 현재 작업: M2 완료(005 c545333 · 010 8a09e17 · 011 16f51b2 · 006 7ee77c3) → 다음 M3: task-007 워커 API W-01~W-04 — 상태: 대기
-- 단계: M3 수집 API + 화면 1차(007 → 008 ∥ 014 ∥ 016). 007 높음(challenger + code·security). 014·016은 M2 결과만 필요해 007과 병렬 가능(화면은 design 리뷰 추가)
-- 다음 한 걸음: `/next` (007과 014·016 병렬 검토)
+- 현재 작업: M3 완료(007 2615218 · 016 b12b0f4 · 014 147ea75 · 008 8036c72) → 다음 M4: task-013 MON-01 소재수집 목록 — 상태: 대기
+- 단계: M4 소재수집 완성(013 → 015 ∥ 017). 셋 다 위험도 높음 → 워커 opus + challenger 착수 전 + code·security(+design) 리뷰
+- 다음 한 걸음: `/next` (013). 013에서 MON-D1 다이얼로그 연결(`tasks/task-013.md#앞 작업에서 넘어온 것`)
+- M3 결과: 워커 API(claim·heartbeat·후보·finish, job당 조회 200 상한)·수집 작업 API(retry·stop RPC, 24시간 20건)·대시보드·프로필 조건 화면·웹→API 공용 클라이언트(401 → SESSION_EXPIRED_PATH). 상태 전이 정본 `docs/02_ARCHITECTURE.md#3-3`
+- 모델 규칙(2026-11-17): 워커 model은 위험도로 — 낮음 haiku · 보통 sonnet · 높음 opus(TEAM.md·개인 CLAUDE.md)
 - M2 결과: 판정 엔진(순수 함수)·프로필 API(낙관적 잠금·선택 RPC)·조회 API(candidate_list_v)·기록 검증(할당량 RPC·60초 제한). 마이그레이션 000006~000009. 결정은 각 task 파일 "구현 결정"·"리뷰 반영 결정"
   - 웹이 맞춰야 할 계약: PUT 프로필은 조건 8필드+updated_at(전체 교체), q 공백=필터 없음, 썸네일 null 가능, A-07 429 두 종류
 - task-012 결과: 세션 서버 전용(httpOnly, 02#2 갱신)·proxy.ts·safeNext 정규화 재검사·confirm POST·IP 제한 5분 10회·/terms. web test 73·E2E 39. 결정 `tasks/task-012.md#구현 결정·#리뷰 반영 결정`
@@ -18,7 +20,7 @@
   - gitleaks는 winget 설치. bash에서는 PATH에 `.../WinGet/Packages/Gitleaks.Gitleaks_Microsoft.Winget.Source_8wekyb3d8bbwe` 추가
   - 테스트의 가짜 JWT·키는 런타임 조립(문자열 리터럴이면 gitleaks에 걸림)
   - pnpm은 `corepack pnpm`, `apps/web`에서 실행 · 반응형은 `tablet:`·`desktop:` · jsdom 없음 · `.env*` 읽기 거부 · Codex CLI 401이라 reviewer로 대체
-- 열린 결정: vidIQ 약관(task-009 보류) · 구간별 폰트 최종값 · Dependabot PR 9건(TS 7은 ci 실패) · GitHub Dependabot alerts·비공개 신고 켜기(사람) · 미확인 방송사 채널(tvN 본채널·SBS NOW·NHK 뉴스·CJ ENM 계열)
+- 열린 결정: vidIQ 약관(task-009 보류) · 구간별 폰트 최종값 · Dependabot PR 9건(TS 7은 ci 실패) · GitHub Dependabot alerts·비공개 신고 켜기(사람) · 미확인 방송사 채널(tvN 본채널·SBS NOW·NHK 뉴스·CJ ENM 계열) · .env.example의 API_BASE_URL 중복 줄(사람 확인) · nomad-agent-os 미커밋 변경 21파일
 - 커밋 안 된 사용자 수정: AGENTS.md·CLAUDE.md·.claude/rules/db.md(건드리지 않음)
 - SDLC 단계: 06 구현
-- 테스트 상태: supabase test db 126 · api pytest 281 + integration 7 · web test 73 · E2E 39(scratchpad)
+- 테스트 상태: supabase test db 221 · api pytest 433 + integration 11 · web test 150 · E2E는 scratchpad(미커밋)
