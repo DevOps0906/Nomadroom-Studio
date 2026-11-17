@@ -81,7 +81,7 @@ describe("후보 목록 상태", () => {
     expect(html).toContain("다시 시도");
   });
 
-  it("성공: 카드 필드·영상 만들기(고정 주소·새 탭)·관측 근거 비활성", () => {
+  it("성공: 카드 필드·영상 만들기(고정 주소·새 탭)·관측 근거 버튼", () => {
     const html = renderToStaticMarkup(
       <CandidateResults data={data([item()], { ...counts, total: 1, producible: 1 })} query={DEFAULT_QUERY} opsUrl="https://ops.example.com/" />,
     );
@@ -90,13 +90,11 @@ describe("후보 목록 상태", () => {
     expect(html).toContain("+1.0%");
     expect(html).toContain('href="https://ops.example.com/"');
     expect(html).toContain('rel="noopener noreferrer"');
-    // 보이는 "준비 중" 설명을 aria-describedby로 연결, 숨은 title·disabled 없음
+    // 관측 근거(MON-D2) 다이얼로그 트리거: 활성, "준비 중" 칩 없음
     const btn = html.match(/<button[^>]*>관측 근거<\/button>/)?.[0] ?? "";
-    expect(btn).toContain('aria-disabled="true"');
-    expect(btn).not.toContain("title=");
-    expect(btn).not.toContain(' disabled=""');
-    const id = btn.match(/aria-describedby="([^"]+)"/)?.[1];
-    expect(html).toMatch(new RegExp(`id="${id}"[^>]*>준비 중<`));
+    expect(btn).toContain('aria-haspopup="dialog"');
+    expect(btn).not.toContain("aria-disabled");
+    expect(html).not.toContain("준비 중");
   });
 
   it("근거 대기: 이전 관측값 필요 + 다음 관측 예정 시각, 영상 만들기 없음", () => {

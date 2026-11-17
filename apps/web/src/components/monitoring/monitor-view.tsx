@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { formatDateTime, formatGrowth } from "@/components/dashboard/format";
 import { RetryButton } from "@/components/dashboard/retry-button";
+import { EvidenceButton } from "@/components/evidence/evidence-dialog";
 import type { CandidateItem, CandidateList, Counts } from "@/server/api/monitor";
 import {
   FORMAT_FILTERS,
@@ -232,20 +233,7 @@ export function CandidateCard({ item, opsUrl }: { item: CandidateItem; opsUrl: s
         </p>
       )}
       <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-1">
-        {/* 관측 근거(MON-D2)는 task-015에서 연결. 숨은 title 대신 보이는 "준비 중"을 설명으로 연결한다. */}
-        <span className="inline-flex min-h-11 items-center gap-2">
-          <button
-            type="button"
-            aria-disabled="true"
-            aria-describedby={`evidence-soon-${item.id}`}
-            className="inline-flex min-h-11 cursor-not-allowed items-center rounded-control px-2 text-body font-semibold text-text-muted"
-          >
-            관측 근거
-          </button>
-          <span id={`evidence-soon-${item.id}`} className="rounded-chip bg-neutral-soft px-2 py-0.5 text-caption text-neutral-soft-fg">
-            준비 중
-          </span>
-        </span>
+        <EvidenceButton candidateId={item.id} title={item.title} opsUrl={opsUrl} />
         {item.status === "producible" && opsUrl && (
           <a
             href={opsUrl}

@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Evidence } from "@/components/evidence/evidence";
 import type { JobProfileRun, JobStatus } from "@/components/monitoring/job";
 import { toApiQuery, type CandidateQuery, type CandidateStatus } from "@/components/monitoring/query";
 import { apiFetch } from "./client";
@@ -96,4 +97,9 @@ export function runVerify(key: string, profileIds: string[]): Promise<VerifyRun>
     body: { profile_ids: profileIds },
     timeoutMs: VERIFY_TIMEOUT_MS,
   });
+}
+
+/** A-06 관측 근거(대표 판정 프로필 기준). 화면 필드 정리는 호출자(Route Handler)가 한다. */
+export function getEvidence(id: string): Promise<Evidence> {
+  return apiFetch<Evidence>(`/v1/candidates/${encodeURIComponent(id)}/evidence`);
 }
