@@ -1,11 +1,10 @@
 # NOW — 재진입 스냅샷 (30줄 이내, 매 작업 끝에 덮어쓴다)
 
 - 갱신: 2026-11-18
-- 현재 작업: task-019 YouTube 검색 후보 수집 — 단계: 구현(builder opus)
-- 단계: M5 = task-019(수집). 이후 W4(P0: 020~028)·W5(P1: 029~033). 팀장 브리프·결정 `tasks/plan-category-shorts.md`
-- 다음 한 걸음: `/next` (task-019). 사람 확인: `design/wireframes/index.html`의 PROD-00~03 시안
-- 015 결과: MON-D2 다이얼로그(components/evidence, 순수 뷰+클라이언트 컨테이너), A-06 중계 /api/evidence/[id], 카드 버튼 연결. 결정 `tasks/task-015.md#착수 결정·#리뷰 반영 결정`
-- 017 결과: A-08 PATCH(멱등 used_at·조건부 update·404), 웹 /api/candidates/[id]/used(assertSameOrigin)·UsedToggle. 결정 `tasks/task-017.md#착수 결정·#리뷰 반영 결정`
+- 현재 작업: task-019 완료(원래 MVP 기능 완료) → 다음: task-020 제작 스키마·RLS·Storage(W4 카테고리형 P0 시작) — 상태: 대기
+- 단계: W4(P0: 020~028) → W5(P1: 029~033). 팀장 브리프·결정 `tasks/plan-category-shorts.md`. 대부분 위험도 높음 → 워커 opus + challenger + code·security
+- 다음 한 걸음: `/next` (task-020). 사람 확인: `design/wireframes/index.html`의 PROD-00~03 시안
+- 019 결과: 수집 = 서버 YouTube 검색(source=youtube_search), 검색 할당량 예약·환불, 000013·000014. 결정 `tasks/task-019.md#착수 결정·#리뷰 반영 결정`. 배포 시 YOUTUBE_API_KEY 필수
 - M3 결과: 워커 API(claim·heartbeat·후보·finish, job당 조회 200 상한)·수집 작업 API(retry·stop RPC, 24시간 20건)·대시보드·프로필 조건 화면·웹→API 공용 클라이언트(401 → SESSION_EXPIRED_PATH). 상태 전이 정본 `docs/02_ARCHITECTURE.md#3-3`
 - 모델 규칙(2026-11-17): 워커 model은 위험도로 — 낮음 haiku · 보통 sonnet · 높음 opus(TEAM.md·개인 CLAUDE.md)
 - M2 결과: 판정 엔진(순수 함수)·프로필 API(낙관적 잠금·선택 RPC)·조회 API(candidate_list_v)·기록 검증(할당량 RPC·60초 제한). 마이그레이션 000006~000009. 결정은 각 task 파일 "구현 결정"·"리뷰 반영 결정"
@@ -22,8 +21,8 @@
   - gitleaks는 winget 설치. bash에서는 PATH에 `.../WinGet/Packages/Gitleaks.Gitleaks_Microsoft.Winget.Source_8wekyb3d8bbwe` 추가
   - 테스트의 가짜 JWT·키는 런타임 조립(문자열 리터럴이면 gitleaks에 걸림)
   - pnpm은 `corepack pnpm`, `apps/web`에서 실행 · 반응형은 `tablet:`·`desktop:` · jsdom 없음 · `.env*` 읽기 거부 · Codex CLI 401이라 reviewer로 대체
-  - Docker 실행 후 9327~9526 포트 예약됨 → CDP 캡처 포트 19335. 캡처 스크립트 scratchpad dlgshot015.mjs, 서버 run015.sh(3016·3017·8016)
+  - Docker 실행 후 9327~9526 포트 예약됨 → CDP 캡처 포트 19335. 캡처 스크립트 scratchpad dlgshot015.mjs·shot019.mjs, 서버 run015.sh(3016·3017·8016) — Server Action 캡처는 웹 APP_ORIGIN=http://localhost:3017로 띄워야 함
 - 열린 결정: vidIQ는 구현 안 함·준비 중(2026-11-17 사용자 결정: 후보 수집은 YouTube 검색 = task-019) · 구간별 폰트 최종값 · Dependabot PR 9건(TS 7은 ci 실패) · GitHub Dependabot alerts·비공개 신고 켜기(사람) · 미확인 방송사 채널(tvN 본채널·SBS NOW·NHK 뉴스·CJ ENM 계열) · .env.example의 API_BASE_URL 중복 줄(사람 확인) · nomad-agent-os 미커밋 변경 21파일
 - 커밋 안 된 사용자 수정: AGENTS.md·CLAUDE.md·.claude/rules/db.md(건드리지 않음)
 - SDLC 단계: 06 구현
-- 테스트 상태: supabase test db 221 · api pytest 454 + integration 11 · web test 266 · E2E는 scratchpad(미커밋)
+- 테스트 상태: supabase test db 275 · api pytest 515 + integration 13 · web test 274 · E2E는 scratchpad(미커밋)
