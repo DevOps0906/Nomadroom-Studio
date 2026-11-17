@@ -1,14 +1,16 @@
 {
  "version": "1",
- "generated": "2026-11-17T12:44:10+00:00",
+ "generated": "2026-11-17T18:36:51+00:00",
  "docs": "docs",
  "tokens": ".\\apps\\web\\src\\styles\\tokens.css",
  "sources": {
-  "docs/03_SCREENS_UX.md": "56c8f567ebda",
-  "docs/04_API.md": "571b0ca4df2a",
-  "docs/05_DATA_MODEL.md": "54d41fb7f57b"
+  "docs/03_SCREENS_UX.md": "aeba56baa9ee",
+  "docs/04_API.md": "31c18903a3f1",
+  "docs/05_DATA_MODEL.md": "4ba935368dd6"
  },
- "changed": [],
+ "changed": [
+  "PROD-02"
+ ],
  "removed": [],
  "screens": {
   "AUTH-01": {
@@ -279,7 +281,7 @@
     },
     {
      "type": "card",
-     "label": "후보(썸네일·상태·장르·제목·형식·프로필·라이선스·두 시점 미니 차트·기간·증가율·button:관측 근거·button:영상 만들기 →)",
+     "label": "후보(썸네일·상태·장르·제목·형식·프로필·라이선스·두 시점 미니 차트·기간·증가율·button:관측 근거·button:영상 만들기 →·button:카테고리형 제작)",
      "items": [
       "후보(썸네일",
       "상태",
@@ -292,7 +294,8 @@
       "기간",
       "증가율",
       "button:관측 근거",
-      "button:영상 만들기 →)"
+      "button:영상 만들기 →",
+      "button:카테고리형 제작)"
      ]
     },
     {
@@ -314,13 +317,15 @@
     "A-04",
     "A-05",
     "A-07",
-    "A-08"
+    "A-08",
+    "A-09"
    ],
    "role": "로그인",
    "next": [
     "MON-D1",
     "MON-D2",
-    "DASH-01"
+    "DASH-01",
+    "PROD-01"
    ],
    "states_combined": "",
    "source": "docs/03_SCREENS_UX.md",
@@ -332,7 +337,7 @@
     "저장된 보기·열 설정"
    ],
    "states_missing": [],
-   "hash": "65bf557db0c5",
+   "hash": "847161231c2e",
    "wireframe": "design/wireframes/MON-01.html"
   },
   "MON-D1": {
@@ -482,6 +487,483 @@
    "states_missing": [],
    "hash": "2727932453e9",
    "wireframe": "design/wireframes/MON-D2.html"
+  },
+  "PROD-00": {
+   "id": "PROD-00",
+   "name": "제작 작업 목록",
+   "type_raw": "목록",
+   "route": "/production",
+   "purpose": "카테고리형 제작 작업을 찾고 이어서 진행한다",
+   "blocks": [
+    {
+     "type": "breadcrumb",
+     "label": "",
+     "items": []
+    },
+    {
+     "type": "header",
+     "label": "",
+     "items": []
+    },
+    {
+     "type": "search",
+     "label": "제목",
+     "items": [
+      "제목"
+     ]
+    },
+    {
+     "type": "filter",
+     "label": "상태·언어",
+     "items": [
+      "상태",
+      "언어"
+     ]
+    },
+    {
+     "type": "table",
+     "label": "제목·상태·원본·최근 리비전·수정 시각",
+     "items": [
+      "제목",
+      "상태",
+      "원본",
+      "최근 리비전",
+      "수정 시각"
+     ]
+    },
+    {
+     "type": "pagination",
+     "label": "",
+     "items": []
+    },
+    {
+     "type": "button",
+     "label": "새 작업(원본 직접 시작)",
+     "items": [
+      "새 작업(원본 직접 시작)"
+     ]
+    },
+    {
+     "type": "button",
+     "label": "소재수집 열기(빈 상태)",
+     "items": [
+      "소재수집 열기(빈 상태)"
+     ]
+    }
+   ],
+   "data": [
+    "production_jobs"
+   ],
+   "api": [
+    "A-09"
+   ],
+   "role": "로그인",
+   "next": [
+    "PROD-01",
+    "PROD-03"
+   ],
+   "states_combined": "",
+   "source": "docs/03_SCREENS_UX.md",
+   "type": "list",
+   "must_missing": [],
+   "should_missing": [
+    "일괄 작업(선택·삭제·내보내기)",
+    "저장된 보기·열 설정"
+   ],
+   "states_missing": [],
+   "hash": "de9979335607",
+   "wireframe": "design/wireframes/PROD-00.html"
+  },
+  "PROD-01": {
+   "id": "PROD-01",
+   "name": "원본·구간·출처",
+   "type_raw": "폼",
+   "route": "/production/[jobId]/source",
+   "purpose": "원본 확보, 사용 구간, 출처·권리 확인",
+   "blocks": [
+    {
+     "type": "breadcrumb",
+     "label": "",
+     "items": []
+    },
+    {
+     "type": "header",
+     "label": "작업 제목·상태",
+     "items": [
+      "작업 제목",
+      "상태"
+     ]
+    },
+    {
+     "type": "form",
+     "label": "원본 파일 업로드(기본)*·\"사용 권한 확인\" 체크·원본 URL(P1·체크 후 입력)·원본 시작(초)*·길이(초)*(힌트 \"0 초과 180 이하\")·저작자·라이선스·출처 URL",
+     "items": [
+      "원본 파일 업로드(기본)*",
+      "\"사용 권한 확인\" 체크",
+      "원본 URL(P1",
+      "체크 후 입력)",
+      "원본 시작(초)*",
+      "길이(초)*(힌트 \"0 초과 180 이하\")",
+      "저작자",
+      "라이선스",
+      "출처 URL"
+     ]
+    },
+    {
+     "type": "card",
+     "label": "후보 정보(MON-01에서 넘어온 제목·URL·라이선스)",
+     "items": [
+      "후보 정보(MON-01에서 넘어온 제목",
+      "URL",
+      "라이선스)"
+     ]
+    },
+    {
+     "type": "player",
+     "label": "원본 미리보기",
+     "items": [
+      "원본 미리보기"
+     ]
+    },
+    {
+     "type": "button",
+     "label": "원본 준비 시작",
+     "items": [
+      "원본 준비 시작"
+     ]
+    },
+    {
+     "type": "button",
+     "label": "저장",
+     "items": [
+      "저장"
+     ]
+    },
+    {
+     "type": "button",
+     "label": "편집안으로(준비 완료 때 활성)",
+     "items": [
+      "편집안으로(준비 완료 때 활성)"
+     ]
+    },
+    {
+     "type": "button",
+     "label": "취소",
+     "items": [
+      "취소"
+     ]
+    }
+   ],
+   "data": [
+    "production_jobs",
+    "production_assets",
+    "candidates"
+   ],
+   "api": [
+    "A-09",
+    "A-10",
+    "A-11"
+   ],
+   "role": "로그인",
+   "next": [
+    "PROD-02",
+    "PROD-00"
+   ],
+   "states_combined": "",
+   "source": "docs/03_SCREENS_UX.md",
+   "type": "form",
+   "must_missing": [],
+   "should_missing": [
+    "임시 저장(긴 폼)"
+   ],
+   "states_missing": [],
+   "hash": "4c6766099bd7",
+   "wireframe": "design/wireframes/PROD-01.html"
+  },
+  "PROD-02": {
+   "id": "PROD-02",
+   "name": "편집안",
+   "type_raw": "폼",
+   "route": "/production/[jobId]/edit",
+   "purpose": "분석 시트를 보며 제목·훅·자막·구도를 고치고 승인한다",
+   "blocks": [
+    {
+     "type": "breadcrumb",
+     "label": "",
+     "items": []
+    },
+    {
+     "type": "header",
+     "label": "작업 제목·리비전",
+     "items": [
+      "작업 제목",
+      "리비전"
+     ]
+    },
+    {
+     "type": "button",
+     "label": "취소(작업으로 돌아가기)",
+     "items": [
+      "취소(작업으로 돌아가기)"
+     ]
+    },
+    {
+     "type": "panel",
+     "label": "분석 시트(장면 후보·0.5초 간격 이미지·구간 재생)",
+     "items": [
+      "분석 시트(장면 후보",
+      "0.5초 간격 이미지",
+      "구간 재생)"
+     ]
+    },
+    {
+     "type": "tabs",
+     "label": "편집안·댓글(P1)·출처(P1)",
+     "items": [
+      "편집안",
+      "댓글(P1)",
+      "출처(P1)"
+     ]
+    },
+    {
+     "type": "form",
+     "label": "제목 2줄*·첫 훅 문구*·훅 음성(첨부 업로드)·훅 카운터(훅 길이와 첫 자막 길이 비교·브라우저 메타 길이 있을 때 경고만)",
+     "items": [
+      "제목 2줄*",
+      "첫 훅 문구*",
+      "훅 음성(첨부 업로드)",
+      "훅 카운터(훅 길이와 첫 자막 길이 비교",
+      "브라우저 메타 길이 있을 때 경고만)"
+     ]
+    },
+    {
+     "type": "list",
+     "label": "자막 행(＋행·삭제·구간·유형 3종·문구·1.4초 미만 노랑 배지)*",
+     "items": [
+      "자막 행(＋행",
+      "삭제",
+      "구간",
+      "유형 3종",
+      "문구",
+      "1.4초 미만 노랑 배지)*"
+     ]
+    },
+    {
+     "type": "list",
+     "label": "구도(컷) 행(구간·배율·세로 오프셋)*",
+     "items": [
+      "구도(컷) 행(구간",
+      "배율",
+      "세로 오프셋)*"
+     ]
+    },
+    {
+     "type": "bar",
+     "label": "구간 타임라인(겹침·공백 빨강)",
+     "items": [
+      "구간 타임라인(겹침",
+      "공백 빨강)"
+     ]
+    },
+    {
+     "type": "form",
+     "label": "댓글 탭(P1) 문구·표시 구간·위치",
+     "items": [
+      "댓글 탭(P1) 문구",
+      "표시 구간",
+      "위치"
+     ]
+    },
+    {
+     "type": "form",
+     "label": "출처 탭(P1) 표기 위치·내용",
+     "items": [
+      "출처 탭(P1) 표기 위치",
+      "내용"
+     ]
+    },
+    {
+     "type": "button",
+     "label": "AI 초안 채우기(P1)",
+     "items": [
+      "AI 초안 채우기(P1)"
+     ]
+    },
+    {
+     "type": "button",
+     "label": "저장(오류 허용·서버 검증 결과 표시)",
+     "items": [
+      "저장(오류 허용",
+      "서버 검증 결과 표시)"
+     ]
+    },
+    {
+     "type": "button",
+     "label": "승인(오류 0일 때)",
+     "items": [
+      "승인(오류 0일 때)"
+     ]
+    },
+    {
+     "type": "note",
+     "label": "하단 고정(~767)·승인 비활성 사유 링크",
+     "items": [
+      "하단 고정(~767)",
+      "승인 비활성 사유 링크"
+     ]
+    }
+   ],
+   "data": [
+    "edit_revisions",
+    "production_assets"
+   ],
+   "api": [
+    "A-10",
+    "A-12",
+    "A-13",
+    "A-14",
+    "A-18"
+   ],
+   "role": "로그인",
+   "next": [
+    "PROD-03",
+    "PROD-01"
+   ],
+   "states_combined": "",
+   "source": "docs/03_SCREENS_UX.md",
+   "type": "form",
+   "must_missing": [],
+   "should_missing": [
+    "임시 저장(긴 폼)"
+   ],
+   "states_missing": [],
+   "hash": "b145053d34c0",
+   "wireframe": "design/wireframes/PROD-02.html"
+  },
+  "PROD-03": {
+   "id": "PROD-03",
+   "name": "작업·검수",
+   "type_raw": "상세",
+   "route": "/production/[jobId]",
+   "purpose": "진행을 보고 MP4를 검수·다운로드한다",
+   "blocks": [
+    {
+     "type": "breadcrumb",
+     "label": "",
+     "items": []
+    },
+    {
+     "type": "header",
+     "label": "작업 제목·상태(초안·원본 준비·편집안 검토·렌더링·검수 대기·완료·실패)",
+     "items": [
+      "작업 제목",
+      "상태(초안",
+      "원본 준비",
+      "편집안 검토",
+      "렌더링",
+      "검수 대기",
+      "완료",
+      "실패)"
+     ]
+    },
+    {
+     "type": "stepper",
+     "label": "진행 단계",
+     "items": [
+      "진행 단계"
+     ]
+    },
+    {
+     "type": "card",
+     "label": "승인됨·렌더 미시작 안내·button:렌더 요청",
+     "items": [
+      "승인됨",
+      "렌더 미시작 안내",
+      "button:렌더 요청"
+     ]
+    },
+    {
+     "type": "card",
+     "label": "실패 단계·사유 코드·button:재시도(실패 때만)·link:편집안으로 돌아가 고치기(hook_too_long·text_too_long)",
+     "items": [
+      "실패 단계",
+      "사유 코드",
+      "button:재시도(실패 때만)",
+      "link:편집안으로 돌아가 고치기(hook_too_long",
+      "text_too_long)"
+     ]
+    },
+    {
+     "type": "player",
+     "label": "MP4",
+     "items": [
+      "MP4"
+     ]
+    },
+    {
+     "type": "card",
+     "label": "검수 리포트",
+     "items": [
+      "검수 리포트"
+     ]
+    },
+    {
+     "type": "button",
+     "label": "검수 승인 → 완료(검수 대기)",
+     "items": [
+      "검수 승인 → 완료(검수 대기)"
+     ]
+    },
+    {
+     "type": "button",
+     "label": "다운로드(MP4·리포트)",
+     "items": [
+      "다운로드(MP4",
+      "리포트)"
+     ]
+    },
+    {
+     "type": "link",
+     "label": "편집안으로(새 리비전)",
+     "items": [
+      "편집안으로(새 리비전)"
+     ]
+    },
+    {
+     "type": "updated",
+     "label": "",
+     "items": []
+    }
+   ],
+   "data": [
+    "render_runs",
+    "production_assets",
+    "edit_revisions"
+   ],
+   "api": [
+    "A-09",
+    "A-11",
+    "A-15",
+    "A-16",
+    "A-17",
+    "A-18"
+   ],
+   "role": "로그인",
+   "next": [
+    "PROD-02",
+    "PROD-00"
+   ],
+   "states_combined": "",
+   "source": "docs/03_SCREENS_UX.md",
+   "type": "detail",
+   "must_missing": [],
+   "should_missing": [
+    "관련 항목 탭",
+    "활동·변경 이력"
+   ],
+   "states_missing": [],
+   "hash": "c26550090ba7",
+   "wireframe": "design/wireframes/PROD-03.html"
   }
  },
  "states": {
@@ -514,6 +996,30 @@
    "로딩": "근거 스켈레톤",
    "오류": "불러오기 실패 \"다시 시도\". 없는 후보(404): 목록으로 돌아가기",
    "성공": "—"
+  },
+  "PROD-00": {
+   "빈": "작업 없음: \"카테고리형 제작은 소재수집(정체)의 후보에서 시작\" 안내 + \"소재수집 열기\" 버튼",
+   "로딩": "표 스켈레톤",
+   "오류": "\"다시 시도\". 권한 없음: 로그인 화면으로 이동",
+   "성공": "목록 표시"
+  },
+  "PROD-01": {
+   "빈": "첫 입력: 후보 정보로 채운 폼(없으면 빈 폼, 파일 업로드 안내)",
+   "로딩": "업로드·원본 준비 진행 표시, 저장 버튼 비활성. 특수: 원본 준비 중이면 \"편집안으로\" 비활성 + \"원본 준비 중\" 표시",
+   "오류": "필드별 오류(구간 범위·길이). URL 받기 실패(권한·접근 제한·네트워크): 사유 안내 + 파일 업로드로 전환(로그인·쿠키 우회 없음). 권한 확인 미체크 시 URL 입력 비활성",
+   "성공": "원본 준비 완료 → 편집안으로 이동"
+  },
+  "PROD-02": {
+   "빈": "초안 없음: 빈 양식 + \"AI 초안 채우기\" 안내",
+   "로딩": "AI 초안·검증 중 버튼 비활성, 시트 스켈레톤",
+   "오류": "검증 오류: 해당 입력 옆에 위치 표시(공백·겹침·범위 초과·빈 화면 배율·Y·NaN·제목 2줄 위반·빈 자막 문구·첫 자막 0초 아님), 오류가 있으면 승인 비활성(사유 링크). 훅 길이·문구 폭은 승인 때 검사하지 않음: 브라우저 메타 길이가 있으면 훅 카운터에 경고만, 최종 판정은 렌더 후 PROD-03 안내(판정식 `04_API.md` W-09). 미저장 변경이 있는 채 취소하면 확인. TTS 실패(P1 TTS 사용 시): 사유 + 첨부 음성 업로드로 전환(무음·가짜 음성 대체 없음). AI 초안 실패 \"다시 시도\"(직접 입력 유지)",
+   "성공": "1.4초 미만 자막은 경고(노랑)로 표시하되 렌더를 막지 않음. 저장·승인 시 토스트, 승인 후 편집하면 새 리비전"
+  },
+  "PROD-03": {
+   "빈": "승인됨·렌더 미시작: \"승인됨 — 렌더 요청을 눌러 시작\" 안내 + \"렌더 요청\" 버튼",
+   "로딩": "단계별 진행·렌더 중. 특수: 렌더 요청 중·렌더 중 버튼 비활성(리비전·언어당 1건, 중복 클릭은 같은 작업으로 합침)",
+   "오류": "실패 단계·사유 코드 + \"재시도\"(실패 때만, 완료 파일 덮어쓰지 않음). `hook_too_long`·`text_too_long`: 재시도 대신 \"편집안으로 돌아가 고치기\"(훅은 필요 길이 안내). 없는 작업(404): 목록으로 돌아가기",
+   "성공": "검수 대기: MP4 재생·리포트·다운로드 표시 + \"검수 승인 → 완료\" 버튼"
   }
  },
  "flows": {
@@ -545,6 +1051,17 @@
     "DASH-01",
     "MON-01",
     "MON-D2"
+   ],
+   "source": "docs/03_SCREENS_UX.md"
+  },
+  "F-04": {
+   "id": "F-04",
+   "name": "카테고리형 제작",
+   "steps": [
+    "MON-01",
+    "PROD-01",
+    "PROD-02",
+    "PROD-03"
    ],
    "source": "docs/03_SCREENS_UX.md"
   }
@@ -663,10 +1180,160 @@
     "ID": "A-08",
     "메서드": "PATCH",
     "경로": "/v1/candidates/{id}/used",
-    "입력": "used`(bool)",
-    "출력": "id`, `used`, `used_at`(Q4 수동 표시 제안). 제작 전환 지표 측정원(`01_PRD.md#5`)",
+    "입력": "used`(bool, 엄격·추가 키 금지)",
+    "출력": "id`, `used`, `used_at`. 제작 전환 지표 측정원(`01_PRD.md#5`). 규칙: `true` 재요청은 멱등(`used_at` 유지), `false`는 `used_at` null, 다시 표시하면 새 시각. 상세 `tasks/task-017.md#착수 결정",
+    "권한": "로그인",
+    "오류": "404(없는 id·타 워크스페이스), 400 본문"
+   },
+   "source": "docs/04_API.md"
+  },
+  "A-09": {
+   "id": "A-09",
+   "method": "GET",
+   "path": "/v1/production-jobs` · `/{id}",
+   "row": {
+    "ID": "A-09",
+    "메서드": "GET",
+    "경로": "/v1/production-jobs` · `/{id}",
+    "입력": "목록: `status`, `page`, `size`. 상세: —",
+    "출력": "목록 `items[]{id, title, status, failed_stage, error_code, candidate_id, updated_at, completed_at}`. 상세 `job`(전 컬럼 중 `claimed_by` 제외) + `assets[]{id, kind, status, size_bytes, duration_sec}` + `current_revision{id, rev_no, approved_at, validation}` + `latest_run{id, status, progress_pct, progress_stage, error_stage, error_code, attempt}` + `worker_online`(3분 이내)",
     "권한": "로그인",
     "오류": "404"
+   },
+   "source": "docs/04_API.md"
+  },
+  "A-10": {
+   "id": "A-10",
+   "method": "POST",
+   "path": "/v1/production-jobs/{id}/uploads` · `/{id}/uploads/{asset_id}/complete",
+   "row": {
+    "ID": "A-10",
+    "메서드": "POST",
+    "경로": "/v1/production-jobs/{id}/uploads` · `/{id}/uploads/{asset_id}/complete",
+    "입력": "요청: `kind`(`source_upload`·`hook_audio`), `size_bytes`, `mime`. 완료: —",
+    "출력": "요청 → `asset{id, kind, status:\"pending\"}`, `upload_url`(서명 PUT, 용도·단일 객체, 만료 위 공통·경로 `05_DATA_MODEL.md#storage`). 완료 → `asset{status:\"ready\"}`(Storage에 객체 존재·크기 확인 후)",
+    "권한": "로그인",
+    "오류": "400 확장자·mime·크기 상한(500MB 가정 — `01_PRD.md#7` Q8) · 409 `draft`·`review`가 아닌 상태(`hook_audio`는 `review`·`failed`일 때도) · 422/409 객체 없음·크기 불일치"
+   },
+   "source": "docs/04_API.md"
+  },
+  "A-11": {
+   "id": "A-11",
+   "method": "POST",
+   "path": "/v1/production-jobs/{id}/prepare",
+   "row": {
+    "ID": "A-11",
+    "메서드": "POST",
+    "경로": "/v1/production-jobs/{id}/prepare",
+    "입력": "— (업로드 원본이면 `source_upload` ready 필요)",
+    "출력": "job{status:\"preparing\"}`(202). 실패 후 호출은 원본 단계 재시도(`retry_count`+1)",
+    "권한": "로그인",
+    "오류": "409 상태 불가(`draft`·`failed(prepare)`만)·재시도 3회(가정) 초과·준비 진행 중 · 400 원본 없음"
+   },
+   "source": "docs/04_API.md"
+  },
+  "A-12": {
+   "id": "A-12",
+   "method": "GET · PUT",
+   "path": "/v1/production-jobs/{id}/revision",
+   "row": {
+    "ID": "A-12",
+    "메서드": "GET · PUT",
+    "경로": "/v1/production-jobs/{id}/revision",
+    "입력": "GET: `rev_no?`(기본 현재). PUT: `spec`(`05_DATA_MODEL.md#편집안-spec-필드`), `base_rev_no`(낙관적 잠금)",
+    "출력": "revision{id, rev_no, spec, origin, validation{errors[], warnings[]}, approved_at}`. PUT: 현재 리비전이 미승인이면 그 행 갱신, 승인본이면 새 `rev_no`로 생성(`inspect`·`failed`이면 job `review`로). 오류가 있어도 저장하고 `validation`에 담음",
+    "권한": "로그인",
+    "오류": "400 spec 스키마·경로 필드(절대 경로·`..`·URL 문자열) · 409 `base_rev_no` 불일치·`rendering` 중·`draft`·`preparing"
+   },
+   "source": "docs/04_API.md"
+  },
+  "A-13": {
+   "id": "A-13",
+   "method": "POST",
+   "path": "/v1/production-jobs/{id}/revision/approve",
+   "row": {
+    "ID": "A-13",
+    "메서드": "POST",
+    "경로": "/v1/production-jobs/{id}/revision/approve",
+    "입력": "rev_no`(현재 리비전과 같아야 함)",
+    "출력": "revision{approved_at, approved_by}`. 서버가 spec을 다시 검증",
+    "권한": "로그인",
+    "오류": "400 `VALIDATION`(`validation.errors` 비어 있지 않음 — 응답에 오류 목록) · 409 `review` 아님·이미 승인·`rev_no` 불일치"
+   },
+   "source": "docs/04_API.md"
+  },
+  "A-14": {
+   "id": "A-14",
+   "method": "POST",
+   "path": "(P1) `/v1/production-jobs/{id}/ai-draft",
+   "row": {
+    "ID": "A-14",
+    "메서드": "POST",
+    "경로": "(P1) `/v1/production-jobs/{id}/ai-draft",
+    "입력": "Idempotency-Key`. 본문 없음. Claude 입력 범위(정본): 0.5초 시트 이미지(저해상도 JPEG)·analysis.json·후보 제목만. 원본 영상·음성 파일은 보내지 않는다.",
+    "출력": "revision`(새 `rev_no`, `origin`=`ai_draft`, 서버 검증 결과 포함. 기존 사용자 편집은 덮어쓰지 않음), `ai_draft_count",
+    "권한": "로그인",
+    "오류": "409 `review` 아님 · 429 `QUOTA_EXCEEDED`(작업당 상한, `01_PRD.md#7` Q7)·`RATE_LIMITED` · 502 `UPSTREAM_ERROR`(Claude 오류·응답이 스키마 불일치 시 재시도 1회 후). 호출 횟수는 성공·실패 모두 기록"
+   },
+   "source": "docs/04_API.md"
+  },
+  "A-15": {
+   "id": "A-15",
+   "method": "POST",
+   "path": "/v1/production-jobs/{id}/render-runs",
+   "row": {
+    "ID": "A-15",
+    "메서드": "POST",
+    "경로": "/v1/production-jobs/{id}/render-runs",
+    "입력": "Idempotency-Key`, `revision_id`(승인본), `lang`(`ko`)",
+    "출력": "render_run{id, status:\"queued\", attempt, preset_version}`(202, `review→rendering`). 같은 키 재요청은 200 + 기존 run",
+    "권한": "로그인",
+    "오류": "400 미승인 리비전·`lang` · 409 같은 (작업, 리비전, 언어) 진행·완료 run 있음·워크스페이스 동시 렌더 1건(`render_runs` 부분 unique, `05_DATA_MODEL.md#제작-테이블`) · 429 `RATE_LIMITED` 60초 내 새 키(가정, A-05·A-07과 같은 값)"
+   },
+   "source": "docs/04_API.md"
+  },
+  "A-16": {
+   "id": "A-16",
+   "method": "POST",
+   "path": "/v1/production-jobs/{id}/render-runs/{run_id}/retry",
+   "row": {
+    "ID": "A-16",
+    "메서드": "POST",
+    "경로": "/v1/production-jobs/{id}/render-runs/{run_id}/retry",
+    "입력": "—",
+    "출력": "새 `render_run`(`attempt`+1, `retry_of`=run_id, 같은 승인본·언어. 완료 파일 덮어쓰기 없음)",
+    "권한": "로그인",
+    "오류": "404 · 409 `failed` run 아님·`failed_stage`=prepare·상한 3회(가정) 초과·같은 승인본 활성 run 있음"
+   },
+   "source": "docs/04_API.md"
+  },
+  "A-17": {
+   "id": "A-17",
+   "method": "POST",
+   "path": "/v1/production-jobs/{id}/review/approve",
+   "row": {
+    "ID": "A-17",
+    "메서드": "POST",
+    "경로": "/v1/production-jobs/{id}/review/approve",
+    "입력": "—",
+    "출력": "job{status:\"done\", completed_at}`. 편집 수정은 A-12(새 리비전)",
+    "권한": "로그인",
+    "오류": "409 `inspect` 아님·`mp4` 자산 없음"
+   },
+   "source": "docs/04_API.md"
+  },
+  "A-18": {
+   "id": "A-18",
+   "method": "GET",
+   "path": "/v1/production-jobs/{id}/assets/{asset_id}/download-url",
+   "row": {
+    "ID": "A-18",
+    "메서드": "GET",
+    "경로": "/v1/production-jobs/{id}/assets/{asset_id}/download-url",
+    "입력": "—",
+    "출력": "url`(서명 GET, 용도·단일 객체, 만료 위 공통), `expires_at`, `kind`. 시트 미리보기·MP4 재생·리포트·다운로드 공용",
+    "권한": "로그인",
+    "오류": "404 · 409 자산 `ready` 아님"
    },
    "source": "docs/04_API.md"
   },
@@ -727,6 +1394,81 @@
     "출력": "job{status}",
     "권한": "워커 토큰",
     "오류": "404 · 409 이미 종료"
+   },
+   "source": "docs/04_API.md"
+  },
+  "W-05": {
+   "id": "W-05",
+   "method": "POST",
+   "path": "/worker/v1/production/claim",
+   "row": {
+    "ID": "W-05",
+    "메서드": "POST",
+    "경로": "/worker/v1/production/claim",
+    "입력": "— (폴링, 간격 W-01과 같음)",
+    "출력": "task{kind, id, job_id, preset_version, source_start_sec?, segment_len_sec?, source_kind?, source_url?(P1), spec?}` 또는 204(`source_url`은 `rights_confirmed`가 true일 때만, `spec`은 render의 승인 리비전). 워커당 진행 1건: 이미 running이면 그 task를 다시 돌려줌(재시작 복구). 수령은 조건부 갱신(원자적, `preparing`→claimed_by / run `queued`→`running`)",
+    "권한": "워커 토큰(자기 워크스페이스)",
+    "오류": "401"
+   },
+   "source": "docs/04_API.md"
+  },
+  "W-06": {
+   "id": "W-06",
+   "method": "GET",
+   "path": "/worker/v1/production/{kind}/{id}/inputs",
+   "row": {
+    "ID": "W-06",
+    "메서드": "GET",
+    "경로": "/worker/v1/production/{kind}/{id}/inputs",
+    "입력": "—",
+    "출력": "inputs[]{asset_id, kind, download_url, expires_at}`(서명 GET). prepare: `source_upload`. render: `source`·`analysis`·`hook_audio` 등 이 task에 필요한 것만",
+    "권한": "워커 토큰·수령한 워커만",
+    "오류": "404 · 409 종료·다른 워커 task"
+   },
+   "source": "docs/04_API.md"
+  },
+  "W-07": {
+   "id": "W-07",
+   "method": "POST",
+   "path": "/worker/v1/production/{kind}/{id}/outputs",
+   "row": {
+    "ID": "W-07",
+    "메서드": "POST",
+    "경로": "/worker/v1/production/{kind}/{id}/outputs",
+    "입력": "items[]{kind, size_bytes, mime, duration_sec?}`. 허용 kind: prepare=`source`·`analysis`·`sheet`(≤200 가정), render=`output_mp4`·`report`·`hook_audio",
+    "출력": "items[]{asset_id, kind, upload_url}`(서명 PUT, 용도·단일 객체·만료). 다른 kind는 400. 업로드 후 W-09가 `ready`로 확정",
+    "권한": "워커 토큰",
+    "오류": "400 kind·크기 · 404 · 409 종료"
+   },
+   "source": "docs/04_API.md"
+  },
+  "W-08": {
+   "id": "W-08",
+   "method": "POST",
+   "path": "/worker/v1/production/{kind}/{id}/progress",
+   "row": {
+    "ID": "W-08",
+    "메서드": "POST",
+    "경로": "/worker/v1/production/{kind}/{id}/progress",
+    "입력": "stage`(`download`·`extract`·`sheet`·`audio`·`compose`·`encode`·`upload` 가정), `progress_pct`(0~100)",
+    "출력": "ok`. `updated_at` 갱신 = 오프라인 평가 기준(3분 미수신 → `worker_offline`, `02b_PRODUCTION_FLOW.md`). 하트비트 겸용(W-02는 수집용)",
+    "권한": "워커 토큰",
+    "오류": "404 · 409 종료"
+   },
+   "source": "docs/04_API.md"
+  },
+  "W-09": {
+   "id": "W-09",
+   "method": "POST",
+   "path": "/worker/v1/production/{kind}/{id}/finish",
+   "row": {
+    "ID": "W-09",
+    "메서드": "POST",
+    "경로": "/worker/v1/production/{kind}/{id}/finish",
+    "입력": "status`(`done`·`failed`), `asset_ids[]`(업로드 완료, done일 때), `meta?`(prepare: `duration_sec`·`width`·`height`·`has_audio`), `error_stage?`(`prepare`·`audio`·`render`), `error_code?",
+    "출력": "task{status}`. done: 서버가 자산 존재·크기 확인 후 `ready`, job 상태 전이(`preparing→review` / `rendering→inspect`). failed: 단계·코드 저장 → job `failed`. 훅 길이 정본(공식): 렌더 워커가 훅 음성을 실측해 `훅 길이+0.08 > min(duration, 첫 자막 종료)+0.02`이면 `hook_too_long`으로 보고(배포본 render.py와 같은 식, 승인 때 서버는 길이를 검사하지 않음). 렌더러가 문구 폭 초과를 판정하면 `text_too_long`. 두 코드는 job을 `review`로 되돌리고 편집안·훅 문구를 보존(`02b_PRODUCTION_FLOW.md#2`)",
+    "권한": "워커 토큰·수령한 워커만",
+    "오류": "400 필수 자산 누락(prepare: `source`·`analysis`·`sheet`≥1, render: `output_mp4`·`report`) · 404 · 409 이미 종료. 코드(가정): prepare=`range_invalid`·`input_invalid`·`url_unavailable`·`download_failed`·`unknown`, render=`hook_too_long`·`text_too_long`·`tts_failed`(P1)·`audio_missing`·`render_failed`·`unknown`. 서버 생성 코드 `worker_offline`(진행 보고 3분 초과, 워커는 보내지 않음). 키·URL 전체·로컬 경로는 error에 넣지 않음"
    },
    "source": "docs/04_API.md"
   }
@@ -863,6 +1605,50 @@
     "비고": "상한 8,000 unit(`adr/0002`). 워크스페이스 열 없음(키가 서버 전체 1개) — 공통 규칙의 예외"
    },
    "source": "docs/05_DATA_MODEL.md"
+  },
+  "production_jobs": {
+   "name": "production_jobs",
+   "row": {
+    "테이블": "production_jobs",
+    "목적": "제작 작업 1건(원본·구간·상태)",
+    "주요 컬럼": "id, workspace_id, title, status(`draft`·`preparing`·`review`·`rendering`·`inspect`·`done`·`failed`), failed_stage(`prepare`·`audio`·`render`·null), error_code(null, 워커 보고 코드 + 서버 생성 `worker_offline`), candidate_id(→candidates, null 허용), source_kind(`upload`·`url`(P1)), source_url(null, http/https만, P1), rights_confirmed(bool), rights_confirmed_by·rights_confirmed_at, license_cc(bool·null=미확인), credit(text·null, 업로더·저작자), source_start_sec(numeric ≥0, 원본 전체 기준), segment_len_sec(numeric 0 초과 ≤180, 배포본 규격), lang(`ko`, P2 전까지 단일), preset_version(text), source_meta(jsonb: duration_sec·width·height·has_audio, prepare 완료 때 워커 보고), current_revision_id(→edit_revisions), ai_draft_count(int, 상한은 `01_PRD.md#7` Q7), retry_count(prepare 재시도, 상한 `02_ARCHITECTURE.md#3-3`), claimed_by(→workers, prepare 수령), updated_at(진행 보고 시각, 오프라인 평가 기준), requested_by, created_at, completed_at",
+    "RLS 기준": "읽기: 구성원. 쓰기: API만(워커는 API 경유)",
+    "비고": "check: `source_kind`=`url`이면 `source_url` not null·`rights_confirmed`=true. 상태 전이 `02b_PRODUCTION_FLOW.md#2`. index(workspace_id, status, created_at desc)·(candidate_id). 한 후보로 작업 여러 건 허용(재제작)"
+   },
+   "source": "docs/05_DATA_MODEL.md"
+  },
+  "production_assets": {
+   "name": "production_assets",
+   "row": {
+    "테이블": "production_assets",
+    "목적": "작업의 파일 메타(내용은 Storage)",
+    "주요 컬럼": "id, workspace_id, job_id, kind(`source_upload`·`source`·`analysis`·`sheet`·`hook_audio`·`output_mp4`·`report`), storage_path, mime, size_bytes(bigint), duration_sec(numeric·null, 영상·음성 길이), status(`pending`·`ready`), render_run_id(null, `output_mp4`·`report`·워커 생성 `hook_audio`만), created_by(user 또는 worker), created_at",
+    "RLS 기준": "읽기: 구성원. 쓰기: API만. 서명 URL은 API가 소유 확인 후 발급",
+    "비고": "storage_path`는 서버가 생성(아래 Storage). unique(storage_path). index(job_id, kind). `sheet`는 여러 건. 다운로드는 `ready`만. 확장자·mime 허용 목록(영상 mp4·mov·webm·mkv, 음성 wav·mp3·m4a — 가정)이며 ffprobe 확인은 워커 보고로 `ready` 전환"
+   },
+   "source": "docs/05_DATA_MODEL.md"
+  },
+  "edit_revisions": {
+   "name": "edit_revisions",
+   "row": {
+    "테이블": "edit_revisions",
+    "목적": "편집안 리비전(승인 고정 단위)",
+    "주요 컬럼": "id, workspace_id, job_id, rev_no(int, 1부터), schema_version(int), spec(jsonb, 아래 필드 표), origin(`user`·`ai_draft`(P1)), validation(jsonb: errors[]·warnings[] — `{code, path, message}`), approved_at(null), approved_by(null), created_by, created_at, updated_at",
+    "RLS 기준": "읽기: 구성원. 쓰기: API만",
+    "비고": "unique(job_id, rev_no). 승인된 행(`approved_at` not null)은 spec 수정 거부(API가 새 rev_no 생성). 승인은 `validation.errors`가 비었을 때만. 저장은 오류가 있어도 허용(경고·오류는 validation에 기록). 같은 작업에서 낮은 rev 승인본은 이력으로 보존"
+   },
+   "source": "docs/05_DATA_MODEL.md"
+  },
+  "render_runs": {
+   "name": "render_runs",
+   "row": {
+    "테이블": "render_runs",
+    "목적": "렌더 실행 1회(멱등·재시도 단위)",
+    "주요 컬럼": "id, workspace_id, job_id, revision_id, lang(`ko`), attempt(int, 1부터), retry_of(→render_runs, null), idempotency_key, preset_version, status(`queued`·`running`·`done`·`failed`), progress_pct(0~100), progress_stage(text), error_stage(`audio`·`render`·null), error_code(null, 워커 보고 코드 + 서버 생성 `worker_offline`), claimed_by(→workers), mp4_asset_id·report_asset_id·hook_audio_asset_id(→production_assets, null), requested_by, created_at, started_at, finished_at, updated_at(진행 보고 시각)",
+    "RLS 기준": "읽기: 구성원. 쓰기: API만",
+    "비고": "unique(workspace_id, idempotency_key). 부분 unique(job_id, revision_id, lang) where status in (`queued`,`running`,`done`) = 같은 (작업, 리비전, 언어)는 하나만 진행·완료. 실패 run은 제외되므로 재시도는 새 행(attempt+1, 새 자산). 완료 run의 자산은 수정·덮어쓰기 없음. 부분 unique(workspace_id) where status in (`queued`,`running`) = 워크스페이스당 렌더 1건(동시 렌더 없음, `01_PRD.md#3` 이후), A-15 409와 같은 규칙"
+   },
+   "source": "docs/05_DATA_MODEL.md"
   }
  },
  "issues": [
@@ -890,6 +1676,41 @@
    "🟡",
    "MON-D2",
    "관측 근거 권장: 관련 항목 탭, 활동·변경 이력"
+  ],
+  [
+   "🟡",
+   "PROD-00",
+   "제작 작업 목록 권장: 일괄 작업(선택·삭제·내보내기), 저장된 보기·열 설정"
+  ],
+  [
+   "🟡",
+   "PROD-01",
+   "원본·구간·출처 권장: 임시 저장(긴 폼)"
+  ],
+  [
+   "ℹ️",
+   "PROD-01",
+   "모르는 블록(회색 상자로 표시): player"
+  ],
+  [
+   "🟡",
+   "PROD-02",
+   "편집안 권장: 임시 저장(긴 폼)"
+  ],
+  [
+   "ℹ️",
+   "PROD-02",
+   "모르는 블록(회색 상자로 표시): bar, note, panel"
+  ],
+  [
+   "🟡",
+   "PROD-03",
+   "작업·검수 권장: 관련 항목 탭, 활동·변경 이력"
+  ],
+  [
+   "ℹ️",
+   "PROD-03",
+   "모르는 블록(회색 상자로 표시): player, stepper"
   ]
  ]
 }

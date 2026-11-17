@@ -1,7 +1,7 @@
 # 02 아키텍처 — Nomadroom Studio
 
 > 그림: [`diagrams/architecture.mmd`](diagrams/architecture.mmd) — 코드가 생기면 `deps2mmd`로 다시 생성
-> 범위: MVP(로그인 · 대시보드 · 소재수집(정체)). 나머지 메뉴는 운영 사이트 외부 링크(`01_PRD.md`). 스택 정본: `AGENTS.md#2`.
+> 범위: MVP(로그인 · 대시보드 · 소재수집(정체)) + 카테고리형 제작(PROD, `02b_PRODUCTION_FLOW.md`). 나머지 메뉴는 운영 사이트 외부 링크(`01_PRD.md`). 스택 정본: `AGENTS.md#2`.
 
 ## 1. 구성 요소
 | 요소 | 책임 | 기술 | 소유 경로 | 비밀 보유 |
@@ -10,6 +10,9 @@
 | DB·인증 | 사용자·워크스페이스·프로필 조건·후보·관측값·판정·작업(job) 저장, RLS | Supabase Postgres · Auth | `supabase/` | service_role은 Supabase 안·API에만 |
 | API | 판정·조건 검증, YouTube Data API v3 관측, 작업 등록, 워커 결과 수신 | FastAPI · Pydantic v2 | `apps/api` | YouTube 키 · service_role (클라우드 호스트 환경변수) |
 | 수집 워커 | 운영자 PC에서 Chrome(Playwright)·vidIQ로 후보 수집, Chrome 준비 상태 보고 | Python · Playwright (`apps/api` 내 worker 모듈) | `apps/api/worker` | 워커 토큰만 (YouTube 키·service_role 없음). Chrome·vidIQ 로그인 프로필은 PC 로컬에만 |
+| 제작 워커 | 운영자 PC에서 원본 준비(`prepare`: 구간 추출·analysis·시트)와 렌더(`render`: 훅 음성·합성·FFmpeg·리포트). 같은 워커 토큰·폴링 모델 | Python · FFmpeg · Pillow (`apps/api/worker`) | `apps/api/worker` | 워커 토큰만. 파일은 API가 준 서명 URL로만 송수신. DB·Supabase 키·LLM 키 없음 (`adr/0003-production-render-worker.md`) |
+| 파일 저장소 | 제작 원본·분석·시트·음성·MP4·리포트 보관(작업별). 경로 규칙 `05_DATA_MODEL.md#storage` | Supabase Storage 비공개 버킷 `production` | `supabase/` | 서명 URL 발급은 API(service_role)만 |
+| Claude API (AI 초안) | 승인된 구간 analysis·시트 → 편집안 초안(구조화 JSON) | Anthropic API (최신 모델은 구현 시 확인) | — | Anthropic 키는 API 요소만 |
 | YouTube Data API v3 | 조회수·라이선스(C.C)·채널 정보 | 외부 | — | API 키는 API 요소만 |
 | 운영 사이트 | 그 외 메뉴·"새 영상 만들기" | 외부(기존) | — | 해당 없음 (링크 이동만) |
 
@@ -26,8 +29,13 @@
 | 워커 | API | 아웃바운드 HTTPS만, 워커 토큰으로 작업 요청 폴링·결과 전송. 로컬 포트 개방 없음 | 워커가 DB 직접 접속, 외부에서 워커 호출 |
 | 워커 | Chrome·vidIQ | 로컬 Playwright, 운영자 로그인 프로필 | vidIQ 계정 정보를 API·DB로 전송 |
 | 웹 | 운영 사이트 | 외부 링크(새 탭) | 토큰·세션을 링크에 실어 보내기 |
+| 브라우저 | Storage | **업로드 한 가지만** 예외(대용량이라 직접 PUT, 팀장 결정 2026-11-18): API가 발급한 서명 업로드 URL(만료 `04_API.md#제작-api`)로 원본·훅 음성 PUT. 다운로드는 웹이 API에서 받은 서명 URL로 이동·재생. CSP connect-src에 Storage 출처 추가는 배포 체크리스트 | 서명 URL로 목록·다른 파일 접근, 버킷 공개 설정, 사용자 JWT로 Storage 직접 접근 |
+| API | Storage | service_role로 서명 URL 발급·존재 확인(ffprobe 결과는 워커 보고로 검증). 경로는 서버가 생성 | 클라이언트·워커가 준 파일명·경로 사용 |
+| API | Claude API | 서버에서 Anthropic 키로 호출(A-14만). 입력 범위는 `04_API.md` A-14, 출력은 편집안 스키마로 재검증 | 키를 응답·로그에 포함, 비신뢰 텍스트(제목·자막)를 지시문으로 취급, 작업당 횟수 상한 초과 호출 |
+| 제작 워커 | API · Storage | 아웃바운드 HTTPS만. `/worker/v1/production/*`로 작업 수령·진행·완료 보고, 파일은 서명 URL로만. 워커는 작업 폴더 안에서만 파일명 결정 | JSON의 절대 경로·`..` 수용, Supabase 직접 접속, 로컬 포트 개방 |
+| 제작 워커 | 원본 URL | `rights_confirmed`=true인 작업만 yt-dlp. 로그인·쿠키·접근 제한 우회 없음. 실패 시 업로드로 이관(`url_unavailable`) | 권한 확인 없는 다운로드, SSRF 규칙 위반 주소(`01_PRD.md#8`) |
 
-공통: 금액 없음(결제 제외, D3). LLM 호출 없음(D4). 시간은 UTC 저장, 한국 시간 표시. 보안 레벨 정본은 `01_PRD.md#8`.
+공통: 금액 없음(결제 제외, D3). LLM 호출은 제작 AI 초안(A-14)만, 그 외 없음(D4, `01_PRD.md#6` 개정). 시간은 UTC 저장, 한국 시간 표시. 보안 레벨 정본은 `01_PRD.md#8`.
 
 ## 3. 주요 흐름
 ### 3-1. 후보 가져오기
@@ -81,8 +89,13 @@
 
 > 그림: [`diagrams/flow-3.mmd`](diagrams/flow-3.mmd)
 
+### 3-4. 카테고리형 제작
+분리: [`02b_PRODUCTION_FLOW.md`](02b_PRODUCTION_FLOW.md) (흐름·제작 job 상태 전이·실패 분기).
+
 ## 다이어그램 요청 (diagrammer)
 - `diagrams/architecture.mmd` 갱신: 구성도(웹 · Supabase · API · 수집 워커(운영자 PC) · YouTube API · vidIQ/Chrome · 운영 사이트), 비밀 보유 요소 표시, 신뢰 경계(클라우드/운영자 PC) 구분.
 - `diagrams/flow-1.mmd`: 시퀀스 — 후보 가져오기(3-1).
 - `diagrams/flow-2.mmd`: 시퀀스 — 기록 검증 실행(3-2).
 - `diagrams/flow-3.mmd`: 상태도 — job(대기·진행·재시도·중지·실패·완료)과 Chrome 준비 실패 분기(3-3).
+- `architecture.mmd`에 제작 워커·Storage·Claude 추가. 제작 시퀀스 `flow-4.mmd`는 `02b_PRODUCTION_FLOW.md`.
+- 제작 다이어그램(신규, 기존 파일 덮어쓰기 없음): `diagrams/flow-4.mmd`(제작 시퀀스) · `diagrams/flow-F-04.mmd`(화면 흐름 F-04) · `diagrams/category-shorts-render-flow.mmd`(렌더 흐름).

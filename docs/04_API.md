@@ -31,6 +31,24 @@
 | A-07 | POST | `/v1/verify-runs` | `Idempotency-Key`, `profile_ids[]`(생략 시 선택된 프로필) | `job{id, kind:"verify", status}`, `checked`, `skipped_recent`(24시간 미만), `failed`, `counts{total, producible, pending, excluded, used}`(워커 불필요, 동기 응답) | 로그인 | 400 · 409 검증 진행 중·같은 키의 다른 kind job · 429 `QUOTA_EXCEEDED`(남은 후보는 이전 판정 유지)·`RATE_LIMITED`(같은 워크스페이스 직전 실행 후 60초 이내 새 키) · 502(YouTube 오류·키 미설정). 같은 `Idempotency-Key` 재요청은 200으로 기존 job과 저장된 결과 반환(본문이 달라도). 10분 넘은 실행 중 job은 새 요청 때 `failed` 정리. 대상: used 제외·최신 관측 24시간 이상·상한 200 |
 | A-08 | PATCH | `/v1/candidates/{id}/used` | `used`(bool, 엄격·추가 키 금지) | `id`, `used`, `used_at`. 제작 전환 지표 측정원(`01_PRD.md#5`). 규칙: `true` 재요청은 멱등(`used_at` 유지), `false`는 `used_at` null, 다시 표시하면 새 시각. 상세 `tasks/task-017.md#착수 결정` | 로그인 | 404(없는 id·타 워크스페이스), 400 본문 |
 
+### 제작 API
+카테고리형. 흐름 `02b_PRODUCTION_FLOW.md` · 컬럼 `05_DATA_MODEL.md#제작-테이블`.
+공통: 경로·자산은 **ID만** 주고받는다(경로·파일명 입력 없음). 타 워크스페이스·없는 id는 404. 상태가 맞지 않으면 409 `CONFLICT`(`detail`에 현재 `status`). **서명 URL 만료(정본): 업로드 15분·다운로드 10분.** 워커 URL도 같은 규칙: 입력 다운로드(W-06, GET) 10분 · 산출물 업로드(W-07, PUT) 15분. 만료되면 워커가 다시 발급받는다.
+| ID | 메서드 | 경로 | 입력 | 출력 | 권한 | 오류 |
+|---|---|---|---|---|---|---|
+| A-09 | POST | `/v1/production-jobs` | `Idempotency-Key`, `title`, `candidate_id?`, `source_kind`(`upload`·`url`(P1)), `source_url?`(P1), `rights_confirmed`, `license_cc?`, `credit?`, `source_start_sec`, `segment_len_sec`(0 초과 ≤180, 배포본 규격) | `job`(201, `status`=draft, ←`production_jobs`). 같은 키 재요청은 200 + 기존 job | 로그인 | 400 `VALIDATION`(url인데 `rights_confirmed` false·url 형식(SSRF 규칙 `01_PRD.md#8`)·구간) · 404 후보 |
+| A-09 | PATCH | `/v1/production-jobs/{id}` | `source_kind`·`source_url?`·`rights_confirmed`·`license_cc?`·`credit?`·`source_start_sec`·`segment_len_sec`(POST와 같은 검증, 보낸 필드만) | `job`(←`production_jobs`) | 로그인 | 400 `VALIDATION` · 404 · 409 `draft`·`failed(prepare)`가 아닌 상태 |
+| A-09 | GET | `/v1/production-jobs` · `/{id}` | 목록: `status`, `page`, `size`. 상세: — | 목록 `items[]{id, title, status, failed_stage, error_code, candidate_id, updated_at, completed_at}`. 상세 `job`(전 컬럼 중 `claimed_by` 제외) + `assets[]{id, kind, status, size_bytes, duration_sec}` + `current_revision{id, rev_no, approved_at, validation}` + `latest_run{id, status, progress_pct, progress_stage, error_stage, error_code, attempt}` + `worker_online`(3분 이내) | 로그인 | 404 |
+| A-10 | POST | `/v1/production-jobs/{id}/uploads` · `/{id}/uploads/{asset_id}/complete` | 요청: `kind`(`source_upload`·`hook_audio`), `size_bytes`, `mime`. 완료: — | 요청 → `asset{id, kind, status:"pending"}`, `upload_url`(서명 PUT, 용도·단일 객체, 만료 위 공통·경로 `05_DATA_MODEL.md#storage`). 완료 → `asset{status:"ready"}`(Storage에 객체 존재·크기 확인 후) | 로그인 | 400 확장자·mime·크기 상한(500MB 가정 — `01_PRD.md#7` Q8) · 409 `draft`·`review`가 아닌 상태(`hook_audio`는 `review`·`failed`일 때도) · 422/409 객체 없음·크기 불일치 |
+| A-11 | POST | `/v1/production-jobs/{id}/prepare` | — (업로드 원본이면 `source_upload` ready 필요) | `job{status:"preparing"}`(202). 실패 후 호출은 원본 단계 재시도(`retry_count`+1) | 로그인 | 409 상태 불가(`draft`·`failed(prepare)`만)·재시도 3회(가정) 초과·준비 진행 중 · 400 원본 없음 |
+| A-12 | GET · PUT | `/v1/production-jobs/{id}/revision` | GET: `rev_no?`(기본 현재). PUT: `spec`(`05_DATA_MODEL.md#편집안-spec-필드`), `base_rev_no`(낙관적 잠금) | `revision{id, rev_no, spec, origin, validation{errors[], warnings[]}, approved_at}`. PUT: 현재 리비전이 미승인이면 그 행 갱신, 승인본이면 새 `rev_no`로 생성(`inspect`·`failed`이면 job `review`로). **오류가 있어도 저장**하고 `validation`에 담음 | 로그인 | 400 spec 스키마·경로 필드(절대 경로·`..`·URL 문자열) · 409 `base_rev_no` 불일치·`rendering` 중·`draft`·`preparing` |
+| A-13 | POST | `/v1/production-jobs/{id}/revision/approve` | `rev_no`(현재 리비전과 같아야 함) | `revision{approved_at, approved_by}`. 서버가 spec을 다시 검증 | 로그인 | 400 `VALIDATION`(`validation.errors` 비어 있지 않음 — 응답에 오류 목록) · 409 `review` 아님·이미 승인·`rev_no` 불일치 |
+| A-14 | POST | (P1) `/v1/production-jobs/{id}/ai-draft` | `Idempotency-Key`. 본문 없음. **Claude 입력 범위(정본): 0.5초 시트 이미지(저해상도 JPEG)·analysis.json·후보 제목만. 원본 영상·음성 파일은 보내지 않는다.** | `revision`(새 `rev_no`, `origin`=`ai_draft`, 서버 검증 결과 포함. 기존 사용자 편집은 덮어쓰지 않음), `ai_draft_count` | 로그인 | 409 `review` 아님 · 429 `QUOTA_EXCEEDED`(작업당 상한, `01_PRD.md#7` Q7)·`RATE_LIMITED` · 502 `UPSTREAM_ERROR`(Claude 오류·응답이 스키마 불일치 시 재시도 1회 후). 호출 횟수는 성공·실패 모두 기록 |
+| A-15 | POST | `/v1/production-jobs/{id}/render-runs` | `Idempotency-Key`, `revision_id`(승인본), `lang`(`ko`) | `render_run{id, status:"queued", attempt, preset_version}`(202, `review→rendering`). 같은 키 재요청은 200 + 기존 run | 로그인 | 400 미승인 리비전·`lang` · 409 같은 (작업, 리비전, 언어) 진행·완료 run 있음·워크스페이스 동시 렌더 1건(`render_runs` 부분 unique, `05_DATA_MODEL.md#제작-테이블`) · 429 `RATE_LIMITED` 60초 내 새 키(가정, A-05·A-07과 같은 값) |
+| A-16 | POST | `/v1/production-jobs/{id}/render-runs/{run_id}/retry` | — | 새 `render_run`(`attempt`+1, `retry_of`=run_id, 같은 승인본·언어. 완료 파일 덮어쓰기 없음) | 로그인 | 404 · 409 `failed` run 아님·`failed_stage`=prepare·상한 3회(가정) 초과·같은 승인본 활성 run 있음 |
+| A-17 | POST | `/v1/production-jobs/{id}/review/approve` | — | `job{status:"done", completed_at}`. 편집 수정은 A-12(새 리비전) | 로그인 | 409 `inspect` 아님·`mp4` 자산 없음 |
+| A-18 | GET | `/v1/production-jobs/{id}/assets/{asset_id}/download-url` | — | `url`(서명 GET, 용도·단일 객체, 만료 위 공통), `expires_at`, `kind`. 시트 미리보기·MP4 재생·리포트·다운로드 공용 | 로그인 | 404 · 409 자산 `ready` 아님 |
+
 ## 워커 API (수집 워커 → FastAPI, 아웃바운드 전용)
 `Authorization: Bearer <워커 토큰>`(`workers.token_hash`로 검증, 사용자 JWT 아님). 로컬 포트 개방·DB 직접 접속 없음. 화면 ID 없음.
 | ID | 메서드 | 경로 | 입력 | 출력 | 권한 | 오류 |
@@ -40,6 +58,16 @@
 | W-03 | POST | `/worker/v1/jobs/{id}/candidates` | `profile_id`, `items[]{video_id, title, thumbnail_url, genre, category, format, market, channel_id, channel_title}`(형식 검증, 신뢰 안 함. 요청당 ≤200) | `accepted`, `duplicates`(요청 안 중복+기존 후보), `unavailable`(YouTube 응답에 없음). 신규는 YouTube 1차 관측 후 판정, 제목·채널·라이선스·썸네일은 YouTube 값 | 워커 토큰 | 400 형식 · 404 · 409 중지됨·종료됨 · 502 |
 | W-04 | POST | `/worker/v1/jobs/{id}/finish` | `status`(`done`·`failed`·`stopped`(stop_requested일 때만)), `error?`(코드: `chrome_failed`·`vidiq_changed`·`network`·`stopped_by_user`·`unknown`) | `job{status}` | 워커 토큰 | 404 · 409 이미 종료 |
 
+### 제작 워커 API (`/worker/v1/production/*`, 같은 워커 토큰·폴링 모델)
+`{kind}` = `prepare`(task id = `production_jobs.id`) · `render`(task id = `render_runs.id`). 워커는 task id·자산 ID만 보내고 파일명·경로를 정하지 않는다(서버가 생성).
+| ID | 메서드 | 경로 | 입력 | 출력 | 권한 | 오류 |
+|---|---|---|---|---|---|---|
+| W-05 | POST | `/worker/v1/production/claim` | — (폴링, 간격 W-01과 같음) | `task{kind, id, job_id, preset_version, source_start_sec?, segment_len_sec?, source_kind?, source_url?(P1), spec?}` 또는 204(`source_url`은 `rights_confirmed`가 true일 때만, `spec`은 render의 승인 리비전). 워커당 진행 1건: 이미 running이면 그 task를 다시 돌려줌(재시작 복구). 수령은 조건부 갱신(원자적, `preparing`→claimed_by / run `queued`→`running`) | 워커 토큰(자기 워크스페이스) | 401 |
+| W-06 | GET | `/worker/v1/production/{kind}/{id}/inputs` | — | `inputs[]{asset_id, kind, download_url, expires_at}`(서명 GET). prepare: `source_upload`. render: `source`·`analysis`·`hook_audio` 등 이 task에 필요한 것만 | 워커 토큰·수령한 워커만 | 404 · 409 종료·다른 워커 task |
+| W-07 | POST | `/worker/v1/production/{kind}/{id}/outputs` | `items[]{kind, size_bytes, mime, duration_sec?}`. 허용 kind: prepare=`source`·`analysis`·`sheet`(≤200 가정), render=`output_mp4`·`report`·`hook_audio` | `items[]{asset_id, kind, upload_url}`(서명 PUT, 용도·단일 객체·만료). 다른 kind는 400. 업로드 후 W-09가 `ready`로 확정 | 워커 토큰 | 400 kind·크기 · 404 · 409 종료 |
+| W-08 | POST | `/worker/v1/production/{kind}/{id}/progress` | `stage`(`download`·`extract`·`sheet`·`audio`·`compose`·`encode`·`upload` 가정), `progress_pct`(0~100) | `ok`. `updated_at` 갱신 = 오프라인 평가 기준(3분 미수신 → `worker_offline`, `02b_PRODUCTION_FLOW.md`). 하트비트 겸용(W-02는 수집용) | 워커 토큰 | 404 · 409 종료 |
+| W-09 | POST | `/worker/v1/production/{kind}/{id}/finish` | `status`(`done`·`failed`), `asset_ids[]`(업로드 완료, done일 때), `meta?`(prepare: `duration_sec`·`width`·`height`·`has_audio`), `error_stage?`(`prepare`·`audio`·`render`), `error_code?` | `task{status}`. done: 서버가 자산 존재·크기 확인 후 `ready`, job 상태 전이(`preparing→review` / `rendering→inspect`). failed: 단계·코드 저장 → job `failed`. **훅 길이 정본(공식): 렌더 워커가 훅 음성을 실측해 `훅 길이+0.08 > min(duration, 첫 자막 종료)+0.02`이면 `hook_too_long`으로 보고**(배포본 render.py와 같은 식, 승인 때 서버는 길이를 검사하지 않음). 렌더러가 문구 폭 초과를 판정하면 `text_too_long`. 두 코드는 job을 `review`로 되돌리고 편집안·훅 문구를 보존(`02b_PRODUCTION_FLOW.md#2`) | 워커 토큰·수령한 워커만 | 400 필수 자산 누락(prepare: `source`·`analysis`·`sheet`≥1, render: `output_mp4`·`report`) · 404 · 409 이미 종료. 코드(가정): prepare=`range_invalid`·`input_invalid`·`url_unavailable`·`download_failed`·`unknown`, render=`hook_too_long`·`text_too_long`·`tts_failed`(P1)·`audio_missing`·`render_failed`·`unknown`. 서버 생성 코드 `worker_offline`(진행 보고 3분 초과, 워커는 보내지 않음). 키·URL 전체·로컬 경로는 error에 넣지 않음 |
+
 ## 03 추적
 | 화면 | API ID | 비고 |
 |---|---|---|
@@ -48,11 +76,21 @@
 | MON-01 | A-03, A-04, A-05, A-07, A-08 | 진행 표시는 A-05 GET 폴링(간격 가정 3초) |
 | MON-D1 | A-03 | |
 | MON-D2 | A-06 | |
+| MON-01 "카테고리형 제작" 버튼(CAT-01) | A-09 POST(MON-01 행 API에도 A-09) | 후보 ID·제목·원본 URL·라이선스를 넘겨 draft 생성 후 PROD-01로 이동. 기존 "영상 만들기 →" 외부 링크는 유지 |
+| PROD-00 | A-09 GET(목록) | 상태 필터·페이지 |
+| PROD-01 | A-09(POST·PATCH·GET), A-10, A-11 | URL(P1)은 `rights_confirmed` 체크 후만. 실패하면 업로드로 이관 안내(`url_unavailable`) |
+| PROD-02 | A-10(훅 음성 업로드), A-12, A-13, A-14(P1), A-18 | 저장(A-12) 때마다 검증 결과 표시. 시트 미리보기는 A-18. AI 초안은 새 리비전. 렌더 요청(A-15)은 승인 후 PROD-03 |
+| PROD-03 | A-09 GET(상세), A-11, A-15, A-16, A-17, A-18 | 진행·실패 사유는 A-09 상세 폴링(간격 3초 가정, 숨김 탭 정지). 원본 단계 재시도는 A-11, 편집 수정은 PROD-02(A-12) |
 
 ## 보안 메모 (`01_PRD.md#8` 위협 메모 적용)
 | 항목 | 내용 |
 |---|---|
-| 노출 면 | A-02~A-08은 로그인 사용자만. CSRF·로그인 제한 등 웹 면은 `01_PRD.md#8`. W-01~W-04는 워커 토큰만. 공개·웹훅·업로드 없음 |
+| 노출 면 | A-02~A-08은 로그인 사용자만. CSRF·로그인 제한 등 웹 면은 `01_PRD.md#8`. W-01~W-04는 워커 토큰만. 공개·웹훅·업로드 없음(수집 API 기준. 제작 API는 아래 제작 행) |
 | 인가 | 모든 쿼리에 `workspace_id` 조건 + RLS. 경로의 id가 타 워크스페이스면 403이 아닌 404(존재 노출 방지) |
 | 남용 | 실행류 멱등 키 + 워크스페이스당 동시 1건, 실행당 후보 200, 429 처리. 조회(A-04)는 요청당 저장소 호출 약 8회·size≤60·page≤1000 — 내부 도구라 수용, 사용자·후보가 늘면 요청 속도 제한 추가. A-05 GET·active 폴링(3초·숨김 탭 정지·백오프)은 요청당 저장소 호출 약 5~10회, 진행 중에는 result 집계 생략 — 같은 근거로 수용. A-05 GET·active는 오프라인 만료(running→failed)를 지연 평가하는 부수 효과가 있다(결정적·입력 무관이라 CSRF 실익 없음, 수용) |
 | 로그 | 실행·성공/실패 기록. 키·JWT·워커 토큰·쿠키 기록 금지 |
+| 제작 노출 면 | A-09~A-18은 로그인 사용자만, W-05~W-09는 워커 토큰만. 노출 면별 위협 메모 정본은 `01_PRD.md#8`(업로드·서명 URL·LLM·URL 다운로드·경로 주입) — 여기는 API 결정만 |
+| 제작 인가·경로 | 모든 쿼리 `workspace_id` + RLS, 타 워크스페이스 404. 서명 URL은 소유 확인 후 용도(PUT/GET)·단일 객체·짧은 만료로만 발급, URL 전체는 로그 금지. 경로·파일명은 서버 생성, spec·요청 어디서도 경로 문자열 거부, 워커는 수령한 task의 자산 ID만 접근 |
+| 제작 입력 | 업로드 크기·확장자·mime 검증 후 워커가 ffprobe로 재확인(확장자만 신뢰 금지). URL은 SSRF 규칙(`01_PRD.md#8`) 통과 후, `rights_confirmed` 없으면 워커 task에 URL 미전달. 편집안은 Pydantic 검증이 정본, AI 응답도 같은 스키마로 재검증하고 프롬프트의 제목·자막은 비신뢰 텍스트로 구분 |
+| 제작 남용 | 렌더 멱등 키(`render_runs`) + (작업, 리비전, 언어) 부분 unique + 워크스페이스 동시 렌더 1건, AI 초안 작업당 횟수 상한·멱등 키, 업로드 크기·건수 상한(값은 `01_PRD.md#7` Q7·Q8), 오프라인 지연 평가는 `02b_PRODUCTION_FLOW.md` |
+| 제작 로그 | 상태 전이·실패 단계·코드·거부 사유·호출 횟수 O. 서명 토큰·파일 내용·프롬프트 원문·Anthropic 키·로컬 경로 X |

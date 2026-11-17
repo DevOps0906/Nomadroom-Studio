@@ -1,9 +1,9 @@
 # NOW — 재진입 스냅샷 (30줄 이내, 매 작업 끝에 덮어쓴다)
 
 - 갱신: 2026-11-18
-- 현재 작업: task-017 완료(M4 끝) → 다음: task-019 YouTube 검색 후보 수집(vidIQ 대체) — 상태: 대기
-- 단계: M5 = task-019. 위험도 높음 → 워커 opus + challenger + code·security
-- 다음 한 걸음: `/next` (task-019)
+- 현재 작업: 카테고리형 쇼츠 제작 기획 개정 완료(P0+P1, task-020~033 대기) · 다음 구현: task-019 → 020
+- 단계: M5 = task-019(수집). 이후 W4(P0: 020~028)·W5(P1: 029~033). 팀장 브리프·결정 `tasks/plan-category-shorts.md`
+- 다음 한 걸음: `/next` (task-019). 사람 확인: `design/wireframes/index.html`의 PROD-00~03 시안
 - 015 결과: MON-D2 다이얼로그(components/evidence, 순수 뷰+클라이언트 컨테이너), A-06 중계 /api/evidence/[id], 카드 버튼 연결. 결정 `tasks/task-015.md#착수 결정·#리뷰 반영 결정`
 - 017 결과: A-08 PATCH(멱등 used_at·조건부 update·404), 웹 /api/candidates/[id]/used(assertSameOrigin)·UsedToggle. 결정 `tasks/task-017.md#착수 결정·#리뷰 반영 결정`
 - M3 결과: 워커 API(claim·heartbeat·후보·finish, job당 조회 200 상한)·수집 작업 API(retry·stop RPC, 24시간 20건)·대시보드·프로필 조건 화면·웹→API 공용 클라이언트(401 → SESSION_EXPIRED_PATH). 상태 전이 정본 `docs/02_ARCHITECTURE.md#3-3`

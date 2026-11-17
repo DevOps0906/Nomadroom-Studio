@@ -6,10 +6,13 @@ flowchart LR
     api["API (FastAPI)<br/>비밀: YouTube 키 · service_role"]
     db[("Supabase Postgres · Auth<br/>비밀: service_role")]
     yt["YouTube Data API v3"]
+    storage[("파일 저장소 Supabase Storage<br/>비공개 버킷 production")]
   end
+  claude["Claude API (AI 초안)"]
   subgraph pc["운영자 PC (신뢰 경계 B)"]
     worker["수집 워커 (Python · Playwright)<br/>비밀: 워커 토큰만"]
     chrome["Chrome · vidIQ<br/>로그인 프로필 (PC 로컬만)"]
+    prodw["제작 워커 (Python · FFmpeg)<br/>비밀: 워커 토큰만"]
   end
   user --> web
   web -.->|"새 탭 링크"| ext
@@ -19,3 +22,8 @@ flowchart LR
   api -->|"서버 키"| yt
   worker -->|"아웃바운드 HTTPS 폴링·결과"| api
   worker --> chrome
+  user -.->|"업로드·다운로드 서명 URL 직접 (예외)"| storage
+  api -->|"서명 URL 발급·존재 확인"| storage
+  api -->|"AI 초안 호출 (A-14만)"| claude
+  prodw -->|"아웃바운드 HTTPS 폴링·진행·완료"| api
+  prodw -->|"서명 URL로만 파일 송수신"| storage

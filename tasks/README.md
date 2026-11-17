@@ -21,6 +21,20 @@
 | task-016 | DASH-01 대시보드 | W3 | 011, 012, 018 | 보통 | builder | 완료 |
 | task-017 | A-08 사용한 소재 | W3 | 011, 013 | 높음 | builder + tester | 완료 |
 | task-019 | YouTube 검색 후보 수집 (vidIQ 대체) | W3 | 006, 008, 013 | 높음 | builder + tester | 대기 |
+| task-020 | 제작 스키마 · RLS · Storage 버킷 | W4 | 002 | 높음 | builder + tester | 대기 |
+| task-021 | 편집안 검증 모듈 | W4 | 003 | 보통 | builder + tester | 대기 |
+| task-022 | 제작 작업 API A-09~A-13·A-17·A-18 | W4 | 020, 021 | 높음 | builder + tester | 대기 |
+| task-023 | 렌더 요청·재시도 A-15·A-16 · 워커 API W-05~W-09 | W4 | 022 | 높음 | builder + tester | 대기 |
+| task-024 | 로컬 제작 워커 prepare·render | W4 | 023 | 높음 | builder + tester | 대기 |
+| task-025 | PROD-00·PROD-01 화면 + MON-01 제작 버튼 | W4 | 022 | 보통 | builder | 대기 |
+| task-026 | PROD-02 편집안 화면 | W4 | 022, 025 | 보통 | builder | 대기 |
+| task-027 | PROD-03 작업·검수 화면 | W4 | 023, 025 | 보통 | builder | 대기 |
+| task-028 | P0 인수 테스트 CAT-01~07 | W4 | 024, 026, 027 | 보통 | tester | 대기 |
+| task-029 | AI 초안 A-14 (Claude) | W5 | 028 | 높음 | builder + tester | 대기 |
+| task-030 | TTS (edge-tts, 워커 전용) | W5 | 028 | 높음 | builder | 대기 |
+| task-031 | URL 원본 (권리 확인 · yt-dlp · SSRF 방지) | W5 | 028 | 높음 | builder + tester | 대기 |
+| task-032 | 댓글·출처 오버레이 레이어 | W5 | 028 | 보통 | builder | 대기 |
+| task-033 | P1 인수 테스트 CAT-08 + 회귀 | W5 | 029, 030, 031, 032 | 보통 | tester | 대기 |
 
 상태: 대기 / 진행 / 완료 / 보류
 

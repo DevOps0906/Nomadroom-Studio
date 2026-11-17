@@ -1,0 +1,107 @@
+sequenceDiagram
+  participant B as 브라우저
+  participant N as 웹 서버 Next
+  participant A as API FastAPI
+  participant S as Supabase DB와 Storage
+  participant W as 제작 워커 로컬 PC
+  participant C as Claude API
+
+  Note over B,A: 1단계 작업 생성과 원본 업로드 (A-09 A-10 A-11)
+  B->>N: 새 작업 (후보 URL 권리 확인)
+  N->>A: POST production-jobs (JWT 전달)
+  A->>S: job draft 저장
+  A-->>N: job 201
+  B->>N: 업로드 요청 (source_upload)
+  N->>A: POST uploads
+  A->>S: asset pending 저장
+  A-->>N: upload_url 서명 PUT 15분
+  N-->>B: upload_url
+  B->>S: 서명 URL로 직접 PUT (예외 단일 객체)
+  B->>N: 업로드 완료 알림
+  N->>A: POST uploads complete
+  A->>S: 객체 존재와 크기 확인 후 asset ready
+  B->>N: 준비 시작
+  N->>A: POST prepare
+  A->>S: job draft에서 preparing
+
+  Note over W,A: 2단계 제작 워커 준비 (W-05 W-06 W-07 W-09)
+  W->>A: W-05 claim prepare (워커 토큰)
+  A->>S: preparing에 claimed_by 기록
+  A-->>W: task prepare 와 source 정보
+  W->>A: W-06 입력 URL 요청
+  A-->>W: 입력 서명 GET 10분
+  alt 업로드 원본
+    W->>S: 서명 URL로 원본 다운로드
+  else URL 원본 (rights_confirmed만)
+    W->>W: yt-dlp로 원본 다운로드
+  end
+  W->>W: 구간 추출 analysis 시트 생성
+  loop 작업 중 주기 보고
+    W->>A: W-08 progress stage 와 progress_pct
+  end
+  W->>A: W-07 outputs source analysis sheet
+  A-->>W: upload_url 목록
+  W->>S: 산출물 서명 PUT
+  W->>A: W-09 finish done asset_ids
+  A->>S: 자산 확인 후 ready, job을 review로
+  Note over A,S: 첫 편집안 리비전 생성
+
+  Note over B,A: 3단계 편집안 저장과 AI 초안과 승인 (A-12 A-14 A-13)
+  B->>N: 편집안 저장
+  N->>A: PUT revision spec base_rev_no
+  A->>S: 리비전 저장 (오류가 있어도 저장, 검증 결과 포함)
+  opt AI 초안 요청
+    B->>N: AI 초안 요청
+    N->>A: POST ai-draft (Idempotency-Key)
+    A->>C: 0.5초 시트 이미지 analysis 후보 제목만 전송
+    C-->>A: 편집안 JSON
+    A->>S: 스키마 재검증 후 새 리비전 origin ai_draft
+    A-->>N: revision 와 ai_draft_count
+  end
+  B->>N: 승인 요청 (rev_no)
+  N->>A: POST revision approve
+  A->>S: 오류 0 확인 후 승인 리비전 고정
+
+  Note over B,W: 4단계 렌더 요청과 워커 렌더 (A-15 W-05 W-06 W-07 W-09)
+  B->>N: 렌더 요청
+  N->>A: POST render-runs (Idempotency-Key, revision_id)
+  A->>S: run queued, job을 rendering으로
+  W->>A: W-05 claim render
+  A->>S: run queued에서 running
+  A-->>W: task render 와 승인 spec
+  W->>A: W-06 입력 요청
+  A-->>W: source analysis hook_audio 서명 GET
+  W->>S: 입력 다운로드
+  W->>W: 훅 음성 실측 TTS 합성 FFmpeg 리포트
+  W->>A: W-07 outputs output_mp4 report hook_audio
+  A-->>W: upload_url 목록
+  W->>S: MP4 리포트 음성 서명 PUT
+  alt 렌더 완료
+    W->>A: W-09 finish done
+    A->>S: 자산 확인 후 ready, job을 inspect로
+  else 훅 길이 초과 hook_too_long
+    W->>A: W-09 failed hook_too_long
+    A->>S: run failed, job을 review로 되돌림 편집안과 훅 문구 보존
+  else 렌더 실패 또는 음성 실패
+    W->>A: W-09 failed 단계와 사유 코드
+    A->>S: run과 job을 failed로 저장
+    B->>N: 같은 승인본 재시도 (A-16)
+    N->>A: POST retry
+    A->>S: 새 run attempt 증가 (완료 파일 덮어쓰기 없음)
+  end
+
+  Note over B,S: 5단계 검수와 다운로드 (A-09 A-18 A-17)
+  loop 상세 화면 폴링 3초
+    B->>N: 진행과 상태 확인
+    N->>A: GET production-jobs id
+    A-->>N: job latest_run worker_online
+    N-->>B: 상태 표시
+  end
+  B->>N: 재생과 리포트 확인 요청
+  N->>A: GET assets download-url
+  A-->>N: 서명 GET URL 10분
+  N-->>B: 재생 URL
+  B->>S: 서명 URL로 MP4 재생 또는 다운로드
+  B->>N: 검수 승인
+  N->>A: POST review approve
+  A->>S: job을 done으로, completed_at 저장
