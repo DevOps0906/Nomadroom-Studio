@@ -7,6 +7,8 @@ export const VERIFY_TIMEOUT_MESSAGE = "검증이 계속 진행 중일 수 있습
 export const WORKER_OFFLINE_MESSAGE =
   "워커 오프라인 — 로컬 워커가 연결되지 않아 수집이 대기 중입니다. 워커를 켜거나 수집을 중지하세요.";
 export const UNKNOWN_CAUSE = "알 수 없는 원인";
+/** 검색 수집일 때 vidIQ 자리 안내(task-009 준비 중). */
+export const VIDIQ_PENDING_MESSAGE = "vidIQ 수집: 준비 중";
 export const FAILED_MESSAGE = "요청을 처리하지 못했습니다. 다시 시도하세요.";
 
 export const CHROME_STATE_LABEL: Record<ChromeState, string> = {
@@ -31,6 +33,8 @@ const JOB_ERROR_LABEL: Record<string, string> = {
   stopped_by_user: "사용자가 수집을 중지했습니다",
   worker_offline: "워커 오프라인 — 하트비트가 3분 넘게 없어 실패 처리되었습니다",
   timeout: "시간 초과",
+  upstream_error: "YouTube 검색 응답을 받지 못했습니다",
+  quota_exceeded: "오늘 YouTube 조회 한도에 도달해 일부 프로필을 수집하지 못했습니다",
   unknown: UNKNOWN_CAUSE,
 };
 

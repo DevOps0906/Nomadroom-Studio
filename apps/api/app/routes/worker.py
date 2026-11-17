@@ -18,7 +18,12 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.auth.worker import CurrentWorker, get_current_worker, parse_token
 from app.errors import ApiError, ErrorBody, db_error, unauthenticated
-from app.jobs.state import OFFLINE_ERROR, close_profile_runs, expire_offline_jobs
+from app.jobs.state import (
+    OFFLINE_ERROR,
+    SEARCH_SOURCE,
+    close_profile_runs,
+    expire_offline_jobs,
+)
 from app.routes.profiles import _json_list, _send
 from app.routes.verify_runs import _profile, quota_exceeded, youtube_error
 from app.verdict.engine import Candidate, Observation, judge
@@ -374,6 +379,8 @@ async def claim_job(
             "workspace_id": f"eq.{ws}",
             "kind": "eq.collect",
             "status": "in.(queued,retrying)",
+            # 검색 수집 job(task-019)은 서버가 처리한다. 워커가 수령하지 않는다.
+            "or": f"(params->>source.is.null,params->>source.neq.{SEARCH_SOURCE})",
         }
         body = {
             "status": "running",

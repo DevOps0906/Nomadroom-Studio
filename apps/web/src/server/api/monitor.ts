@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { Evidence } from "@/components/evidence/evidence";
-import type { JobProfileRun, JobStatus } from "@/components/monitoring/job";
+import type { JobProfileRun, JobSource, JobStatus } from "@/components/monitoring/job";
 import { toApiQuery, type CandidateQuery, type CandidateStatus } from "@/components/monitoring/query";
 import { apiFetch } from "./client";
 
@@ -34,6 +34,7 @@ export type CandidateList = { counts: Counts; categories: string[]; items: Candi
 /** A-05 POST·retry·stop 응답의 job. */
 export type CollectJob = {
   id: string;
+  source: JobSource;
   status: JobStatus;
   error: string | null;
   stop_requested: boolean;
@@ -78,12 +79,13 @@ export async function createCollectJob(key: string, profileIds: string[]): Promi
     method: "POST",
     idempotencyKey: key,
     body: { profile_ids: profileIds },
+    timeoutMs: VERIFY_TIMEOUT_MS, // 검색 수집은 서버가 동기 처리한다
   });
   return res.job;
 }
 
 export async function retryCollectJob(id: string): Promise<CollectJob> {
-  return (await apiFetch<{ job: CollectJob }>(`${jobPath(id)}/retry`, { method: "POST" })).job;
+  return (await apiFetch<{ job: CollectJob }>(`${jobPath(id)}/retry`, { method: "POST", timeoutMs: VERIFY_TIMEOUT_MS })).job;
 }
 
 export async function stopCollectJob(id: string): Promise<CollectJob> {

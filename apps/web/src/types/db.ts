@@ -25,14 +25,14 @@ export type Database = {
           Tables: {
             "api_quota_daily": {
                   Row: {
-                    "day": string,"units": number
+                    "day": string,"search_units": number,"units": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "day": string,"units"?: number
+                    "day": string,"search_units"?: number,"units"?: number
                   }
                   Update: {
-                    "day"?: string,"units"?: number
+                    "day"?: string,"search_units"?: number,"units"?: number
                   }
                   Relationships: [
                     
@@ -376,6 +376,9 @@ isOneToOne: false
             "apply_collect_batch":
 { Args: { "p_job": string,"p_payload": Json,"p_profile": string,"p_worker": string,"p_workspace": string }; Returns: number
                            },
+"apply_search_batch":
+{ Args: { "p_job": string,"p_payload": Json,"p_profile": string,"p_workspace": string }; Returns: number
+                           },
 "apply_verify_batch":
 { Args: { "p_job": string,"p_payload": Json,"p_workspace": string }; Returns: number
                            },
@@ -385,11 +388,17 @@ isOneToOne: false
 "quota_day":
 { Args: { "p_ts": string }; Returns: string
                            },
+"release_search_quota":
+{ Args: { "p_units": number }; Returns: undefined
+                           },
 "reserve_collect_lookup":
 { Args: { "p_job": string,"p_n": number,"p_worker": string,"p_workspace": string }; Returns: number
                            },
 "reserve_quota":
 { Args: { "p_limit": number,"p_units": number }; Returns: boolean
+                           },
+"reserve_search_quota":
+{ Args: { "p_limit": number,"p_search_limit": number,"p_units": number }; Returns: boolean
                            },
 "retry_collect_job":
 { Args: { "p_job": string,"p_workspace": string }; Returns: Json

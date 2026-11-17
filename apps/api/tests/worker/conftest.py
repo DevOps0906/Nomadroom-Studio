@@ -115,6 +115,10 @@ def _match(row: dict, params: dict[str, str]) -> bool:
     for key, raw in params.items():
         if key in _META:
             continue
+        if key == "or" and raw == "(params->>source.is.null,params->>source.neq.youtube_search)":
+            if (row.get("params") or {}).get("source") == "youtube_search":
+                return False
+            continue
         op, _, value = raw.partition(".")
         cur = row.get(key)
         if op == "eq":

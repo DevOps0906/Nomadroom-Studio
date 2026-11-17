@@ -1,7 +1,10 @@
 """A-05 수집 작업(생성·상태·재시도·중지). 근거: tasks/task-008.md#구현 결정, 02_ARCHITECTURE#3-3.
 
-- 생성: 멱등 키 → 60초 제한 → 대상 프로필(최대 3) → jobs(queued) → 실행 행(pending).
-- 재시도·중지는 RPC(retry_collect_job·stop_collect_job)가 job 행을 잠그고 조건을 확인한다.
+- 생성(task-019): 멱등 키 → 60초·24시간 제한 → 대상 프로필(최대 3) → 활성 job 확인
+  → 검색 할당량 예약(프로필 수 × 100, 실패면 429·job 없음) → jobs(running, source=youtube_search)
+  → 실행 행(pending) → 서버가 동기로 검색 수집 후 done·failed(`app.collect.search`).
+- 재시도: vidIQ job은 RPC(retry_collect_job), 검색 job은 서버가 남은 프로필만 다시 예약해
+  failed → running으로 바꾼 뒤 같은 요청 안에서 실행한다. 중지: vidIQ job은 RPC, 검색 job은 409.
 - 모든 경로가 먼저 오프라인 지연 평가(`expire_offline_jobs`)를 한다.
 """
 
@@ -12,34 +15,49 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Header, Request, Response
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 from app.auth.user import CurrentUser, get_current_user
+from app.collect import search
 from app.errors import ApiError, db_error, not_found
-from app.jobs.state import OFFLINE_AFTER, expire_offline_jobs
+from app.jobs.state import OFFLINE_AFTER, SEARCH_SOURCE, expire_offline_jobs, is_search_job
 from app.routes.candidates import count_rows
+from app.routes.profiles import COLUMNS as PROFILE_COLUMNS
 from app.routes.profiles import MAX_SELECTED, _json_list, _send
 from app.routes.verify_runs import (
     _KEY_RE,
     ACTIVE_JOB_INDEX,
     IDEMPOTENCY_CONSTRAINT,
+    _profile,
+    _rpc,
     _ts,
+    quota_exceeded,
+    youtube_error,
 )
-from app.youtube.constants import MAX_CANDIDATES, RATE_LIMIT_WINDOW
+from app.youtube.constants import (
+    DAILY_UNIT_LIMIT,
+    MAX_CANDIDATES,
+    RATE_LIMIT_WINDOW,
+    SEARCH_DAILY_UNIT_LIMIT,
+    SEARCH_UNITS,
+)
 
 logger = logging.getLogger("nomadroom.collect_jobs")
 
 router = APIRouter(prefix="/v1/collect-jobs", tags=["collect-jobs"])
 
 JOB_COLUMNS = (
-    "id,kind,status,error,profile_ids,stop_requested,retry_count,claimed_by,idempotency_key"
+    "id,kind,status,error,profile_ids,params,stop_requested,retry_count,claimed_by,"
+    "idempotency_key,started_at"
 )
 RUN_COLUMNS = "profile_id,position,chrome_state,detail,status,collected_count"
 DAILY_JOB_LIMIT = 20  # 워크스페이스당 최근 24시간 collect job 생성 상한
 DAILY_WINDOW = timedelta(hours=24)
 
 JobStatus = Literal["queued", "running", "retrying", "stopped", "failed", "done"]
+JobSource = Literal["vidiq", "youtube_search"]
 ACTIVE_STATUSES = ("queued", "running", "retrying")
+MAX_RETRIES = 3
 
 
 # --- 입출력 모델 ---------------------------------------------------------------
@@ -77,6 +95,7 @@ class JobResultOut(BaseModel):
 
 class CollectJobOut(BaseModel):
     id: uuid.UUID
+    source: JobSource
     status: JobStatus
     error: str | None = None
     stop_requested: bool
@@ -128,6 +147,8 @@ _RETRY_ERRORS = {
     "NR007": "다른 수집이 진행 중입니다.",
 }
 _STOP_ERRORS = {"NR006": "이미 종료된 작업입니다."}
+_NOT_RETRYABLE = "재시도할 수 없는 작업입니다."
+_SEARCH_NOT_STOPPABLE = "검색 수집은 중지할 수 없습니다."
 
 
 class _IdempotentHit(Exception):
@@ -186,6 +207,7 @@ async def _job_out(request: Request, ws: uuid.UUID, job: dict) -> CollectJobOut:
             profiles.append(ProfileRunOut.model_validate(r))
     return CollectJobOut(
         id=job["id"],
+        source=SEARCH_SOURCE if is_search_job(job) else "vidiq",
         status=job["status"],
         error=job.get("error"),
         stop_requested=bool(job.get("stop_requested")),
@@ -262,33 +284,95 @@ async def _check_rate_limit(request: Request, ws: uuid.UUID, key: str, now: date
         raise _rate_limited()
 
 
-async def _target_profiles(request: Request, ws: uuid.UUID, body: CollectJobIn | None) -> list[str]:
-    """이번 수집 프로필 id(요청 순서, 생략 시 선택된 프로필 name 순)."""
-    params = {"select": "id,selected", "workspace_id": f"eq.{ws}", "order": "name.asc,id.asc"}
+async def _target_profiles(
+    request: Request, ws: uuid.UUID, body: CollectJobIn | None
+) -> list[dict]:
+    """이번 수집 프로필 행(요청 순서, 생략 시 선택된 프로필 name 순)."""
+    params = {"select": PROFILE_COLUMNS, "workspace_id": f"eq.{ws}", "order": "name.asc,id.asc"}
     rows = _json_list(await _send(request, "GET", "profiles", params=params), "GET", "profiles")
     if body is not None and body.profile_ids is not None:
-        owned = {str(r["id"]) for r in rows}
+        by_id = {str(r["id"]): r for r in rows}
         ids = [str(i) for i in body.profile_ids]
-        if any(i not in owned for i in ids):
+        if any(i not in by_id for i in ids):
             raise ApiError(400, "VALIDATION", "없는 프로필이 포함되어 있습니다.", "profile_ids")
+        out = [by_id[i] for i in ids]
     else:
-        ids = [str(r["id"]) for r in rows if r["selected"]]
-        if len(ids) > MAX_SELECTED:
+        out = [r for r in rows if r["selected"]]
+        if len(out) > MAX_SELECTED:
             raise ApiError(400, "VALIDATION", "선택된 프로필이 3개를 넘습니다.", "profile_ids")
-    if not ids:
+    if not out:
         raise ApiError(400, "VALIDATION", "수집할 프로필이 없습니다.", "profile_ids")
-    return ids
+    return out
+
+
+async def _job_profiles(request: Request, ws: uuid.UUID, ids: list[str]) -> list[dict]:
+    """job.profile_ids 순서의 프로필 행(없어진 프로필은 빠진다)."""
+    params = {
+        "select": PROFILE_COLUMNS,
+        "workspace_id": f"eq.{ws}",
+        "id": f"in.({','.join(ids)})",
+    }
+    rows = _json_list(await _send(request, "GET", "profiles", params=params), "GET", "profiles")
+    by_id = {str(r["id"]): r for r in rows}
+    return [by_id[i] for i in ids if i in by_id]
+
+
+async def _active_jobs(request: Request, ws: uuid.UUID) -> list[dict]:
+    params = {
+        "select": JOB_COLUMNS,
+        "workspace_id": f"eq.{ws}",
+        "kind": "eq.collect",
+        "status": f"in.({','.join(ACTIVE_STATUSES)})",
+    }
+    return _json_list(await _send(request, "GET", "jobs", params=params), "GET", "jobs")
+
+
+async def _reserve_search(request: Request, n_profiles: int) -> None:
+    """검색 일 상한(2,000)과 전체 방어선(8,000)을 한 번에 원자적으로 예약. 실패면 429."""
+    reserved = await _rpc(
+        request,
+        "reserve_search_quota",
+        {
+            "p_units": n_profiles * SEARCH_UNITS,
+            "p_search_limit": SEARCH_DAILY_UNIT_LIMIT,
+            "p_limit": DAILY_UNIT_LIMIT,
+        },
+    )
+    if reserved is not True:
+        raise quota_exceeded()
+
+
+async def _release_search(request: Request, n_profiles: int) -> None:
+    """예약 뒤 job 생성·재시도 전이가 실패했다(검색 안 함) → 예약분을 되돌린다(best-effort)."""
+    path = "rpc/release_search_quota"
+    try:
+        resp = await _send(request, "POST", path, json={"p_units": n_profiles * SEARCH_UNITS})
+    except ApiError:
+        logger.warning("검색 할당량 되돌리기 실패(연결)")
+        return
+    if resp.status_code >= 400:
+        logger.warning("데이터 저장소 오류 %s: POST %s", resp.status_code, path)
+
+
+def _api_key(request: Request) -> SecretStr:
+    api_key = request.app.state.settings.youtube_api_key
+    if api_key is None:
+        logger.warning("YOUTUBE_API_KEY 미설정")
+        raise youtube_error()
+    return api_key
 
 
 async def _create_job(
     request: Request, user: CurrentUser, key: str, profile_ids: list[str]
 ) -> dict:
+    # 검색 job은 워커가 수령하지 않도록 바로 running으로 만든다(claimed_by 없음).
     body = {
         "workspace_id": str(user.workspace_id),
         "kind": "collect",
-        "status": "queued",
+        "status": "running",
+        "started_at": datetime.now(UTC).isoformat(),
         "profile_ids": profile_ids,
-        "params": {"limit": MAX_CANDIDATES},
+        "params": {"limit": MAX_CANDIDATES, "source": SEARCH_SOURCE},
         "idempotency_key": key,
         "requested_by": str(user.user_id),
     }
@@ -356,6 +440,96 @@ async def _control_rpc(
     raise db_error()
 
 
+async def _retry_search(request: Request, ws: uuid.UUID, job: dict) -> None:
+    """검색 job 재시도: 남은(done 아닌) 프로필만 예약 → failed → running(조건부) → 동기 실행."""
+    retry_count = job.get("retry_count") or 0
+    if job["status"] != "failed" or retry_count >= MAX_RETRIES or job.get("stop_requested"):
+        raise _conflict(_NOT_RETRYABLE)
+    api_key = _api_key(request)
+    job_id = str(job["id"])
+    run_params = {
+        "select": "profile_id,status",
+        "workspace_id": f"eq.{ws}",
+        "job_id": f"eq.{job_id}",
+    }
+    runs = _json_list(
+        await _send(request, "GET", "job_profile_runs", params=run_params),
+        "GET",
+        "job_profile_runs",
+    )
+    done = {str(r["profile_id"]) for r in runs if r["status"] == "done"}
+    rows = await _job_profiles(request, ws, [str(p) for p in job.get("profile_ids") or []])
+    todo = [r for r in rows if str(r["id"]) not in done]
+    if not todo:
+        raise _conflict(_NOT_RETRYABLE)
+    if any(str(j["id"]) != job_id for j in await _active_jobs(request, ws)):
+        raise _conflict(_RETRY_ERRORS["NR007"])
+    # 남용 방지: 직전 실행 시작 후 60초 안의 재시도는 429(생성 POST와 같은 구간·문구)
+    last_start = _parse(job.get("started_at"))
+    if last_start is not None and datetime.now(UTC) - last_start < RATE_LIMIT_WINDOW:
+        raise _rate_limited()
+    await _reserve_search(request, len(todo))
+    try:
+        await _start_retry(request, ws, job, retry_count, str(todo[0]["id"]))
+    except BaseException:
+        await _release_search(request, len(todo))
+        raise
+
+    reset = {
+        "workspace_id": f"eq.{ws}",
+        "job_id": f"eq.{job_id}",
+        "profile_id": f"in.({','.join(str(r['id']) for r in todo)})",
+        "status": "eq.failed",
+    }
+    resp = await _send(
+        request,
+        "PATCH",
+        "job_profile_runs",
+        params=reset,
+        json={"status": "pending", "updated_at": datetime.now(UTC).isoformat()},
+    )
+    if resp.status_code >= 400:  # 화면 표시만 늦다. 실행이 running·done으로 덮어쓴다
+        logger.warning("데이터 저장소 오류 %s: PATCH job_profile_runs", resp.status_code)
+    await search.execute(
+        request, ws, job_id, [_profile(r) for r in rows], [_profile(r) for r in todo], api_key
+    )
+
+
+async def _start_retry(
+    request: Request, ws: uuid.UUID, job: dict, retry_count: int, resume_from: str
+) -> None:
+    """failed → running 조건부 전이. 동시 재시도·활성 충돌이면 409."""
+    job_id = str(job["id"])
+    params = {
+        "select": JOB_COLUMNS,
+        "id": f"eq.{job_id}",
+        "workspace_id": f"eq.{ws}",
+        "status": "eq.failed",
+        "retry_count": f"eq.{retry_count}",
+        "stop_requested": "is.false",
+    }
+    body = {
+        "status": "running",
+        "retry_count": retry_count + 1,
+        "error": None,
+        "finished_at": None,
+        "started_at": datetime.now(UTC).isoformat(),
+        "params": {**(job.get("params") or {}), "resume_from_profile_id": resume_from},
+    }
+    resp = await _send(
+        request,
+        "PATCH",
+        "jobs",
+        params=params,
+        json=body,
+        headers={"Prefer": "return=representation"},
+    )
+    if resp.status_code == 409 and ACTIVE_JOB_INDEX in str(_error_body(resp).get("message", "")):
+        raise _conflict(_RETRY_ERRORS["NR007"])
+    if not _json_list(resp, "PATCH", "jobs"):
+        raise _conflict(_NOT_RETRYABLE)  # 동시 재시도가 먼저 바꿨다
+
+
 # --- A-05 ----------------------------------------------------------------------
 
 
@@ -380,11 +554,26 @@ async def post_collect_job(
         response.status_code = 200
         return CollectJobEnvelope(job=await _job_out(request, ws, existing))
 
+    api_key = _api_key(request)
     await _check_rate_limit(request, ws, idempotency_key, datetime.now(UTC))
-    ids = await _target_profiles(request, ws, body)
+    rows = await _target_profiles(request, ws, body)
+    ids = [str(r["id"]) for r in rows]
+    # 진행 중 job이 있으면 할당량을 쓰기 전에 거부한다(생성 시 유니크 인덱스가 최종 확인).
+    active = await _active_jobs(request, ws)
+    same = [j for j in active if j.get("idempotency_key") == idempotency_key]
+    if same:  # 동시 요청이 같은 키로 먼저 만들었다
+        response.status_code = 200
+        return CollectJobEnvelope(job=await _job_out(request, ws, same[0]))
+    if active:
+        raise _running()
+    await _reserve_search(request, len(ids))
     try:
         job = await _create_job(request, user, idempotency_key, ids)
-    except _IdempotentHit:
+    except BaseException as exc:
+        # job이 없으니 검색도 하지 않는다 → 예약분을 되돌린다(멱등·활성 충돌·DB 오류·취소)
+        await _release_search(request, len(ids))
+        if not isinstance(exc, _IdempotentHit):
+            raise
         hit = await _find_by_key(request, ws, idempotency_key)
         if hit is None:
             raise db_error() from None
@@ -393,6 +582,9 @@ async def post_collect_job(
         response.status_code = 200
         return CollectJobEnvelope(job=await _job_out(request, ws, hit))
     await _create_runs(request, ws, str(job["id"]), ids)
+    profiles = [_profile(r) for r in rows]
+    await search.execute(request, ws, str(job["id"]), profiles, profiles, api_key)
+    job = await _get_job(request, ws, uuid.UUID(str(job["id"])))
     return CollectJobEnvelope(job=await _job_out(request, ws, job))
 
 
@@ -460,7 +652,11 @@ async def retry_collect_job(
 ) -> CollectJobEnvelope:
     ws = user.workspace_id
     await expire_offline_jobs(request, ws)
-    await _control_rpc(request, "retry_collect_job", ws, job_id, _RETRY_ERRORS)
+    job = await _get_job(request, ws, job_id)
+    if is_search_job(job):
+        await _retry_search(request, ws, job)
+    else:
+        await _control_rpc(request, "retry_collect_job", ws, job_id, _RETRY_ERRORS)
     return CollectJobEnvelope(job=await _job_out(request, ws, await _get_job(request, ws, job_id)))
 
 
@@ -470,5 +666,7 @@ async def stop_collect_job(
 ) -> CollectJobEnvelope:
     ws = user.workspace_id
     await expire_offline_jobs(request, ws)
+    if is_search_job(await _get_job(request, ws, job_id)):
+        raise _conflict(_SEARCH_NOT_STOPPABLE)
     await _control_rpc(request, "stop_collect_job", ws, job_id, _STOP_ERRORS)
     return CollectJobEnvelope(job=await _job_out(request, ws, await _get_job(request, ws, job_id)))

@@ -20,7 +20,7 @@
 | task-015 | MON-D2 관측 근거 | W3 | 011, 013, 018 | 높음 | builder | 완료 |
 | task-016 | DASH-01 대시보드 | W3 | 011, 012, 018 | 보통 | builder | 완료 |
 | task-017 | A-08 사용한 소재 | W3 | 011, 013 | 높음 | builder + tester | 완료 |
-| task-019 | YouTube 검색 후보 수집 (vidIQ 대체) | W3 | 006, 008, 013 | 높음 | builder + tester | 대기 |
+| task-019 | YouTube 검색 후보 수집 (vidIQ 대체) | W3 | 006, 008, 013 | 높음 | builder + tester | 완료 |
 | task-020 | 제작 스키마 · RLS · Storage 버킷 | W4 | 002 | 높음 | builder + tester | 대기 |
 | task-021 | 편집안 검증 모듈 | W4 | 003 | 보통 | builder + tester | 대기 |
 | task-022 | 제작 작업 API A-09~A-13·A-17·A-18 | W4 | 020, 021 | 높음 | builder + tester | 대기 |
@@ -56,6 +56,9 @@
 | 2026-11-17 | jobs.error 제약 | 허용 코드가 check로 고정 → 008 등에서 새 오류 코드를 쓰면 새 마이그레이션 필요 | 코드 추가 시 함께 마이그레이션 |
 | 2026-11-17 | 웹 테스트 도구 | jsdom·testing-library 없음 → 클릭 배선(MonitorWorkbench 통합)·포커스 이동을 자동 테스트 못 함 | 테스트 의존성 추가 작업(새 의존성 → secscan) |
 | 2026-11-17 | 웹 CSP | Content-Security-Policy(img-src 등) 미설정, 썸네일 host 검사가 유일한 방어선 | 배포 전 CSP 헤더 작업 |
+| 2026-11-18 | 검색 할당량(task-019) | 검색 일 상한 2,000 unit은 서버 공용(워크스페이스별 아님). 단일 워크스페이스라 수용 | 다중 워크스페이스 도입 시 워크스페이스별 상한 |
+| 2026-11-18 | 검색 후보 category(task-019) | 검색 결과에 자체 분류가 없어 찾은 프로필의 category·market을 그대로 기록 | 실측 분류가 필요하면 snippet.categoryId 매핑 표 |
+| 2026-11-18 | 수집 POST 키 미설정(task-019) | YOUTUBE_API_KEY가 없으면 API 502 → 화면은 일반 "요청을 처리하지 못했습니다" | 배포 체크리스트에 키 설정 확인, 필요 시 전용 문구 |
 | 2026-11-16 | 앱 셸 | 로그아웃 버튼(SignOutButton)이 셸에 아직 없음 | DASH-01(task-016) 또는 셸 보강 때 상단 바에 배치 |
 
 ## 교훈 (다음 작업에 그대로 적용할 것만, 20줄 이내 유지)

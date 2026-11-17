@@ -8,7 +8,7 @@ const { JobPanel } = await import("./job-panel");
 const { MonitorWorkbench, fetchJobStatus, finishedNotice } = await import("./monitor-workbench");
 const { safeThumbnailUrl } = await import("./thumbnail");
 const { parseCandidateQuery, toHref, DEFAULT_QUERY } = await import("./query");
-const { toActionFailure, FAILED_MESSAGE, QUOTA_MESSAGE, RATE_LIMITED_MESSAGE, VERIFY_TIMEOUT_MESSAGE, WORKER_OFFLINE_MESSAGE, chromeDetailLabel } =
+const { toActionFailure, FAILED_MESSAGE, QUOTA_MESSAGE, RATE_LIMITED_MESSAGE, VERIFY_TIMEOUT_MESSAGE, WORKER_OFFLINE_MESSAGE, VIDIQ_PENDING_MESSAGE, chromeDetailLabel, jobErrorLabel } =
   await import("./messages");
 const { createIntentKey, createIntentRunner, idsFingerprint } = await import("./intent-key");
 const { createPoller, nextDelay, POLL_MS, OFFLINE_POLL_MS, MAX_BACKOFF_MS } = await import("./poller");
@@ -43,6 +43,7 @@ const counts = { total: 0, producible: 0, pending: 0, excluded: 0, used: 0 };
 const data = (items: Item[], c = counts): Data => ({ counts: c, categories: ["예능"], items, updated_at: "2026-11-17T00:00:00Z" });
 const job = (over: Partial<Job> = {}): Job => ({
   id: JOB_ID,
+  source: "vidiq",
   status: "running",
   error: null,
   stop_requested: false,
@@ -631,5 +632,68 @@ describe("리뷰 반영(design)", () => {
     const open = renderToStaticMarkup(<CandidateFilters query={parseCandidateQuery({ q: "예능", license: "cc" })} categories={[]} profiles={[]} />);
     expect(open).toMatch(/<details[^>]* open=""/);
     expect(open).toContain("(2개 적용)");
+  });
+});
+
+describe("YouTube 검색 수집(source=youtube_search)", () => {
+  const search = (over: Partial<Job> = {}) =>
+    job({ source: "youtube_search", profiles: [{ profile_id: P1, chrome_state: null, detail: null, status: "done", collected_count: 4 }], ...over });
+
+  it("source 파싱: 없거나 모르는 값이면 vidiq", () => {
+    const raw = { id: JOB_ID, status: "done", profiles: [] };
+    expect(pickJob(raw)?.source).toBe("vidiq");
+    expect(pickJob({ ...raw, source: "<x>" })?.source).toBe("vidiq");
+    expect(pickJob({ ...raw, source: "youtube_search" })?.source).toBe("youtube_search");
+  });
+
+  it("완료: Chrome 상태·워커 안내·중지 없이 vidIQ 준비 중 안내", () => {
+    const html = renderToStaticMarkup(<JobPanel job={search({ status: "done" })} profileNames={names} busy={null} onRetry={noop} onStop={noop} />);
+    expect(html).toContain("YouTube 검색 수집");
+    expect(html).toContain(VIDIQ_PENDING_MESSAGE);
+    expect(html).not.toContain("Chrome 준비 결과");
+    expect(html).not.toContain("확인 전");
+    expect(html).toContain("4개");
+    expect(html).not.toContain("수집 중지");
+    expect(html).not.toContain("해당 후보부터 재시도");
+  });
+
+  it("진행(running)·queued 오프라인이어도 중지·워커 안내 없음", () => {
+    const html = renderToStaticMarkup(
+      <JobPanel job={search({ status: "queued", worker_online: false })} profileNames={names} busy={null} onRetry={noop} onStop={noop} />,
+    );
+    expect(html).not.toContain(WORKER_OFFLINE_MESSAGE);
+    expect(html).not.toContain("수집 중지");
+  });
+
+  it("실패: 오류 문구 + 재시도(실패 때만)", () => {
+    const html = renderToStaticMarkup(
+      <JobPanel job={search({ status: "failed", error: "quota_exceeded" })} profileNames={names} busy={null} onRetry={noop} onStop={noop} />,
+    );
+    expect(html).toContain("수집 실패: 오늘 YouTube 조회 한도에 도달해");
+    expect(html).toContain("해당 후보부터 재시도");
+  });
+
+  it("끝난 job이면 폴링·진행 표시 없음(버튼 활성)", () => {
+    const html = renderToStaticMarkup(
+      <MonitorWorkbench
+        profiles={[]}
+        profilesError={null}
+        activeJob={search({ status: "done" })}
+        actions={{ startCollect: vi.fn(), retryCollect: vi.fn(), stopCollect: vi.fn(), verifyRecords: vi.fn(), saveConditions: vi.fn(), saveSelection: vi.fn() }}
+        sessionExpiredPath="/x"
+        updated={null}
+      >
+        <p />
+      </MonitorWorkbench>,
+    );
+    expect(html).not.toContain("animate-pulse");
+    expect(html).not.toContain("aria-busy");
+  });
+
+  it("오류 문구 매핑: upstream_error·quota_exceeded·429 QUOTA_EXCEEDED", () => {
+    expect(jobErrorLabel("upstream_error")).toBe("YouTube 검색 응답을 받지 못했습니다");
+    expect(jobErrorLabel("quota_exceeded")).toContain("조회 한도");
+    expect(finishedNotice(search({ status: "failed", error: "upstream_error" })).text).toContain("YouTube 검색 응답을 받지 못했습니다");
+    expect(toActionFailure({ status: 429, code: "QUOTA_EXCEEDED", message: "x" })).toEqual({ ok: false, message: QUOTA_MESSAGE, keepKey: false });
   });
 });

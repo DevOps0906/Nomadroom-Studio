@@ -1,7 +1,7 @@
 # NOW — 재진입 스냅샷 (30줄 이내, 매 작업 끝에 덮어쓴다)
 
 - 갱신: 2026-11-18
-- 현재 작업: 카테고리형 쇼츠 제작 기획 개정 완료(P0+P1, task-020~033 대기) · 다음 구현: task-019 → 020
+- 현재 작업: task-019 YouTube 검색 후보 수집 — 단계: 구현(builder opus)
 - 단계: M5 = task-019(수집). 이후 W4(P0: 020~028)·W5(P1: 029~033). 팀장 브리프·결정 `tasks/plan-category-shorts.md`
 - 다음 한 걸음: `/next` (task-019). 사람 확인: `design/wireframes/index.html`의 PROD-00~03 시안
 - 015 결과: MON-D2 다이얼로그(components/evidence, 순수 뷰+클라이언트 컨테이너), A-06 중계 /api/evidence/[id], 카드 버튼 연결. 결정 `tasks/task-015.md#착수 결정·#리뷰 반영 결정`

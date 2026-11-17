@@ -31,19 +31,22 @@ def _post(api: TestClient, auth: dict, key: str = "c-1", body: dict | None = Non
 # --- POST -----------------------------------------------------------------------
 
 
-def test_post_creates_queued_job_and_runs(api: TestClient, auth: dict, db: FakeDB):
+def test_post_creates_search_job_and_runs(api: TestClient, auth: dict, db: FakeDB):
+    # task-019: 서버가 검색으로 동기 처리(검색 결과 0건) → done
     resp = _post(api, auth)
     assert resp.status_code == 202, resp.json()
     out = resp.json()["job"]
-    assert out["status"] == "queued" and out["stop_requested"] is False
+    assert out["status"] == "done" and out["stop_requested"] is False
+    assert out["source"] == "youtube_search"
     assert [p["profile_id"] for p in out["profiles"]] == [P1, P2]  # 선택된 프로필, name 순
-    assert all(p["status"] == "pending" and p["collected_count"] == 0 for p in out["profiles"])
+    assert all(p["status"] == "done" and p["collected_count"] == 0 for p in out["profiles"])
     created = db.jobs[0]
-    assert created["kind"] == "collect" and created["params"] == {"limit": 200}
-    assert created["profile_ids"] == [P1, P2]
+    assert created["kind"] == "collect"
+    assert created["params"] == {"limit": 200, "source": "youtube_search"}
+    assert created["profile_ids"] == [P1, P2] and created["claimed_by"] is None
     assert [(r["profile_id"], r["position"], r["status"]) for r in db.runs] == [
-        (P1, 0, "pending"),
-        (P2, 1, "pending"),
+        (P1, 0, "done"),
+        (P2, 1, "done"),
     ]
 
 
@@ -132,7 +135,8 @@ def test_post_runs_failure_still_202(api: TestClient, auth: dict, db: FakeDB):
     db.runs_insert_fails = True
     resp = _post(api, auth)
     assert resp.status_code == 202
-    assert [p["status"] for p in resp.json()["job"]["profiles"]] == ["pending", "pending"]
+    # 실행 행은 apply_search_batch가 upsert로 보완한다
+    assert [p["status"] for p in resp.json()["job"]["profiles"]] == ["done", "done"]
 
 
 def test_post_unauthenticated_401(api: TestClient):

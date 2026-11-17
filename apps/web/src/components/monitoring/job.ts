@@ -3,6 +3,8 @@
 export type JobStatus = "queued" | "running" | "retrying" | "stopped" | "failed" | "done";
 export type ChromeState = "ready" | "resize_needed" | "login_needed" | "error";
 export type RunStatus = "pending" | "running" | "done" | "failed";
+/** 수집 방식. youtube_search는 서버가 동기로 처리해 끝난 job이 온다(워커·Chrome 없음). */
+export type JobSource = "vidiq" | "youtube_search";
 
 export type JobProfileRun = {
   profile_id: string;
@@ -15,6 +17,7 @@ export type JobProfileRun = {
 /** 화면에 필요한 필드만. GET /v1/collect-jobs/{id}·/active 응답의 부분집합. */
 export type JobView = {
   id: string;
+  source: JobSource;
   status: JobStatus;
   error: string | null;
   stop_requested: boolean;
@@ -27,6 +30,7 @@ export type JobView = {
 const JOB_STATUSES: JobStatus[] = ["queued", "running", "retrying", "stopped", "failed", "done"];
 const CHROME_STATES: ChromeState[] = ["ready", "resize_needed", "login_needed", "error"];
 const RUN_STATUSES: RunStatus[] = ["pending", "running", "done", "failed"];
+const SOURCES: JobSource[] = ["vidiq", "youtube_search"];
 export const TERMINAL: JobStatus[] = ["done", "failed", "stopped"];
 export const RETRY_LIMIT = 3;
 
@@ -66,6 +70,7 @@ export function pickJob(raw: unknown): JobView | null {
   const res = typeof j.result === "object" && j.result !== null ? (j.result as Record<string, unknown>) : null;
   return {
     id: j.id,
+    source: oneOf(j.source, SOURCES) ?? "vidiq",
     status,
     error: strOrNull(j.error),
     stop_requested: j.stop_requested === true,

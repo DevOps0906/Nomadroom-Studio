@@ -147,7 +147,13 @@ export function MonitorWorkbench({ profiles, profilesError, activeJob, actions, 
     if (!res) return;
     if (!res.ok) return setNotice({ tone: "error", text: res.message });
     setJob(res.job);
-    setNotice({ tone: "info", text: "후보를 가져오는 중입니다. 프로필별 진행은 Chrome 준비 결과에서 확인하세요." });
+    if (isTerminal(res.job.status)) {
+      // 검색 수집은 끝난 job이 바로 온다: 폴링 없이 결과를 알리고 목록을 새로 받는다.
+      setNotice(finishedNotice(res.job));
+      router.refresh();
+    } else {
+      setNotice({ tone: "info", text: "후보를 가져오는 중입니다. 프로필별 진행은 Chrome 준비 결과에서 확인하세요." });
+    }
   }
 
   async function verify() {
