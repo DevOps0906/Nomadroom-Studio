@@ -103,3 +103,10 @@ export function runVerify(key: string, profileIds: string[]): Promise<VerifyRun>
 export function getEvidence(id: string): Promise<Evidence> {
   return apiFetch<Evidence>(`/v1/candidates/${encodeURIComponent(id)}/evidence`);
 }
+
+export type UsedResult = { id: string; used: boolean; used_at: string | null };
+
+/** A-08 사용한 소재 표시/해제. true 재요청은 멱등(used_at 유지). */
+export function setUsed(id: string, used: boolean): Promise<UsedResult> {
+  return apiFetch<UsedResult>(`/v1/candidates/${encodeURIComponent(id)}/used`, { method: "PATCH", body: { used } });
+}

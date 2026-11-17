@@ -12,7 +12,15 @@ from app.auth.jwks import JwksCache
 from app.config import Settings
 from app.errors import install_error_handlers
 from app.logging_mask import setup_logging
-from app.routes import candidates, collect_jobs, dashboard, profiles, verify_runs, worker
+from app.routes import (
+    candidates,
+    candidates_used,
+    collect_jobs,
+    dashboard,
+    profiles,
+    verify_runs,
+    worker,
+)
 
 HTTP_TIMEOUT_SECONDS = 5.0
 
@@ -46,6 +54,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_error_handlers(app)
     app.include_router(profiles.router)
     app.include_router(candidates.router)
+    app.include_router(candidates_used.router)
     app.include_router(dashboard.router)
     app.include_router(verify_runs.router)
     app.include_router(collect_jobs.router)

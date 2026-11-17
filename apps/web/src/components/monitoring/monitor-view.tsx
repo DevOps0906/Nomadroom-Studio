@@ -17,6 +17,7 @@ import {
 } from "./query";
 import { FiltersDisclosure } from "./filters-disclosure";
 import { safeThumbnailUrl } from "./thumbnail";
+import { UsedToggle } from "./UsedToggle";
 
 // MON-01 후보 영역(상태 없는 서버 렌더 뷰). 비신뢰 값(제목·장르·프로필명)은 JSX 텍스트로만 넣는다.
 
@@ -234,6 +235,7 @@ export function CandidateCard({ item, opsUrl }: { item: CandidateItem; opsUrl: s
       )}
       <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-1">
         <EvidenceButton candidateId={item.id} title={item.title} opsUrl={opsUrl} />
+        <UsedToggle candidateId={item.id} used={item.used} />
         {item.status === "producible" && opsUrl && (
           <a
             href={opsUrl}

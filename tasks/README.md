@@ -19,7 +19,7 @@
 | task-014 | MON-D1 프로필 조건 | W3 | 010, 012, 018 | 보통 | builder | 완료 |
 | task-015 | MON-D2 관측 근거 | W3 | 011, 013, 018 | 높음 | builder | 완료 |
 | task-016 | DASH-01 대시보드 | W3 | 011, 012, 018 | 보통 | builder | 완료 |
-| task-017 | A-08 사용한 소재 | W3 | 011, 013 | 높음 | builder + tester | 대기 |
+| task-017 | A-08 사용한 소재 | W3 | 011, 013 | 높음 | builder + tester | 완료 |
 | task-019 | YouTube 검색 후보 수집 (vidIQ 대체) | W3 | 006, 008, 013 | 높음 | builder + tester | 대기 |
 
 상태: 대기 / 진행 / 완료 / 보류

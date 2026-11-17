@@ -29,7 +29,7 @@
 | A-05 | POST | `/v1/collect-jobs/{id}/stop` | — | `job{status, stop_requested}`(queued·retrying → `stopped`, running → `stop_requested`=true 후 워커가 stopped로 마감. 수집된 후보 보존) | 로그인 | 404 · 409 이미 종료 |
 | A-06 | GET | `/v1/candidates/{id}/evidence` | — | `candidate{id, title, status}`, `prev{observed_at, view_count}`(없으면 null), `curr{observed_at, view_count}`, `growth_pct`, `reason`(←`candidate_verdicts.reason`), `needs_prev`(이전 관측 없음), `next_observation_at`. 대표 판정 프로필 기준 | 로그인 | 404 후보 없음(타 워크스페이스 포함). 대표 판정 없음 → 200·prev/curr null·`needs_prev` true |
 | A-07 | POST | `/v1/verify-runs` | `Idempotency-Key`, `profile_ids[]`(생략 시 선택된 프로필) | `job{id, kind:"verify", status}`, `checked`, `skipped_recent`(24시간 미만), `failed`, `counts{total, producible, pending, excluded, used}`(워커 불필요, 동기 응답) | 로그인 | 400 · 409 검증 진행 중·같은 키의 다른 kind job · 429 `QUOTA_EXCEEDED`(남은 후보는 이전 판정 유지)·`RATE_LIMITED`(같은 워크스페이스 직전 실행 후 60초 이내 새 키) · 502(YouTube 오류·키 미설정). 같은 `Idempotency-Key` 재요청은 200으로 기존 job과 저장된 결과 반환(본문이 달라도). 10분 넘은 실행 중 job은 새 요청 때 `failed` 정리. 대상: used 제외·최신 관측 24시간 이상·상한 200 |
-| A-08 | PATCH | `/v1/candidates/{id}/used` | `used`(bool) | `id`, `used`, `used_at`(Q4 수동 표시 제안). 제작 전환 지표 측정원(`01_PRD.md#5`) | 로그인 | 404 |
+| A-08 | PATCH | `/v1/candidates/{id}/used` | `used`(bool, 엄격·추가 키 금지) | `id`, `used`, `used_at`. 제작 전환 지표 측정원(`01_PRD.md#5`). 규칙: `true` 재요청은 멱등(`used_at` 유지), `false`는 `used_at` null, 다시 표시하면 새 시각. 상세 `tasks/task-017.md#착수 결정` | 로그인 | 404(없는 id·타 워크스페이스), 400 본문 |
 
 ## 워커 API (수집 워커 → FastAPI, 아웃바운드 전용)
 `Authorization: Bearer <워커 토큰>`(`workers.token_hash`로 검증, 사용자 JWT 아님). 로컬 포트 개방·DB 직접 접속 없음. 화면 ID 없음.
