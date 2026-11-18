@@ -1,11 +1,11 @@
 # NOW — 재진입 스냅샷 (30줄 이내, 매 작업 끝에 덮어쓴다)
 
 - 갱신: 2026-11-19
-- 현재 작업: task-020 완료 → 다음: task-021 편집안 검증 모듈(보통·sonnet, 선행 003 완료) — 상태: 대기. 021과 병행 가능한 것 없음(022는 020·021 선행)
+- 현재 작업: task-021 완료 → 다음: task-022 제작 작업 API A-09~A-13·A-17·A-18(높음·opus·challenger 먼저, 선행 020·021 완료) — 상태: 대기
 - 단계: W4(P0: 020~028) → W5(P1: 029~033). 팀장 브리프·결정 `tasks/plan-category-shorts.md`. 대부분 위험도 높음 → 워커 opus + challenger + code·security
 - 예능형 기획 추가(2026-11-19): W6(P0: 034~038)·W7(P1: 039~041), 카테고리형 W4 뒤. 브리프·결정 `tasks/plan-variety-shorts.md`(D-V1~4·R1~R8), 근거 `docs/research/variety-shorts-zip-analysis.md`. 020·022에 format 칸 선반영. 미결 Q9 글꼴·Q10 whisper·Q11 한도
 - 쇼핑쇼츠·일본어판 기획 추가(2026-11-19): 유형 general(조회수)/shopping(제휴: 상품·여행), 언어 ko/ja 공통. W8 쇼핑 P0(042~047)·W9 AI 대본·AI 영상 연동(048·054)·W10 일본어판(049~053). 브리프 `tasks/plan-shopping-japanese.md`, 근거 `docs/research/shopping-shorts-notion-analysis.md`. AI 영상: quality=힉스필드·economy=그록, 예산 상한·컷 검수 3항목. 미결 Q12~Q16
-- 다음 한 걸음: `/next` (task-021). 020 결과: 마이그레이션 000015(제작 4테이블·소속 복합 FK·부분 unique 이름 render_runs_active_ws_uidx/rev_uidx·비공개 버킷 500MB), pgTAP 311. 결정·후속 `tasks/task-020.md#착수 결정·#구현 결정·#리뷰 반영 결정`
+- 다음 한 걸음: `/next` (task-022). 021 결과: `app/production/spec.py` validate_spec(오류·경고 코드 `tasks/task-021.md#구현 결정`), 테스트 48. 020 결과: 마이그레이션 000015·pgTAP 311. 후속 메모는 각 task 파일 "리뷰 반영 결정"
 - 019 결과: 수집 = 서버 YouTube 검색(source=youtube_search), 검색 할당량 예약·환불, 000013·000014. 결정 `tasks/task-019.md#착수 결정·#리뷰 반영 결정`. 배포 시 YOUTUBE_API_KEY 필수
 - M3 결과: 워커 API(claim·heartbeat·후보·finish, job당 조회 200 상한)·수집 작업 API(retry·stop RPC, 24시간 20건)·대시보드·프로필 조건 화면·웹→API 공용 클라이언트(401 → SESSION_EXPIRED_PATH). 상태 전이 정본 `docs/02_ARCHITECTURE.md#3-3`
 - 모델 규칙(2026-11-17): 워커 model은 위험도로 — 낮음 haiku · 보통 sonnet · 높음 opus(TEAM.md·개인 CLAUDE.md)
@@ -27,4 +27,4 @@
 - 열린 결정: vidIQ는 구현 안 함·준비 중(2026-11-17 사용자 결정: 후보 수집은 YouTube 검색 = task-019) · 구간별 폰트 최종값 · Dependabot PR 9건(TS 7은 ci 실패) · GitHub Dependabot alerts·비공개 신고 켜기(사람) · 미확인 방송사 채널(tvN 본채널·SBS NOW·NHK 뉴스·CJ ENM 계열) · .env.example의 API_BASE_URL 중복 줄(사람 확인) · nomad-agent-os 미커밋 변경 21파일
 - 커밋 안 된 사용자 수정: AGENTS.md·CLAUDE.md·.claude/rules/db.md(건드리지 않음)
 - SDLC 단계: 06 구현
-- 테스트 상태: supabase test db 311 · api pytest 515 + integration 13 · web test 274 · E2E는 scratchpad(미커밋)
+- 테스트 상태: supabase test db 311 · api pytest 563 + integration 13 · web test 274 · E2E는 scratchpad(미커밋)

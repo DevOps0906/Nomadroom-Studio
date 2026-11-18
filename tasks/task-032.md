@@ -11,6 +11,7 @@
 | 쓰기 허용 | `apps/worker/production/overlays.py`, `apps/worker/tests/production/test_overlays.py`, `apps/api/app/production/spec.py`(overlays 검증 추가만), `apps/api/tests/production/test_spec_overlays.py`, `apps/web/src/components/production/edit/OverlaysTab.tsx` |
 
 ## 할 것
+- task-021 리뷰 🟡3: overlays와 자막의 시간·위치 겹침 경고를 `spec.py`에 추가한다.
 - spec `overlays`(댓글 카드: 문구·표시 구간·위치, 출처 표기) 검증·렌더 합성. PROD-02 댓글·출처 탭에서 직접 입력(D-C6).
 - 구간이 영상 길이를 벗어나거나 겹침이면 오류로 표시.
 
