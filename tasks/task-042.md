@@ -12,7 +12,7 @@
 
 ## 할 것
 - production_jobs: kind(`general`·`shopping`)·vertical(`product`·`travel`, shopping만)·brief(jsonb)·affiliates(jsonb, 언어별)·comment_keyword. format check에 `shopping` 추가(kind와 정합 check).
-- production_assets.rights(jsonb), 원본 자산 다건 허용. edit_revisions.lang·derived_from, unique를 (job, lang, rev_no)로 갱신. 기존 행은 kind=general·lang=ko 기본값.
+- production_assets.rights(jsonb), 원본 자산 다건 허용. edit_revisions.lang·derived_from, unique를 (job, lang, rev_no)로 갱신. 기존 행은 kind=general·lang=ko 기본값. task-020 리뷰 후속: candidates unique(id, workspace_id) + production_jobs (candidate_id, workspace_id) 복합 FK, Storage 테스트 강화(storage.objects RLS·authenticated/anon 정책 0건·allowed_mime_types).
 
 ## 하지 않을 것
 - 적용된 마이그레이션 수정, API·웹 코드.

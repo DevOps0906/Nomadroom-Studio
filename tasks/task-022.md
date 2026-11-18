@@ -12,6 +12,7 @@
 
 ## 할 것
 - A-09 POST·PATCH·GET(멱등 키·권리 확인·구간 검증), A-10 업로드 서명 PUT·완료(15분·크기 확인), A-11 prepare, A-12 리비전 GET·PUT(낙관적 잠금·오류 있어도 저장), A-13 승인(서버 재검증), A-17 검수 승인, A-18 다운로드 서명 GET(10분).
+- A-09 candidate_id는 같은 워크스페이스 후보인지 API가 확인한다(DB FK는 소속을 보장하지 않음, task-020 구현 결정). 업로드 크기 상한 500MB(Q8 확정). 권리 확인 시 rights_confirmed_by·at을 반드시 함께 저장한다(task-020 리뷰 🟡4).
 - A-09는 `format`을 받아 저장한다. W4 동안 `variety`는 400 `VALIDATION`("준비 중"), task-035에서 연다(`tasks/plan-variety-shorts.md` D-V1).
 - 웹·API는 작업 ID·자산 ID만 주고받는다. 타 워크스페이스 404.
 

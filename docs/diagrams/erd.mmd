@@ -116,6 +116,65 @@ erDiagram
     date day PK
     integer units
   }
+  production_jobs {
+    uuid id PK
+    uuid workspace_id FK
+    uuid candidate_id FK
+    uuid rights_confirmed_by FK
+    uuid claimed_by FK
+    uuid requested_by FK
+    text title
+    text format
+    text status
+    text failed_stage
+    text error_code
+    text transcribe_state
+    string more_19_cols
+  }
+  edit_revisions {
+    uuid id PK
+    uuid workspace_id FK
+    uuid approved_by FK
+    uuid created_by FK
+    uuid job_id
+    text lang
+    integer rev_no
+    integer schema_version
+    jsonb spec
+    text origin
+    jsonb validation
+    timestamptz approved_at
+    string more_2_cols
+  }
+  production_assets {
+    uuid id PK
+    uuid workspace_id FK
+    uuid job_id
+    text kind
+    text storage_path
+    text mime
+    bigint size_bytes
+    numeric duration_sec
+    text status
+    uuid render_run_id
+    uuid created_by
+    timestamptz created_at
+  }
+  render_runs {
+    uuid id PK
+    uuid workspace_id FK
+    uuid claimed_by FK
+    uuid requested_by FK
+    uuid job_id
+    uuid revision_id
+    text lang
+    integer attempt
+    uuid retry_of
+    text idempotency_key
+    text preset_version
+    text status
+    string more_11_cols
+  }
   workspaces ||--o{ workspace_members : "workspace_id"
   workspaces ||--o{ profiles : "workspace_id"
   workspaces ||--o{ broadcaster_channels : "workspace_id"
@@ -139,3 +198,20 @@ erDiagram
   profiles ||--o{ candidate_verdicts : "profile_id"
   observations ||--o{ candidate_verdicts : "prev_observation_id"
   observations ||--o{ candidate_verdicts : "curr_observation_id"
+  workspaces ||--o{ production_jobs : "workspace_id"
+  candidates ||--o{ production_jobs : "candidate_id"
+  workers ||--o{ production_jobs : "claimed_by"
+  workspaces ||--o{ edit_revisions : "workspace_id"
+  workspaces ||--o{ production_assets : "workspace_id"
+  workspaces ||--o{ render_runs : "workspace_id"
+  workers ||--o{ render_runs : "claimed_by"
+  production_jobs ||--o{ edit_revisions : "job_id"
+  production_jobs ||--o{ production_assets : "job_id"
+  production_jobs ||--o{ render_runs : "job_id"
+  edit_revisions ||--o{ production_jobs : "current_revision_id"
+  edit_revisions ||--o{ render_runs : "revision_id"
+  render_runs ||--o{ render_runs : "retry_of"
+  production_assets ||--o{ render_runs : "mp4_asset_id"
+  production_assets ||--o{ render_runs : "report_asset_id"
+  production_assets ||--o{ render_runs : "hook_audio_asset_id"
+  render_runs ||--o{ production_assets : "render_run_id"

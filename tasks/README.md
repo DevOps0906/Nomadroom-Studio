@@ -21,7 +21,7 @@
 | task-016 | DASH-01 대시보드 | W3 | 011, 012, 018 | 보통 | builder | 완료 |
 | task-017 | A-08 사용한 소재 | W3 | 011, 013 | 높음 | builder + tester | 완료 |
 | task-019 | YouTube 검색 후보 수집 (vidIQ 대체) | W3 | 006, 008, 013 | 높음 | builder + tester | 완료 |
-| task-020 | 제작 스키마 · RLS · Storage 버킷 | W4 | 002 | 높음 | builder + tester | 대기 |
+| task-020 | 제작 스키마 · RLS · Storage 버킷 | W4 | 002 | 높음 | builder + tester | 완료 |
 | task-021 | 편집안 검증 모듈 | W4 | 003 | 보통 | builder + tester | 대기 |
 | task-022 | 제작 작업 API A-09~A-13·A-17·A-18 | W4 | 020, 021 | 높음 | builder + tester | 대기 |
 | task-023 | 렌더 요청·재시도 A-15·A-16 · 워커 API W-05~W-09 | W4 | 022 | 높음 | builder + tester | 대기 |
@@ -81,6 +81,7 @@
 | 2026-11-18 | 검색 후보 category(task-019) | 검색 결과에 자체 분류가 없어 찾은 프로필의 category·market을 그대로 기록 | 실측 분류가 필요하면 snippet.categoryId 매핑 표 |
 | 2026-11-18 | 수집 POST 키 미설정(task-019) | YOUTUBE_API_KEY가 없으면 API 502 → 화면은 일반 "요청을 처리하지 못했습니다" | 배포 체크리스트에 키 설정 확인, 필요 시 전용 문구 |
 | 2026-11-16 | 앱 셸 | 로그아웃 버튼(SignOutButton)이 셸에 아직 없음 | DASH-01(task-016) 또는 셸 보강 때 상단 바에 배치 |
+| 2026-11-19 | 배포(원격 Supabase) | 원본 업로드 한도 500MB(Q8 확정) → 원격은 Pro 플랜 필요, 프로젝트 Storage 업로드 상한 500MB로 설정. 적용 후 `production` 버킷 public=false 확인(기존 버킷이 있으면 on conflict로 유지됨) | 08 배포 체크리스트 |
 
 ## 교훈 (다음 작업에 그대로 적용할 것만, 20줄 이내 유지)
 - 테스트의 가짜 JWT·키는 문자열 리터럴로 두지 말고 런타임에 조립한다(gitleaks pre-commit 차단).

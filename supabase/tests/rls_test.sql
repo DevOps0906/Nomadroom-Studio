@@ -12,7 +12,7 @@ select is(
 select is(
   (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r'),
-  12, 'public 테이블 12개(05_DATA_MODEL 표 11개 + task-006 api_quota_daily)');
+  16, 'public 테이블 16개(05_DATA_MODEL 표 11개 + task-006 api_quota_daily + task-020 제작 4개)');
 
 -- 픽스처: 전용 워크스페이스와 11개 테이블 각 1행, 구성원·비구성원 사용자
 insert into auth.users (id, email, aud, role) values
@@ -109,7 +109,7 @@ select is(
   (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r'
       and has_table_privilege('authenticated', c.oid, 'SELECT')),
-  10, '잔여 권한: authenticated select는 workers 뺀 10개');
+  14, '잔여 권한: authenticated select는 workers 뺀 14개(제작 4개 포함)');
 select ok(not has_table_privilege('authenticated', 'public.workers', 'SELECT'), '잔여 권한: authenticated workers select 없음');
 select is(
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
