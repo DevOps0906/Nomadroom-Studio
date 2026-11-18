@@ -1,18 +1,28 @@
-# 02b 제작 흐름 — 카테고리형 쇼츠 (PROD)
+# 02b 제작 흐름 — 카테고리형·예능형 쇼츠 (PROD)
 
-> 02 아키텍처에서 분리한 장. 구성 요소·경계 규칙은 `02_ARCHITECTURE.md#1·#2`, 결정 근거 `adr/0003-production-render-worker.md`, 컬럼 `05_DATA_MODEL.md#제작-테이블`, API `04_API.md`(A-09~A-18 · W-05~W-09).
+> 02 아키텍처에서 분리한 장. 구성 요소·경계 규칙은 `02_ARCHITECTURE.md#1·#2`, 결정 근거 `adr/0003-production-render-worker.md`, 컬럼 `05_DATA_MODEL.md#제작-테이블`, API `04_API.md`(A-09~A-19 · W-05~W-09).
 > 그림: [`diagrams/flow-4.mmd`](diagrams/flow-4.mmd) (diagrammer 요청: 시퀀스 — 웹·API·Storage·제작 워커·Claude, 서명 URL 송수신, 실패·재시도 분기)
 
 ## 1. 흐름 (prepare → 편집안 → 승인 → render → 검수)
 | 단계 | 주체 | 동작 |
 |---|---|---|
-| 1 | 웹→API | 작업 생성(A-09: 후보·URL·권리 확인) → 파일 업로드면 서명 URL로 Storage에 직접 PUT(A-10) → 준비 시작(A-11) `draft→preparing` |
+| 1 | 웹→API | 작업 생성(MON-01·PROD-00 "내부 제작" 진입, A-09: 후보·URL·권리 확인) → 파일 업로드면 서명 URL로 Storage에 직접 PUT(A-10) → 준비 시작(A-11) `draft→preparing` |
 | 2 | 제작 워커 | W-05 claim(`prepare`) → W-06 입력 URL로 다운로드(URL 작업(P1)은 `rights_confirmed`일 때 yt-dlp) → 구간 추출·analysis·시트 → W-07 업로드 URL로 올림 → W-09 완료. `preparing→review` |
 | 3 | 웹→API | 편집안 저장(A-12, 서버 검증 정본)·선택적 AI 초안(P1, A-14) → 오류 0이면 승인(A-13, 리비전 고정) |
 | 4 | 웹→API | 렌더 요청(A-15, `Idempotency-Key`) → `render_runs` queued, `review→rendering` |
 | 5 | 제작 워커 | W-05 claim(`render`) → 훅 음성 실측(첨부 파일, 로컬 TTS는 (P1))·합성·FFmpeg·리포트 → W-07·W-09. `rendering→inspect` |
 | 6 | 웹→API | 재생·리포트 확인(A-18) → 검수 승인(A-17) `inspect→done`, 또는 편집 수정(A-12) `inspect→review`(새 리비전) |
 | 7 | 실패 | 워커가 단계·사유 코드와 함께 W-09 failed → `failed`. 원본 단계 재시도(A-11)·편집 수정(A-12)·같은 승인본 렌더 재시도(A-16: 새 render_run, 완료 파일 덮어쓰기 없음). 예외: `hook_too_long`·`text_too_long`(렌더러 폭 초과)는 편집안 검토로 되돌림(아래 전이표) |
+
+## 1-1. 형식 분기 — 예능형(`format`=`variety`) {#형식-분기}
+위 1~7단계·상태 전이·승인·렌더 큐·서명 URL·검수는 형식과 무관하게 같다(A-09는 W4 동안 `variety` 거부, task-035에서 허용). 다른 점만 적는다. 필드·검증 코드는 `05_DATA_MODEL.md#예능형-spec-필드`, 그림 [`diagrams/variety-shorts-render-flow.mmd`](diagrams/variety-shorts-render-flow.mmd).
+| 단계 | 카테고리형 | 예능형 |
+|---|---|---|
+| 2 prepare | 구간 추출·analysis·시트 | 같음 |
+| 2-1 transcribe (P1) | 없음 | `review`에서 A-19 요청 → `production_jobs.transcribe_state`=`queued` → W-05 `transcribe`(claim 조건: format=`variety`·status=`review`·transcribe_state=`queued`) → 로컬 받아쓰기 → `transcript` 자산(원본 시각 기준). 음성 파일은 PC 밖으로 보내지 않음. 화면에서 "받아쓰기로 자막 채우기" 시 선택한 컷에 맞춰 출력 시각으로 바꿔 subtitles 초안. 상태는 job 상태와 분리: `transcribe_state`(null·`queued`·`running`·`done`·`failed`)·`transcribe_error`. W-09 failed·오프라인 지연(3분, `worker_offline`)도 이 칸에만 기록하고 job `status`·`error_stage`는 불변. 실패하면 수동 입력으로 계속(가짜 자막 없음). 다시 요청하면 새 transcript 자산 |
+| 3 편집안 | A-12 category spec, A-14 시트 기반 | A-12 variety spec, A-14(P1)는 transcript+시트 기반 |
+| 5 render | 훅 음성 실측·shots 합성 | 어댑터가 `variety_project.json` 생성 → 컷별 trim·띠 크롭·흰 캔버스·제목·자막 2종·반응·원본 음성(음량 정규화)·리포트. 훅 음성 없음 |
+| 7 실패 | `hook_too_long`·`text_too_long` → review | **`hook_too_long` 없음**. `text_too_long`만 review로 복귀 |
 
 ## 2. 제작 job 상태 전이 (정본 — 기획서 #4 상태도, 값은 `05_DATA_MODEL.md#production_jobs`)
 | 현재 | 다음 | 주체 | 조건 |

@@ -13,6 +13,7 @@
 ## 할 것
 - `production_jobs`·`production_assets`·`edit_revisions`·`render_runs` 테이블, 상태·오류 코드 check, 모든 테이블 RLS(같은 워크스페이스만).
 - `render_runs`의 queued·running 합산 워크스페이스당 1건 부분 unique, (작업, 리비전, 언어) 멱등 unique.
+- `production_jobs.format`(`category`·`variety`, 기본 `category`) check와 형식별 `preset_version`, `production_assets.kind`에 `transcript`(P1 예능형 받아쓰기) 포함(`tasks/plan-variety-shorts.md` D-V1 — 나중 마이그레이션 방지).
 - Storage 비공개 버킷 + 경로 규칙(작업 ID·자산 ID). 클라이언트 쓰기 권한 회수(기존 004 패턴).
 
 ## 하지 않을 것

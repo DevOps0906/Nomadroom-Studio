@@ -98,4 +98,4 @@
 - `diagrams/flow-2.mmd`: 시퀀스 — 기록 검증 실행(3-2).
 - `diagrams/flow-3.mmd`: 상태도 — job(대기·진행·재시도·중지·실패·완료)과 Chrome 준비 실패 분기(3-3).
 - `architecture.mmd`에 제작 워커·Storage·Claude 추가. 제작 시퀀스 `flow-4.mmd`는 `02b_PRODUCTION_FLOW.md`.
-- 제작 다이어그램(신규, 기존 파일 덮어쓰기 없음): `diagrams/flow-4.mmd`(제작 시퀀스) · `diagrams/flow-F-04.mmd`(화면 흐름 F-04) · `diagrams/category-shorts-render-flow.mmd`(렌더 흐름).
+- 제작 다이어그램(신규, 기존 파일 덮어쓰기 없음): `diagrams/flow-4.mmd`(제작 시퀀스) · `diagrams/flow-F-04.mmd`(화면 흐름 F-04) · `diagrams/category-shorts-render-flow.mmd`(렌더 흐름) · `diagrams/variety-shorts-render-flow.mmd`(예능형 렌더 흐름).
