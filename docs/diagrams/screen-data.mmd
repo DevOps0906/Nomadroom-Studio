@@ -9,6 +9,8 @@ flowchart LR
     n_PROD_01["PROD-01 원본·구간·출처"]
     n_PROD_02["PROD-02 편집안"]
     n_PROD_02V["PROD-02V 편집안(예능형)"]
+    n_PROD_01S["PROD-01S 원본·브리프(쇼핑)"]
+    n_PROD_02S["PROD-02S 편집안(쇼핑)"]
     n_PROD_03["PROD-03 작업·검수"]
   end
   subgraph AP["API"]
@@ -30,12 +32,16 @@ flowchart LR
     n_api_A_16["A-16 POST /v1/production-jobs/{id}/render-runs/{run_id}/retry"]
     n_api_A_17["A-17 POST /v1/production-jobs/{id}/review/approve"]
     n_api_A_18["A-18 GET /v1/production-jobs/{id}/assets/{asset_id}/download-url"]
+    n_api_A_20["A-20 POST /v1/production-jobs/{id}/translate"]
+    n_api_A_21["A-21 GET /v1/production-jobs/{id}/publish-text"]
+    n_api_A_22["A-22 POST · GET (P1, task-054) `/v1/production-jobs/{id}/generation-runs` · `/{run_id}/confirm` · GET 목록"]
   end
   subgraph DB["데이터"]
     n_t_auth_users[("auth.users")]
     n_t_candidate_verdicts[("candidate_verdicts")]
     n_t_candidates[("candidates")]
     n_t_edit_revisions[("edit_revisions")]
+    n_t_generation_runs[("generation_runs")]
     n_t_job_profile_runs[("job_profile_runs")]
     n_t_jobs[("jobs")]
     n_t_observations[("observations")]
@@ -80,6 +86,7 @@ flowchart LR
   n_PROD_02 --> n_api_A_13
   n_PROD_02 --> n_api_A_14
   n_PROD_02 --> n_api_A_18
+  n_PROD_02 --> n_api_A_20
   n_PROD_02 -.-> n_t_edit_revisions
   n_PROD_02 -.-> n_t_production_assets
   n_PROD_02V --> n_api_A_10
@@ -87,14 +94,30 @@ flowchart LR
   n_PROD_02V --> n_api_A_13
   n_PROD_02V --> n_api_A_14
   n_PROD_02V --> n_api_A_18
+  n_PROD_02V --> n_api_A_20
   n_PROD_02V -.-> n_t_edit_revisions
   n_PROD_02V -.-> n_t_production_assets
+  n_PROD_01S --> n_api_A_09
+  n_PROD_01S --> n_api_A_10
+  n_PROD_01S --> n_api_A_11
+  n_PROD_01S -.-> n_t_production_jobs
+  n_PROD_01S -.-> n_t_production_assets
+  n_PROD_02S --> n_api_A_12
+  n_PROD_02S --> n_api_A_13
+  n_PROD_02S --> n_api_A_14
+  n_PROD_02S --> n_api_A_18
+  n_PROD_02S --> n_api_A_20
+  n_PROD_02S --> n_api_A_22
+  n_PROD_02S -.-> n_t_edit_revisions
+  n_PROD_02S -.-> n_t_production_assets
+  n_PROD_02S -.-> n_t_generation_runs
   n_PROD_03 --> n_api_A_09
   n_PROD_03 --> n_api_A_11
   n_PROD_03 --> n_api_A_15
   n_PROD_03 --> n_api_A_16
   n_PROD_03 --> n_api_A_17
   n_PROD_03 --> n_api_A_18
+  n_PROD_03 --> n_api_A_21
   n_PROD_03 -.-> n_t_render_runs
   n_PROD_03 -.-> n_t_production_assets
   n_PROD_03 -.-> n_t_edit_revisions

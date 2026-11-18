@@ -24,6 +24,37 @@
 | 5 render | 훅 음성 실측·shots 합성 | 어댑터가 `variety_project.json` 생성 → 컷별 trim·띠 크롭·흰 캔버스·제목·자막 2종·반응·원본 음성(음량 정규화)·리포트. 훅 음성 없음 |
 | 7 실패 | `hook_too_long`·`text_too_long` → review | **`hook_too_long` 없음**. `text_too_long`만 review로 복귀 |
 
+## 1-2. 유형 분기 — 쇼핑(`kind`=`shopping`)·일본어판 {#유형-분기}
+1~7단계·상태 전이·승인·렌더 큐·검수는 같다. 쇼핑 필드·검증 코드는 `05_DATA_MODEL.md#쇼핑-spec-필드`, 그림 [`diagrams/shopping-shorts-render-flow.mmd`](diagrams/shopping-shorts-render-flow.mmd). 원본은 운영자 업로드만(자동 수집·다운로드 없음). 새 수치는 모두 가정.
+| 단계 | 일반(카테고리형·예능형) | 쇼핑(`format`=`shopping`) |
+|---|---|---|
+| 1 생성 | A-09 `kind`=`general`, 형식 선택 | `kind`=`shopping`·`vertical`(`product`·`travel`)·`brief`·`affiliates`. 금지 품목(의약품·건강기능식품)은 체크·키워드 검사로 400. 원본 업로드 다건(A-10)·원본마다 권리 입력. 원본 3개 미만이면 경고만 |
+| 2 prepare | 원본 1개 | **원본별** 구간 추출·analysis·시트(원본 수만큼 `source`·`analysis`·`sheet`, 한 task에서 순차 처리) |
+| 3 편집안 | 형식별 spec | shopping spec(대본 4문장·문장별 컷·마스크·음성). 승인은 오류 0 + 모든 원본·BGM 권리 basis 입력 + `has_person`이면 `portrait_consent` |
+| 5 render | 형식별 | TTS 또는 첨부 녹음 → 컷 길이를 문장 길이에 맞춤 → 자막 자동 배치 → 마스크·CTA·표기. 산출물에 게시 문구(A-21) 추가. TTS 실패는 `tts_failed`로 review 복귀(무음·가짜 음성 금지) |
+
+### 여행(`vertical`=`travel`) 흐름 {#여행-흐름}
+같은 1~7단계 위에 사진 컷과 선택적 AI 생성을 더한다. 설렘 서사 대본은 `tasks/plan-shopping-japanese.md`(상품 vs 여행). 비용·키 규칙은 `01_PRD.md#7` Q16·`#8`. 수치는 가정.
+| 단계 | 동작 |
+|---|---|
+| 사진 업로드 | PROD-01S에서 공식 사진을 `image` 자산으로 업로드(A-10, 권리 basis 필수). 영상 원본(`source_upload`)도 함께 쓸 수 있음 |
+| 사진 컷 | PROD-02S에서 `image` 컷은 기본 확대·이동 모션(`motion` pan·zoom·none, 무료, 렌더러 적용) |
+| (선택) AI 생성 | 컷별로 고른다. A-22 견적(예상 비용·예산 잔액 표시) → 운영자 확인 → FastAPI가 플랫폼 호출(P1). 예산·상한 초과는 409로 거부, 같은 멱등 키는 중복 과금 없음. 결과는 `source_upload`(basis `ai_generated`)로 저장되고 `generation_runs`에 기록. API 없는 플랫폼은 운영자가 만든 영상을 업로드 |
+| 검수 | AI 생성 컷은 컷마다 "검수 완료"(`reviewed`) 체크 필요(환각 대비). 미검수면 승인 불가(`gen.unreviewed`) |
+| 편집·승인·렌더 | 이후 A-12·A-13·A-15는 쇼핑과 같음. 생성 실패는 job 상태를 바꾸지 않고 컷을 사진 모션으로 두고 계속 진행 |
+
+### 일본어판(모든 형식, `lang`=`ja`) {#일본어판}
+| 단계 | 동작 |
+|---|---|
+| 파생 | 승인된 ko 리비전에서 `edit_revisions.lang`=`ja`·`derived_from`=ko 리비전 ID로 새 리비전 생성. 컷·구도·마스크는 고정 복사, 텍스트만 교체 |
+| 번역 | A-20: Claude가 구어체 일본어 초안(입력은 ko 텍스트만), 운영자가 수정 |
+| 승인·렌더 | ja 리비전 승인 후 A-15 `lang`=`ja`. 멱등·동시 렌더 규칙은 ko와 같고 리비전이 언어별로 따로 있음 |
+| 음성 | 카테고리형: 훅 TTS를 일본어로. 쇼핑: 내레이션 전체 일본어 TTS + 자막 자동 배치. 예능형: 대사 자막마다 일본어 TTS, 원본 소리 duck(가정 15%) |
+| 넘침 | 예능형 TTS가 자막 구간 초과 → rate 상향(상한 가정 +30%) → 그래도 초과면 `dub_overflow` 경고(렌더 안 막음, 검수에서 확인) |
+| 변경 감지 | ko 리비전이 바뀌면 ja에 "원본 변경됨" 경고(`derived_from`이 현재 ko 승인본보다 오래됨), 재파생 권유 |
+- TTS(edge-tts, `01_PRD.md#7` Q6)는 쇼핑·일본어판 필수 경로다. 불가하면 첨부 녹음, 대체 TTS는 Q14.
+- 게시(업로드·DM·링크 발급)는 자동화하지 않는다. 게시 문구 복사와 권장 시각 표시까지.
+
 ## 2. 제작 job 상태 전이 (정본 — 기획서 #4 상태도, 값은 `05_DATA_MODEL.md#production_jobs`)
 | 현재 | 다음 | 주체 | 조건 |
 |---|---|---|---|
@@ -38,3 +69,4 @@
 | failed | preparing · review · rendering | A-11 · A-12 · A-16 | 실패 단계가 prepare / 편집·음성 문제 / 렌더 일시 오류 |
 - 렌더 중(`rendering`) 편집안 저장은 409. 완료된 run의 파일은 불변이고 재시도는 새 run·새 자산(`05_DATA_MODEL.md#storage`의 경로가 자산 ID를 포함).
 - 훅 음성 길이는 승인 때 null 허용, **렌더 워커가 실측**(정본 `04_API.md` W-09).
+- 언어별 상태: 위 상태표는 ko 기준이다. ko가 `inspect`·`done`이면 ja 파생(A-20)과 ja 렌더(A-15)를 허용하고, ja 진행·완료·실패는 job 상태를 바꾸지 않고 `render_runs(lang=ja)`로 보여 준다.

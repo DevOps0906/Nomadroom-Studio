@@ -4,6 +4,7 @@
 - 현재 작업: task-019 완료(원래 MVP 기능 완료) → 다음: task-020 제작 스키마·RLS·Storage(W4 카테고리형 P0 시작) — 상태: 대기
 - 단계: W4(P0: 020~028) → W5(P1: 029~033). 팀장 브리프·결정 `tasks/plan-category-shorts.md`. 대부분 위험도 높음 → 워커 opus + challenger + code·security
 - 예능형 기획 추가(2026-11-19): W6(P0: 034~038)·W7(P1: 039~041), 카테고리형 W4 뒤. 브리프·결정 `tasks/plan-variety-shorts.md`(D-V1~4·R1~R8), 근거 `docs/research/variety-shorts-zip-analysis.md`. 020·022에 format 칸 선반영. 미결 Q9 글꼴·Q10 whisper·Q11 한도
+- 쇼핑쇼츠·일본어판 기획 추가(2026-11-19): 유형 general(조회수)/shopping(제휴: 상품·여행), 언어 ko/ja 공통. W8 쇼핑 P0(042~047)·W9 AI 대본·AI 영상 연동(048·054)·W10 일본어판(049~053). 브리프 `tasks/plan-shopping-japanese.md`, 근거 `docs/research/shopping-shorts-notion-analysis.md`. AI 영상: quality=힉스필드·economy=그록, 예산 상한·컷 검수 3항목. 미결 Q12~Q16
 - 다음 한 걸음: `/next` (task-020). 사람 확인: `design/wireframes/index.html`의 PROD-00~03 시안
 - 019 결과: 수집 = 서버 YouTube 검색(source=youtube_search), 검색 할당량 예약·환불, 000013·000014. 결정 `tasks/task-019.md#착수 결정·#리뷰 반영 결정`. 배포 시 YOUTUBE_API_KEY 필수
 - M3 결과: 워커 API(claim·heartbeat·후보·finish, job당 조회 200 상한)·수집 작업 API(retry·stop RPC, 24시간 20건)·대시보드·프로필 조건 화면·웹→API 공용 클라이언트(401 → SESSION_EXPIRED_PATH). 상태 전이 정본 `docs/02_ARCHITECTURE.md#3-3`

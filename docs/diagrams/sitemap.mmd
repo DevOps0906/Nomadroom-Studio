@@ -11,6 +11,8 @@ flowchart LR
     n_PROD_01["PROD-01 원본·구간·출처<br/>/production/[jobId]/source"]
     n_PROD_02["PROD-02 편집안<br/>/production/[jobId]/edit"]
     n_PROD_02V["PROD-02V 편집안(예능형)<br/>/production/[jobId]/edit (format=variety)"]
+    n_PROD_01S["PROD-01S 원본·브리프(쇼핑)<br/>/production/[jobId]/source (kind=shopping)"]
+    n_PROD_02S["PROD-02S 편집안(쇼핑)<br/>/production/[jobId]/edit (format=shopping)"]
     n_PROD_03["PROD-03 작업·검수<br/>/production/[jobId]"]
   end
   n_AUTH_01 --> n_DASH_01
@@ -22,6 +24,7 @@ flowchart LR
   n_MON_D1 --> n_MON_01
   n_MON_D2 --> n_MON_01
   n_PROD_00 --> n_PROD_01
+  n_PROD_00 --> n_PROD_01S
   n_PROD_00 --> n_PROD_03
   n_PROD_01 --> n_PROD_02
   n_PROD_01 --> n_PROD_02V
@@ -30,5 +33,11 @@ flowchart LR
   n_PROD_02 --> n_PROD_01
   n_PROD_02V --> n_PROD_03
   n_PROD_02V --> n_PROD_01
+  n_PROD_01S --> n_PROD_02S
+  n_PROD_01S --> n_PROD_00
+  n_PROD_02S --> n_PROD_03
+  n_PROD_02S --> n_PROD_01S
   n_PROD_03 --> n_PROD_02
+  n_PROD_03 --> n_PROD_02V
+  n_PROD_03 --> n_PROD_02S
   n_PROD_03 --> n_PROD_00
