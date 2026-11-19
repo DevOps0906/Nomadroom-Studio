@@ -7,13 +7,13 @@ import { cn } from "@/lib/utils";
 import { EVIDENCE_SESSION_EXPIRED_PATH as SESSION_EXPIRED_PATH } from "@/components/evidence/evidence";
 import { createIntentKey } from "@/components/monitoring/intent-key";
 import type { ProductionStatus } from "@/server/api/production";
-import { completeUpload, createJob, isYoutubeUrl, patchJob, prepareJob, putFile, requestUpload, type Result } from "./api";
+import { completeUpload, createJob, type JobFormat, isYoutubeUrl, patchJob, prepareJob, putFile, requestUpload, type Result } from "./api";
 
 export { isYoutubeUrl };
 import { FILE_ACCEPT, MAX_FILE_BYTES, STAGE_LABEL, STATUS_LABEL, STATUS_TONE, formatBytes, mimeOf, validateSource, type SourceErrors } from "./format";
 
 // PROD-01 원본·구간·출처 폼. 순서: (생성 | 저장) → 업로드(서명 PUT) → 완료 확인 → 준비 시작(A-11).
-// 근거: docs/03_SCREENS_UX.md PROD-01, tasks/task-025.md. 형식은 카테고리형만(예능형은 task-037).
+// 근거: docs/03_SCREENS_UX.md PROD-01, tasks/task-025.md. 형식 선택(카테고리형·예능형, 작업 생성 뒤 잠금).
 
 const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 const INPUT =
@@ -35,6 +35,7 @@ export type SourceJob = {
   segment_len_sec: number;
   source_kind?: "upload" | "url";
   source_url?: string | null;
+  format?: JobFormat;
 };
 
 export type CandidateInfo = { id: string; title: string; license_cc: boolean | null };
@@ -87,17 +88,20 @@ export function SourceForm({
   candidate,
   hasReadySource,
   readySourceInfo,
+  initialFormat = "category",
 }: {
   job: SourceJob | null;
   candidate: CandidateInfo | null;
   hasReadySource: boolean;
   readySourceInfo?: string;
+  initialFormat?: JobFormat;
 }) {
   const router = useRouter();
   const editable = isEditable(job);
   const preparing = job?.status === "preparing";
   const ready = !!job && ["review", "rendering", "inspect", "done"].includes(job.status);
 
+  const [format, setFormat] = useState<JobFormat>(job?.format ?? initialFormat);
   const [title, setTitle] = useState(job?.title ?? candidate?.title ?? "");
   const [start, setStart] = useState(String(job?.source_start_sec ?? 0));
   const [len, setLen] = useState(String(job?.segment_len_sec ?? 30));
@@ -116,6 +120,7 @@ export function SourceForm({
   const createdId = useRef<string | null>(null);
   const [created, setCreated] = useState(false);
   const titleLocked = !!job || created;
+  const formatLocked = !!job || created; // 작업 생성 뒤에는 서버가 형식 변경을 받지 않는다(원본 준비 시작 후 잠금 포함)
   const intent = useRef(createIntentKey());
 
   // 원본 준비 중이면 상태를 주기적으로 다시 읽는다.
@@ -166,7 +171,7 @@ export function SourceForm({
     let id = job?.id ?? createdId.current;
     if (!id) {
       const body = { ...values, title: title.trim(), ...(candidate ? { candidate_id: candidate.id } : {}) };
-      const r = await createJob(body, intent.current.current(JSON.stringify(body)));
+      const r = await createJob(body, intent.current.current(JSON.stringify({ ...body, format })), undefined, format);
       intent.current.settle(!r.ok && r.keepKey);
       if (!r.ok) return fail(r);
       id = createdId.current = r.data.job.id;
@@ -239,12 +244,10 @@ export function SourceForm({
           </div>
         )}
 
-        <Field id="src-format" label="형식" required hint={job && job.status !== "draft" ? "형식은 바꿀 수 없음" : undefined}>
-          <select id="src-format" className={INPUT} disabled value="category">
+        <Field id="src-format" label="형식" required hint={formatLocked ? "형식은 바꿀 수 없음" : undefined}>
+          <select id="src-format" className={INPUT} disabled={formatLocked || lock} value={format} onChange={(e) => setFormat(e.target.value as JobFormat)}>
             <option value="category">카테고리형</option>
-            <option value="variety" disabled>
-              예능형 (준비 중)
-            </option>
+            <option value="variety">예능형</option>
           </select>
         </Field>
 

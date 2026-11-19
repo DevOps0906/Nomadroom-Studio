@@ -19,7 +19,7 @@ export default async function NewProductionPage({ searchParams }: { searchParams
     <div className="mx-auto flex max-w-3xl flex-col gap-4 tablet:gap-5">
       <SourceHeader title="새 제작 작업" />
       {candidate && <CandidateCard candidate={candidate} />}
-      <SourceForm job={null} candidate={candidate} hasReadySource={false} />
+      <SourceForm job={null} candidate={candidate} hasReadySource={false} initialFormat={one(sp.format) === "variety" ? "variety" : "category"} />
     </div>
   );
 }

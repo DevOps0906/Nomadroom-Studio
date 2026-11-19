@@ -76,7 +76,7 @@ export type ProductionJobDetail = {
 
 export type CreateProductionJob = {
   title: string;
-  format?: "category";
+  format?: "category" | "variety";
   candidate_id?: string;
   source_kind: "upload" | "url";
   source_url?: string | null;

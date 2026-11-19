@@ -27,6 +27,7 @@ import { OverlaysTab } from "./OverlaysTab";
 import { SheetPanel, type SheetInfo } from "./sheet-panel";
 import { AiDraftButton } from "./AiDraftButton";
 import { Timeline } from "./timeline";
+import { VarietyEditForm } from "./variety-form";
 
 // PROD-02 편집안 폼. 서버 검증(validation)이 정본이다: 저장은 오류가 있어도 허용, 승인은 오류 0·저장 완료일 때만.
 // 근거: docs/03_SCREENS_UX.md PROD-02, tasks/task-026.md.
@@ -39,7 +40,7 @@ const PRIMARY = cn(BTN, "bg-primary text-primary-fg hover:bg-primary-hover", FOC
 const SECONDARY = cn(BTN, "border border-border bg-surface text-text hover:bg-surface-alt", FOCUS);
 const CARD = "rounded-panel border border-border bg-surface p-4 tablet:p-5";
 
-export type EditJob = { id: string; title: string; status: ProductionStatus; failed_stage: "prepare" | "audio" | "render" | null };
+export type EditJob = { id: string; title: string; status: ProductionStatus; failed_stage: "prepare" | "audio" | "render" | null; format?: "category" | "variety" };
 export type EditRevision = { rev_no: number; spec: Record<string, unknown>; validation: Validation; approved_at: string | null };
 
 type Section = "hook" | "items" | "shots" | "sheet";
@@ -115,7 +116,12 @@ function RowShell({ title, badges, onRemove, disabled, issues, children }: { tit
 
 const SHORT_BADGE = <span className="rounded-chip bg-warning-soft px-2 py-0.5 text-caption font-semibold text-warning-soft-fg">1.4초 미만</span>;
 
-export function EditForm({
+/** 형식 분기: 예능형은 별도 패널(PROD-02V), 그 밖에는 카테고리형 폼. */
+export function EditForm(props: { job: EditJob; revision: EditRevision | null; sheet: SheetInfo | null }) {
+  return props.job.format === "variety" ? <VarietyEditForm {...props} /> : <CategoryEditForm {...props} />;
+}
+
+function CategoryEditForm({
   job,
   revision,
   sheet,

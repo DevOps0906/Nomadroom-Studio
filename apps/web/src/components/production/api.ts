@@ -48,8 +48,10 @@ export type SaveBody = {
   segment_len_sec: number;
 };
 
-export const createJob = (body: SaveBody & { title: string }, key: string, f?: typeof fetch) =>
-  call<{ job: { id: string; status: string } }>("/api/production-jobs", "POST", { source_kind: "upload", ...body, format: "category" }, { "Idempotency-Key": key }, f);
+export type JobFormat = "category" | "variety";
+
+export const createJob = (body: SaveBody & { title: string }, key: string, f?: typeof fetch, format: JobFormat = "category") =>
+  call<{ job: { id: string; status: string } }>("/api/production-jobs", "POST", { source_kind: "upload", ...body, format }, { "Idempotency-Key": key }, f);
 
 export const patchJob = (id: string, body: Omit<SaveBody, "title" | "candidate_id">, f?: typeof fetch) =>
   call<{ job: { id: string; status: string } }>(base(id), "PATCH", body, {}, f);

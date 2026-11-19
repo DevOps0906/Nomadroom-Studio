@@ -49,12 +49,14 @@ export default async function ProductionEditPage({ params }: { params: Promise<{
           </Link>{" "}
           / 편집안
         </nav>
-        <h1 className="line-clamp-2 text-h1 font-bold">{job.title}</h1>
+        <h1 className="line-clamp-2 text-h1 font-bold">
+          {job.title}
+        </h1>
         <p className="text-caption text-text-muted">{revision ? `리비전 ${revision.rev_no}${revision.approved_at ? " · 승인됨" : ""}` : "리비전 없음"}</p>
       </header>
       <EditForm
         key={`${job.id}-${revision?.rev_no ?? 0}`}
-        job={{ id: job.id, title: job.title, status: job.status, failed_stage: job.failed_stage }}
+        job={{ id: job.id, title: job.title, status: job.status, failed_stage: job.failed_stage, format: job.format }}
         revision={revision}
         sheet={{
           jobId: job.id,

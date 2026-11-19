@@ -109,9 +109,16 @@ describe("/api/production-jobs/*", () => {
     ["길이 0", { ...VALID, segment_len_sec: 0 }, KEY],
     ["시작 음수", { ...VALID, source_start_sec: -1 }, KEY],
     ["빈 제목", { ...VALID, title: " " }, KEY],
+    ["알 수 없는 형식", { ...VALID, format: "shopping" }, KEY],
   ])("생성 400: %s", async (_n, body, extra) => {
     expect((await create.POST(req("POST", body, ORIGIN, extra))).status).toBe(400);
     expect(h.calls).toHaveLength(0);
+  });
+
+  it("생성: format variety는 그대로 API로 전달, 없으면 category", async () => {
+    await create.POST(req("POST", { ...VALID, format: "variety" }, ORIGIN, KEY));
+    await create.POST(req("POST", VALID, ORIGIN, { "idempotency-key": ["key-", "8765", "4321"].join("") }));
+    expect(h.bodies.map((b) => (b as { format: string }).format)).toEqual(["variety", "category"]);
   });
 
   it("생성: URL 원본은 source_kind·source_url을 API로 전달, 응답은 id·status만", async () => {

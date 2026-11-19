@@ -24,6 +24,7 @@ export async function POST(request: Request) {
   if (b.source_kind === "url" ? !(typeof b.source_url === "string" && isYoutubeUrl(b.source_url)) : b.source_url !== undefined && b.source_url !== null)
     return json(400, { code: "VALIDATION", message: URL_ONLY, field: "source_url" });
   if (b.candidate_id !== undefined && !isUuid(b.candidate_id)) return json(400, { code: "VALIDATION", message: "잘못된 후보 id입니다." });
+  if (b.format !== undefined && b.format !== "category" && b.format !== "variety") return json(400, { code: "VALIDATION", message: "형식이 올바르지 않습니다.", field: "format" });
   const seg = segmentError(b.source_start_sec, b.segment_len_sec);
   if (seg) return json(400, { code: "VALIDATION", message: seg, field: "segment_len_sec" });
   if (!isLicense(b.license_cc) || !isCredit(b.credit)) return json(400, INVALID);
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
     const job = await createProductionJob(
       {
         title,
-        format: "category",
+        format: b.format === "variety" ? "variety" : "category", // 위에서 category·variety·미지정만 통과
         candidate_id: b.candidate_id as string | undefined,
         source_kind: b.source_kind,
         source_url: b.source_kind === "url" ? (b.source_url as string).trim() : null,

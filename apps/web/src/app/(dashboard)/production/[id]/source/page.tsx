@@ -52,6 +52,7 @@ export default async function ProductionSourcePage({ params }: { params: Promise
           segment_len_sec: job.segment_len_sec,
           source_kind: job.source_kind,
           source_url: job.source_url,
+          format: job.format,
         }}
         candidate={null}
         hasReadySource={!!source}
