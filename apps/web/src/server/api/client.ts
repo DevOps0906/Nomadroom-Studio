@@ -7,6 +7,9 @@ import { getVerifiedClaims } from "@/server/auth/session";
 
 export const API_TIMEOUT_MS = 10_000;
 
+/** 편집안 검증 항목(A-12·A-13 400 응답의 errors[]·warnings[]). */
+export type ApiIssue = { code: string; path: string; message: string };
+
 /** API 오류. status 0은 응답을 받지 못한 경우(타임아웃·연결 실패). */
 export class ApiError extends Error {
   constructor(
@@ -14,6 +17,9 @@ export class ApiError extends Error {
     readonly code: string,
     message: string,
     readonly field?: string,
+    /** 400 VALIDATION 응답에 errors[]·warnings[]가 있으면 보존한다(없으면 undefined). */
+    readonly errors?: ApiIssue[],
+    readonly warnings?: ApiIssue[],
   ) {
     super(message);
     this.name = "ApiError";
@@ -36,6 +42,16 @@ function defaultCode(status: number): string {
   return "UNKNOWN";
 }
 
+function toIssues(v: unknown): ApiIssue[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  return v.flatMap((i): ApiIssue[] => {
+    const o = typeof i === "object" && i !== null ? (i as Record<string, unknown>) : null;
+    return o && typeof o.code === "string" && typeof o.path === "string" && typeof o.message === "string"
+      ? [{ code: o.code, path: o.path, message: o.message }]
+      : [];
+  });
+}
+
 /** 오류 응답(status, 본문)을 ApiError로 바꾼다. 본문이 {code,message,field?}가 아니면 상태 코드 기본값. */
 export function toApiError(status: number, body: unknown): ApiError {
   const b = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
@@ -43,7 +59,7 @@ export function toApiError(status: number, body: unknown): ApiError {
   const message =
     typeof b.message === "string" && b.message ? b.message : (DEFAULT_MESSAGES[code] ?? DEFAULT_MESSAGES.UNKNOWN);
   const field = typeof b.field === "string" ? b.field : undefined;
-  return new ApiError(status, code, message, field);
+  return new ApiError(status, code, message, field, toIssues(b.errors), toIssues(b.warnings));
 }
 
 /** 화면 처리 분류: 401 → 로그인 이동, 403 FORBIDDEN → 소속 없음 안내, 나머지 → 오류 상태. */

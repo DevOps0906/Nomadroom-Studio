@@ -201,3 +201,17 @@ describe("apiFetch", () => {
     expect([e.status, e.code]).toEqual([200, "INTERNAL"]);
   });
 });
+
+describe("toApiError errors·warnings", () => {
+  it("400 본문의 errors[]·warnings[]를 보존하고 형식이 틀린 항목은 버린다", () => {
+    const e = toApiError(400, {
+      code: "VALIDATION",
+      message: "m",
+      errors: [{ code: "shots.gap", path: "shots.1", message: "x" }, { code: 1 }, "bad"],
+      warnings: [],
+    });
+    expect(e.errors).toEqual([{ code: "shots.gap", path: "shots.1", message: "x" }]);
+    expect(e.warnings).toEqual([]);
+    expect(toApiError(409, { code: "CONFLICT", message: "m" }).errors).toBeUndefined();
+  });
+});

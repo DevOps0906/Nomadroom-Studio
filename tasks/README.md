@@ -27,7 +27,7 @@
 | task-023 | 렌더 요청·재시도 A-15·A-16 · 워커 API W-05~W-09 | W4 | 022 | 높음 | builder + tester | 대기 |
 | task-024 | 로컬 제작 워커 prepare·render | W4 | 023 | 높음 | builder + tester | 대기 |
 | task-025 | PROD-00·PROD-01 화면 + MON-01 제작 버튼 | W4 | 022 | 보통 | builder | 완료 |
-| task-026 | PROD-02 편집안 화면 | W4 | 022, 025 | 보통 | builder | 대기 |
+| task-026 | PROD-02 편집안 화면 | W4 | 022, 025 | 보통 | builder | 완료 |
 | task-027 | PROD-03 작업·검수 화면 | W4 | 023, 025 | 보통 | builder | 대기 |
 | task-028 | P0 인수 테스트 CAT-01~07 | W4 | 024, 026, 027 | 보통 | tester | 대기 |
 | task-029 | AI 초안 A-14 (Claude) | W5 | 028 | 높음 | builder + tester | 대기 |
