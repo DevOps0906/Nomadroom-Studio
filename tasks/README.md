@@ -34,7 +34,7 @@
 | task-030 | TTS (edge-tts, 워커 전용) | W5 | 028 | 높음 | builder | 완료 |
 | task-031 | URL 원본 (권리 확인 · yt-dlp · SSRF 방지) | W5 | 028 | 높음 | builder + tester | 완료 |
 | task-032 | 댓글·출처 오버레이 레이어 | W5 | 028 | 보통 | builder | 완료 |
-| task-033 | P1 인수 테스트 CAT-08 + 회귀 | W5 | 029, 030, 031, 032 | 보통 | tester | 대기 |
+| task-033 | P1 인수 테스트 CAT-08 + 회귀 | W5 | 029, 030, 031, 032 | 보통 | tester | 완료 |
 | task-034 | 예능형 편집안 검증 모듈 | W6 | 021, 028 | 보통 | builder + tester | 완료 |
 | task-035 | 예능형 API 연결 (A-09·A-12·어댑터·W-05 task.format) | W6 | 034 | 높음 | builder + tester | 완료 |
 | task-036 | 예능형 렌더러 (로컬 워커 · 글꼴 라이선스) | W6 | 035 | 높음 | builder + tester | 대기 |
@@ -56,6 +56,7 @@
 | task-052 | 언어 탭 화면 | W10 | 049 | 보통 | builder | 대기 |
 | task-053 | 일본어판·쇼핑 P1 인수 + 회귀 | W10 | 048, 051, 052, 054 | 보통 | tester | 대기 |
 | task-054 | AI 영상 생성 연동 (플랫폼 어댑터 · 비용 상한) | W9 | 047, Q16 | 높음 | builder + tester | 대기 |
+| task-055 | W4·W5 인수 결함 보완(화면 안내·TTS 선택·오버레이) | W5 후속 | 033, 037 | 보통 | builder | 대기 |
 
 상태: 대기 / 진행 / 완료 / 보류
 
