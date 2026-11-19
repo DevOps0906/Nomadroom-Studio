@@ -35,7 +35,19 @@ const base = (id: string) => `/api/production-jobs/${encodeURIComponent(id)}`;
 
 export type SavedRevision = { id: string; rev_no: number; validation: Validation; approved_at: string | null };
 
-export const saveRevision = (id: string, spec: Record<string, unknown>, baseRevNo: number, f?: typeof fetch) =>
+export type AiDraft = {
+  revision: { id: string; rev_no: number; spec: Record<string, unknown>; origin: "user" | "ai_draft"; validation: Validation; approved_at: string | null };
+  ai_draft_count: number;
+  previous_rev_no: number | null;
+};
+
+/** A-14 AI 초안. key는 클릭(의도) 단위로 만든다. */
+export function requestAiDraft(id: string, key: string, f: typeof fetch = fetch): Promise<EditResult<AiDraft>> {
+  const withKey: typeof fetch = (url, init) => f(url, { ...init, headers: { ...(init?.headers as Record<string, string>), "Idempotency-Key": key } });
+  return call<AiDraft>(`${base(id)}/ai-draft`, "POST", undefined, withKey);
+}
+
+export const saveRevision =(id: string, spec: Record<string, unknown>, baseRevNo: number, f?: typeof fetch) =>
   call<{ revision: SavedRevision }>(`${base(id)}/revision`, "PUT", { spec, base_rev_no: baseRevNo }, f);
 
 export const approveRevision = (id: string, revNo: number, f?: typeof fetch) =>

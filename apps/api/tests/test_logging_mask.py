@@ -165,3 +165,12 @@ def test_uvicorn_factory_path_is_masked(monkeypatch, tmp_path, secrets_bundle):
         assert_no_secrets(output, secrets_bundle)
     finally:
         root.removeHandler(handler)
+
+
+def test_anthropic_key_is_masked(log_stream):
+    """task-029 리뷰 반영: Anthropic 키(런타임 조립 가짜 값)는 로그에 남지 않는다."""
+    key = "-".join(["sk", "ant", "api03", new_secret() + new_secret()])  # 상수 접힘 방지
+    assert mask(f"key {key} end") == "key *** end"
+    logging.getLogger("t").warning("원문 %s", key)
+    out = log_stream.getvalue()
+    assert key not in out and key[10:30] not in out

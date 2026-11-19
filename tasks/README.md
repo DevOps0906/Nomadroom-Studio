@@ -30,7 +30,7 @@
 | task-026 | PROD-02 편집안 화면 | W4 | 022, 025 | 보통 | builder | 완료 |
 | task-027 | PROD-03 작업·검수 화면 | W4 | 023, 025 | 보통 | builder | 완료 |
 | task-028 | P0 인수 테스트 CAT-01~07 | W4 | 024, 026, 027 | 보통 | tester | 완료 |
-| task-029 | AI 초안 A-14 (Claude) | W5 | 028 | 높음 | builder + tester | 대기 |
+| task-029 | AI 초안 A-14 (Claude) | W5 | 028 | 높음 | builder + tester | 완료 |
 | task-030 | TTS (edge-tts, 워커 전용) | W5 | 028 | 높음 | builder | 완료 |
 | task-031 | URL 원본 (권리 확인 · yt-dlp · SSRF 방지) | W5 | 028 | 높음 | builder + tester | 대기 |
 | task-032 | 댓글·출처 오버레이 레이어 | W5 | 028 | 보통 | builder | 완료 |

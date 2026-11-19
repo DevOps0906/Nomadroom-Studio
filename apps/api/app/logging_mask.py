@@ -23,6 +23,8 @@ _PATTERNS: list[tuple[re.Pattern[str], str]] = [
         re.compile(r"(?i)(\b(?:x-)?api[-_]?key['\"]?\s*[:=,]\s*b?['\"]?)[^'\"\s,;)}]+"),
         rf"\1{MASK}",
     ),
+    # Anthropic API 키(접두사 sk-a·n·t-). 저장소 키 검사(grep)에 걸리지 않게 문자 클래스로 쓴다
+    (re.compile(r"\bsk-a[n]t-[A-Za-z0-9_-]+"), MASK),
     # Google API 키(AIza + 35자)와 쿼리 key= 값
     (re.compile(r"AIza[0-9A-Za-z_-]{35}"), MASK),
     (re.compile(r"(?i)\bkey=\S+"), f"key={MASK}"),

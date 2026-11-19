@@ -191,3 +191,13 @@ export async function retryProductionRender(id: string, runId: string): Promise<
   const res = await apiFetch<{ render_run: RenderRun }>(`${jobPath(id)}/render-runs/${encodeURIComponent(runId)}/retry`, { method: "POST" });
   return res.render_run;
 }
+
+export type AiDraftResult = { revision: Revision; ai_draft_count: number; previous_rev_no: number | null; replay: boolean };
+
+/** A-14는 Claude 호출(재시도 1회 포함)을 기다리므로 기본 10초보다 길게 둔다(API 설정 타임아웃 90초 × 2 + 여유). */
+export const AI_DRAFT_TIMEOUT_MS = 200_000;
+
+/** A-14 AI 초안(새 리비전, origin=ai_draft, 기존 편집 보존). 같은 키 재요청은 기존 결과. 자동 승인 없음. */
+export async function requestProductionAiDraft(id: string, idempotencyKey: string): Promise<AiDraftResult> {
+  return apiFetch<AiDraftResult>(`${jobPath(id)}/ai-draft`, { method: "POST", idempotencyKey, timeoutMs: AI_DRAFT_TIMEOUT_MS });
+}

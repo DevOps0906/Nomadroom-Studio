@@ -25,6 +25,7 @@ import {
 } from "./model";
 import { OverlaysTab } from "./OverlaysTab";
 import { SheetPanel, type SheetInfo } from "./sheet-panel";
+import { AiDraftButton } from "./AiDraftButton";
 import { Timeline } from "./timeline";
 
 // PROD-02 편집안 폼. 서버 검증(validation)이 정본이다: 저장은 오류가 있어도 허용, 승인은 오류 0·저장 완료일 때만.
@@ -135,7 +136,7 @@ export function EditForm({
   const [localErr, setLocalErr] = useState<{ path: string; message: string } | null>(null);
   const [rejected, setRejected] = useState(false); // 마지막 저장이 400으로 거부돼 validation이 저장본이 아님
   const [conflict, setConflict] = useState(false);
-  const [phase, setPhase] = useState<"idle" | "saving" | "approving" | "uploading">("idle");
+  const [phase, setPhase] = useState<"idle" | "saving" | "approving" | "uploading" | "drafting">("idle");
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [section, setSection] = useState<Section>("hook");
   const [tab, setTab] = useState<"edit" | "comment" | "source">("edit");
@@ -201,6 +202,18 @@ export function EditForm({
     setSnapshot(JSON.stringify(draft));
     setMessage({ tone: "ok", text: rev.validation.errors.length > 0 ? `저장했습니다. 검증 오류 ${rev.validation.errors.length}건이 있습니다.` : "저장했습니다." });
     return true;
+  }
+
+  // A-14 AI 초안: 새 리비전을 화면에 반영(이전 리비전은 서버에 보관)
+  function applyDraft(rev: EditRevision) {
+    const d = toDraft(rev.spec);
+    setDraft(d);
+    setSnapshot(JSON.stringify(d));
+    setRevNo(rev.rev_no);
+    setValidation(rev.validation);
+    setApprovedAt(rev.approved_at);
+    setRejected(false);
+    setLocalErr(null);
   }
 
   const blockers = approveBlockers({ status: job.status, hasRevision: revNo !== null, dirty, approved: approvedAt !== null, errorCount: rejected ? Math.max(errors.length, 1) : errors.length, overlayErrorCount: errors.filter((i) => i.path.startsWith("overlays")).length, busy });
@@ -311,7 +324,7 @@ export function EditForm({
       )}
       {revNo === null && (
         <p role="status" className="rounded-control bg-neutral-soft px-3 py-2 text-body text-neutral-soft-fg">
-          편집안 초안이 아직 없습니다. 초안이 만들어지면 이 양식으로 고칠 수 있습니다(AI 초안 채우기는 후속 작업).
+          편집안 초안이 아직 없습니다. 초안이 만들어지면 이 양식으로 고칠 수 있습니다. 준비가 끝난 작업은 “AI 초안 채우기”로 초안을 만들 수 있습니다.
         </p>
       )}
       {approvedAt && (
@@ -538,6 +551,7 @@ export function EditForm({
         <button type="button" disabled={blockers.length > 0 || conflict} aria-describedby={blockers.length > 0 ? "approve-why" : undefined} onClick={() => void approve()} className={SECONDARY}>
           {phase === "approving" ? "승인하는 중…" : "승인"}
         </button>
+        <AiDraftButton jobId={job.id} disabled={busy || conflict || job.status !== "review"} dirty={dirty} onBusy={(b) => setPhase(b ? "drafting" : "idle")} onApplied={applyDraft} onFail={handleFail} />
         <button type="button" disabled={busy} onClick={cancel} className={SECONDARY}>
           취소
         </button>

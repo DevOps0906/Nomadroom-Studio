@@ -34,3 +34,22 @@
 - H7 테스트는 SDK `messages.create` 인자를 가로채 이미지가 image/jpeg 시트뿐이고 source·mp4 자산 0건임을 단언, 실제 네트워크 차단(사용자 결정: 목 전용).
 - H8 미저장 변경이 있으면 AI 초안 전에 확인. 응답에 직전 rev_no를 담고 화면에 "이전 편집안 rev N은 보관됨" 안내(되돌리기 UI는 후속, README 발견한 문제).
 - 순서: task-032(edit-form.tsx 수정 중) 커밋 뒤 착수. 마이그레이션 번호 000018=029, 000019=031.
+
+## 구현 결정 (2026-11-19, builder)
+- 멱등 키 기록: 새 테이블 대신 `production_jobs.ai_draft_requests`(jsonb 배열, 원소 `{key, status(pending·done·failed), base_rev_no, revision_id, requested_by, created_at, finished_at}`) 칼럼. 새 테이블은 `supabase/tests/rls_test.sql`의 테이블 수 단언(쓰기 범위 밖)을 깨고 ERD·타입 재생성이 필요해서 피했다. 작업당 최대 3건이라 크기 문제 없음. 다른 작업에 쓴 키는 같은 워크스페이스 작업들의 배열 포함 검사로 409(NR011). 서로 다른 두 작업이 같은 키로 동시에 요청하는 경합은 막지 않는다(키는 클릭마다 UUID라 수용).
+- RPC(000018): `reserve_ai_draft(p_workspace, p_job, p_user, p_key, p_limit)` · `create_ai_draft_revision(…, p_key, p_spec, p_validation)` · `fail_ai_draft(p_workspace, p_job, p_key)`(void). SQLSTATE 추가: NR016 상한 → 429 `QUOTA_EXCEEDED`, NR017 60초 내 새 키 → 429 `RATE_LIMITED`, NR018 같은 키 처리 중(pending) → 409. 판정 순서: 같은 키 재요청(기존 결과, 상태·상한 무관) → 다른 작업 키 409 → review 아님 409 → format≠category 409 → 상한 429 → 60초 429. 상한 값은 API 설정 `ai_draft_max_per_job`(기본 3)을 인자로 넘긴다.
+- 횟수는 요청(멱등 키) 단위: 스키마 불일치 재시도 1회는 같은 요청 안이라 추가 계수 없음. 예약 뒤 입력 수집(Storage) 실패·Claude 실패·리비전 생성 거부(호출 중 상태 변경 등)는 모두 `fail_ai_draft`로 failed 기록, 횟수는 그대로 소진. 실패한 키의 재요청은 같은 502(기존 결과), "다시 시도"는 새 키(60초 간격 적용).
+- 응답: 새 리비전 201, 같은 키 재요청 200. 본문 `{revision, ai_draft_count, previous_rev_no}`(`previous_rev_no`=예약 시점 현재 rev_no, H8).
+- Claude 호출: 공식 Anthropic Python SDK `anthropic` 2.10.0(Apache-2.0 — H5의 "MIT"와 다름, 허용 라이선스. 새 전이 의존성 httpx2·httpcore2 BSD-3, jiter·docstring-parser·truststore·h11 MIT, opentelemetry-api Apache-2.0), `AsyncAnthropic(max_retries=0, timeout=설정)`, `messages.create`에 도구 하나(`submit_edit_draft`, JSON 스키마)와 `tool_choice` 강제로 구조화 출력. 도구 스키마에는 편집 필드(header·hook.text·duration·shots·items)만 두고, 서버가 lang·source_start_sec·preset_version과 직전 리비전 hook.audio_asset_id·tts를 채운다(AI가 보낸 값은 버림). overlays(P1)는 초안 대상 아님.
+- 전송: ready `sheet` 자산 중 mime `image/jpeg`이고 내용이 JPEG 매직(FFD8FF)인 것만, 생성 순 상한 `ai_draft_max_sheets`장, 장당 5MB 이하. Storage는 서비스 키로 `object/authenticated` GET(서명 URL을 만들지 않음). analysis.json은 압축 JSON 문자열로 넣고 20만 자 넘으면 자름. 후보 제목·analysis는 `<untrusted_data>` 블록 안 JSON 문자열로만, 꺾쇠는 `<`·`>`로 이스케이프해 블록을 닫지 못하게 했다. 원본·hook_audio·mp4 객체는 읽지도 않는다.
+- 새 환경변수 이름(값은 `.env`에만, `.env.example`은 팀장이 추가): `ANTHROPIC_API_KEY`(없거나 공백이면 A-14만 503), `AI_DRAFT_MODEL`(기본 `claude-sonnet-5-5`), `AI_DRAFT_MAX_PER_JOB`(3), `AI_DRAFT_MAX_SHEETS`(16), `AI_DRAFT_MAX_TOKENS`(8192), `AI_DRAFT_MAX_ITEMS`(80), `AI_DRAFT_MAX_SHOTS`(40), `AI_DRAFT_TIMEOUT_SEC`(90).
+- 로그: `AI 초안 생성: job rev count errors`·`AI 초안 실패: job reason=<예외 이름·코드>`만. 키·프롬프트·응답 원문·SDK 예외 메시지 없음.
+- 웹: `AiDraftButton`("AI 초안 채우기", 실패 후 "AI 초안 다시 시도", 클릭마다 새 키 `ai-<uuid>`). 미저장 변경이 있으면 confirm. 성공 시 새 리비전을 양식에 반영하고 "AI 초안 rev N을 만들었습니다. 이전 편집안 rev M은 보관됨" 안내. 버튼은 job `review`일 때만 활성. edit-form.tsx 변경은 import·phase `drafting`·`applyDraft`·버튼 한 줄·빈 상태 안내 문구뿐.
+
+## 리뷰 반영 결정 (2026-11-19, code·security 리뷰 🔴 없음 · 🟡 반영)
+- 정리 호출 보호: `fail_ai_draft` 호출 오류는 로그(예외 이름만) 후 삼키고 원래 오류(502·409 등)를 그대로 던진다.
+- 멈춘 요청: `reserve_ai_draft`는 5분 넘은 pending을 같은 키 재요청 때 failed로 확정하고 기존 결과(502)를 돌려준다(영구 409 방지). 5분 이내 pending은 409(NR018).
+- 기준 리비전 확인: 예약 때 현재 리비전 id·updated_at을 `base_revision_id`·`base_updated_at`으로 기록하고, `create_ai_draft_revision`은 둘 중 하나라도 다르면 NR010(409)으로 거부한다(rev_no만 보면 미승인 리비전의 같은 행 저장을 놓쳐서 updated_at까지 비교). API는 409 전에 failed로 기록한다.
+- 로그 마스킹: `logging_mask`에 Anthropic 키 패턴 추가. 저장소 키 검사(`grep -rn "sk-ant" apps`)에 걸리지 않게 정규식은 `sk-a[n]t-`로 썼고, 테스트 키는 런타임 조립.
+- 상태 코드 전달: 웹 중계는 FastAPI와 같게 새 초안 201·같은 키 재요청 200. apiFetch가 상태 코드를 돌려주지 않아(client.ts는 범위 밖) API 응답에 `replay`(bool)를 추가해 구분한다(04_API A-14 반영). 웹 → FastAPI 호출 타임아웃은 A-14만 200초(기본 10초면 Claude 호출 중 끊김).
+- 노출 수용: `production_jobs.ai_draft_requests`는 같은 워크스페이스 구성원에게 select로 보인다. 내부 도구이고 담긴 값은 요청 키(클릭 UUID)·상태·rev 번호·시각뿐이라(비밀·토큰 없음) 수용한다.

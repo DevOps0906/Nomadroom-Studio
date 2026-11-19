@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Nomadroom Studio API (FastAPI): Supabase JWT 검증·워커 토큰 인증"
 requires-python = ">=3.14"
 dependencies = [
+    "anthropic>=2.10.0",
     "fastapi>=0.163.1",
     "httpx>=0.28.1",
     "pydantic-settings>=2.16.3",
