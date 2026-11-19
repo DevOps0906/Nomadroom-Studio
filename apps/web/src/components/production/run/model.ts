@@ -12,6 +12,10 @@ export const REASON_TEXT: Record<string, string> = {
   worker_offline: "제작 워커가 응답하지 않아 중단되었습니다. 워커를 켠 뒤 재시도하세요.",
 };
 
+/** hook_too_long 안내(W-09 정본식). 실패 보고에는 훅 길이가 없어 식으로만 안내한다. */
+export const HOOK_NEED_TEXT =
+  "필요한 시간: 훅 음성 길이 + 0.08초가 첫 자막 종료(전체 길이가 더 짧으면 전체 길이) + 0.02초 이하여야 합니다. 첫 자막을 훅 음성보다 0.06초 이상 길게 늘리거나 훅 문구를 줄이세요.";
+
 export const RUN_STAGE_LABEL: Record<string, string> = {
   queued: "대기",
   audio: "음성",
@@ -63,8 +67,10 @@ export type RunView = {
 
 export function viewOf(d: ProductionJobDetail): RunView {
   const { job, latest_run: run, current_revision: rev } = d;
-  const code = job.status === "failed" ? (run?.error_code ?? job.error_code) : null;
-  const failed = job.status === "failed" && job.failed_stage !== "prepare";
+  // 편집 사유 3종은 API가 job을 review로 되돌리므로, review + 최신 run 실패도 실패 안내로 본다.
+  const backToReview = job.status === "review" && run?.status === "failed" && !!run.error_code && (EDIT_FIRST_CODES as readonly string[]).includes(run.error_code);
+  const code = job.status === "failed" ? (run?.error_code ?? job.error_code) : backToReview ? run?.error_code : null;
+  const failed = backToReview || (job.status === "failed" && job.failed_stage !== "prepare");
   const editFirst = failed && !!code && (EDIT_FIRST_CODES as readonly string[]).includes(code);
   const rendering = job.status === "rendering";
   return {

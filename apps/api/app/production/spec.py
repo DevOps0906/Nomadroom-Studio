@@ -19,6 +19,8 @@ NARROW = " .,'!?:;-()"
 CAPTION_Y = {"emph": 390, "white": 700, "paren": 700}
 CAPTION_HALF_H = 45  # 자막 한 줄 높이의 절반(어림)
 CARD_HALF_H = 30  # 오버레이 카드 높이의 절반(어림)
+HEADER_Y_MIN = 0  # 제목 검은 띠 기준: 워커 render.py가 y 0~279를 검게 칠한다
+HEADER_Y_MAX = 280
 MIN_SHOW_SEC = 1.4
 _Num = Annotated[float, Field(strict=True, allow_inf_nan=False)]
 _PATHLIKE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*:|^~|[/\\]|^\.\.$")
@@ -135,6 +137,9 @@ def validate_spec(
 
     if not s.hook.text.strip():
         errors.append(_e("hook.text.empty", "hook.text", "훅 문구가 비어 있습니다."))
+    if s.hook.tts and s.hook.tts.voice.split("-", 1)[0] != s.lang:
+        msg = "음성 언어가 편집안 lang과 같아야 합니다."
+        errors.append(_e("hook.tts.voice_lang", "hook.tts.voice", msg))
     if (s.hook.audio_asset_id is None) == (s.hook.tts is None):
         errors.append(_e("hook.audio_xor", "hook", "audio_asset_id와 tts 중 하나만 지정"))
 
@@ -238,6 +243,10 @@ def _check_overlays(s: Spec, errors: list[dict[str, str]], warnings: list[dict[s
                     )
                 )
     for i, o in enumerate(s.overlays):
+        if o.y + CARD_HALF_H > HEADER_Y_MIN and o.y - CARD_HALF_H < HEADER_Y_MAX:
+            warnings.append(
+                _e("overlays.header_overlap", f"overlays.{i}", "오버레이가 제목 영역과 겹칩니다.")
+            )
         for j, it in enumerate(s.items):
             cy = it.y if it.y is not None else CAPTION_Y[it.kind]
             if (

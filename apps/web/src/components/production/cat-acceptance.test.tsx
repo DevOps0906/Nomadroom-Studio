@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ProductionJobDetail } from "@/server/api/production";
 
 // task-028 인수 테스트(웹 쪽): CAT-01·02·03·04·06·07의 화면·요청 동작. 근거: Nomadroom_Category_Shorts_PRD.md#5.
-// 결함 재현은 it.fails — 결함이 고쳐지면(테스트가 통과하면) 실패로 바뀌어 it 로 승격하라는 신호가 된다.
+//
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), replace: vi.fn(), push: vi.fn() }) }));
 
@@ -115,9 +115,7 @@ describe("CAT-04 첫 자막에 들어가지 않는 훅 음성", () => {
     expect(html).toContain(runModel.REASON_TEXT.hook_too_long!);
   });
 
-  // 결함 재현(🟡): PRD CAT-04 는 '필요한 시간을 안내'하라는데 화면 문구에는 초 단위 안내가 없다.
-  // 워커도 실패 보고에 훅 길이·허용 길이를 싣지 않는다(04_API.md W-09: failed는 코드만).
-  it.fails("필요한 시간(초)을 안내한다", () => {
+  it("필요한 시간(초)을 안내한다", () => {
     expect(failedHtml("hook_too_long")).toMatch(/\d+(\.\d+)?\s*초/);
   });
 });
@@ -138,9 +136,7 @@ describe("CAT-06 산출물 검수", () => {
     expect(html).toMatch(/<button type="button" disabled=""[^>]*>검수 승인 → 완료<\/button>/);
   });
 
-  // 결함 재현(🟡): PRD CAT-06 은 '글자 잘림·검은 틈·핵심 피사체 잘림'을 검수하라는데 PROD-03 에는
-  // 이 3항목 확인 안내·체크가 없다(리포트 열기 버튼뿐). docs/03_SCREENS_UX.md 에도 항목이 없다.
-  it.fails("검수 화면이 글자 잘림·검은 틈·핵심 피사체 잘림 확인을 안내한다", () => {
+  it("검수 화면이 글자 잘림·검은 틈·핵심 피사체 잘림 확인을 안내한다", () => {
     const html = runHtml({ status: "inspect", run: { status: "done" }, assets: ASSETS });
     for (const t of ["글자 잘림", "검은 틈", "피사체"]) expect(html).toContain(t);
   });

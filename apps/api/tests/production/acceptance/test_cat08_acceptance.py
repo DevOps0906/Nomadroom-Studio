@@ -42,7 +42,7 @@ COMMENT = {
     "start": 2.0,
     "end": 6.0,
     "x": 304,
-    "y": 200,
+    "y": 550,
 }
 SOURCE = {
     "kind": "source",
@@ -368,14 +368,9 @@ def test_cat08_full_story_url_overlay_tts_fail_attach_done(api, auth, db):
     assert json.loads(json.dumps(db.revisions[-1]["spec"]))["overlays"] == [COMMENT, SOURCE]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="결함 후보(🟡): 제목(header, 화면 위쪽 y≈130~260)과 겹치는 오버레이는 경고도 없다. "
-    "실환경 프레임(acc033 A_t4)에서 y=200 댓글 카드가 제목 글자를 가렸다. 자막만 검사한다.",
-)
 def test_cat08_overlay_covering_header_warns(api, auth, db):
     job = start_job(api, auth, db)
     prepare_to_review(api, auth, db, job["id"])
     hook = make_asset_ready(api, auth, db, job["id"], "hook_audio", "audio/wav")
-    r = put_spec(api, auth, job["id"], spec(hook_asset=hook, overlays=[COMMENT]), 1)
-    assert codes(r, "warnings") != []
+    r = put_spec(api, auth, job["id"], spec(hook_asset=hook, overlays=[{**COMMENT, "y": 200}]), 1)
+    assert "overlays.header_overlap" in codes(r, "warnings")

@@ -15,7 +15,7 @@ def base() -> dict:
 
 
 def ov(**kw) -> dict:
-    return {"kind": "comment", "text": "댓글", "start": 1, "end": 3, "x": 304, "y": 200, **kw}
+    return {"kind": "comment", "text": "댓글", "start": 1, "end": 3, "x": 304, "y": 550, **kw}
 
 
 def run(*overlays: dict) -> dict:
@@ -86,7 +86,7 @@ def test_caption_overlap_is_warning_only():
 def test_caption_with_custom_y_and_time_gap():
     s = base()
     s["items"] = [{"start": 0, "end": 2, "kind": "white", "text": "자막", "y": 500}]
-    s["overlays"] = [ov(y=200, start=3, end=5), ov(kind="source", y=500, start=3, end=5)]
+    s["overlays"] = [ov(y=550, start=3, end=5), ov(kind="source", y=500, start=3, end=5)]
     r = validate_spec(s, source_duration=60.0)
     assert codes(r, "warnings") == []  # 시간이 안 겹침
     s["overlays"] = [ov(y=520, start=1, end=3)]
@@ -95,3 +95,23 @@ def test_caption_with_custom_y_and_time_gap():
 
 def test_ref_must_not_be_path():
     assert "path.forbidden" in codes(run(ov(ref="https://x.test/a")))
+
+
+def test_overlay_over_header_warns():
+    r = run(ov(y=200))
+    assert codes(r) == []
+    assert codes(r, "warnings") == ["overlays.header_overlap"]
+    assert r["warnings"][0]["path"] == "overlays.0"
+
+
+def test_header_band_boundary():
+    assert codes(run(ov(y=300)), "warnings") == ["overlays.header_overlap"]  # 카드 상단 270 < 280
+    assert codes(run(ov(y=311)), "warnings") == []  # 카드 상단 281
+
+
+def test_tts_voice_must_match_lang():
+    s = base()
+    s["hook"] = {"text": "훅", "tts": {"voice": "ja-JP-NanamiNeural", "rate": "+50%"}}
+    assert codes(validate_spec(s, source_duration=60.0)) == ["hook.tts.voice_lang"]
+    s["hook"]["tts"]["voice"] = "ko-KR-SunHiNeural"
+    assert codes(validate_spec(s, source_duration=60.0)) == []

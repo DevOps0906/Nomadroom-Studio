@@ -9,7 +9,7 @@ import { createIntentKey } from "@/components/monitoring/intent-key";
 import type { ProductionJobDetail } from "@/server/api/production";
 import { STAGE_LABEL, STATUS_LABEL, STATUS_TONE } from "../format";
 import { approveReview, assetUrl, requestRender, retryRender, type RunResult } from "./api";
-import { REASON_TEXT, STEPS, latestAsset, stageLabel, stepStates, viewOf, type StepState } from "./model";
+import { HOOK_NEED_TEXT, REASON_TEXT, STEPS, latestAsset, stageLabel, stepStates, viewOf, type StepState } from "./model";
 
 // PROD-03 작업·검수. 서버(A-09 GET)가 정본이고 렌더 요청·재시도·검수 승인은 Route Handler로 보낸다.
 // 근거: docs/03_SCREENS_UX.md PROD-03, tasks/task-027.md. W4는 ko만(언어 탭·쇼핑 게시 문구·출처 목록은 범위 밖).
@@ -203,7 +203,7 @@ export function RunView({ detail }: { detail: ProductionJobDetail }) {
         </p>
       )}
 
-      {job.status === "review" && (
+      {job.status === "review" && !v.editFirst && (
         <section aria-label="렌더 요청" className={cn(CARD, "flex flex-col items-start gap-3")}>
           {v.canRequest ? (
             <>
@@ -237,6 +237,7 @@ export function RunView({ detail }: { detail: ProductionJobDetail }) {
             실패 단계: {failStage ? STAGE_LABEL[failStage] : "알 수 없음"} · 사유 코드: <code>{failCode ?? "unknown"}</code>
           </p>
           {failCode && REASON_TEXT[failCode] && <p className="text-body text-text-muted">{REASON_TEXT[failCode]}</p>}
+          {failCode === "hook_too_long" && <p className="text-body text-text-muted">{HOOK_NEED_TEXT}</p>}
           {v.canRetry && (
             <button type="button" onClick={() => void onRetry()} disabled={locked} className={PRIMARY}>
               {busy === "retry" ? "재시도 중…" : "재시도"}
@@ -255,6 +256,17 @@ export function RunView({ detail }: { detail: ProductionJobDetail }) {
           <section aria-label="MP4" className={CARD}>
             <Player key={mp4 ?? "none"} jobId={job.id} assetId={mp4} />
           </section>
+          {v.inspect && (
+            <section aria-label="검수 확인 항목" className={CARD}>
+              <h2 className="mb-2 text-h2 font-bold">영상에서 확인하세요</h2>
+              <ul className="list-disc pl-5 text-body">
+                <li>글자 잘림: 제목·자막·댓글·출처 글자가 화면 밖으로 잘리거나 가려지지 않았는지</li>
+                <li>검은 틈: 구도 가장자리나 장면 전환에 검은 줄·빈 화면이 없는지</li>
+                <li>핵심 피사체 잘림: 사람·제품 등 핵심 피사체가 잘리지 않았는지</li>
+              </ul>
+              <p className="mt-2 text-caption text-text-muted">안내용 확인 목록입니다. 문제가 있으면 “편집안으로(새 리비전)”에서 고친 뒤 다시 렌더하세요.</p>
+            </section>
+          )}
           <section aria-label="검수 리포트" className={CARD}>
             <h2 className="mb-2 text-h2 font-bold">검수 리포트</h2>
             {report ? (

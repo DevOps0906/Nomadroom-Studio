@@ -24,7 +24,7 @@ from tests.production.test_ai_draft import (  # noqa: F401  (fixture 재사용)
 )
 
 TTS = {"voice": "ko-KR-SunHiNeural", "rate": "+50%"}
-COMMENT = {"kind": "comment", "text": "댓글 하나", "start": 2.0, "end": 6.0, "x": 304, "y": 200}
+COMMENT = {"kind": "comment", "text": "댓글 하나", "start": 2.0, "end": 6.0, "x": 304, "y": 550}
 
 
 def job_with_tts_and_overlay(db):
@@ -68,11 +68,6 @@ def test_ai_draft_failure_502_leaves_tts_revision_intact(api, auth, db, claude):
     assert rev1["spec"]["hook"]["tts"] == TTS
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="결함 후보: assemble_spec이 직전 리비전 overlays를 옮기지 않아 AI 초안 새 리비전에서 "
-    "사용자의 댓글·출처 오버레이가 사라진다(hook 음성은 보존). 설계 결정 필요(task-029/032 교차).",
-)
 def test_ai_draft_keeps_existing_overlays(api, auth, db, claude):
     job, _ = job_with_tts_and_overlay(db)
     r = post(api, auth, job)

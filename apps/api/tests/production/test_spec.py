@@ -113,7 +113,7 @@ def test_hook_tts_ssml_injection_rejected(tts):
 def test_hook_tts_rate_ok():
     def m(s):
         s["hook"].pop("audio_asset_id")
-        s["hook"]["tts"] = {"voice": "ja-JP-NanamiNeural", "rate": "-10%"}
+        s["hook"]["tts"] = {"voice": "ko-KR-SunHiNeural", "rate": "-10%"}
 
     assert run(m)["errors"] == []
 

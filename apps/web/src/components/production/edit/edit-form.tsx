@@ -9,6 +9,7 @@ import { AUDIO_ACCEPT, MAX_AUDIO_BYTES, approveRevision, audioMime, completeHook
 import {
   KIND_LABEL,
   approveBlockers,
+  defaultTts,
   buildSpec,
   durationOf,
   emptyDraft,
@@ -18,6 +19,7 @@ import {
   issuesAt,
   issuesOf,
   toDraft,
+  voicesFor,
   type Draft,
   type ItemDraft,
   type ItemKind,
@@ -392,10 +394,45 @@ function CategoryEditForm({
         <Field id="ed-hook" label="첫 훅 문구" required issues={<IssueList list={[...issuesOf(errors, "hook.text"), ...issuesOf(errors, "hook")]} />}>
           <input id="ed-hook" className={INPUT} value={draft.hookText} disabled={lock} aria-invalid={issuesOf(errors, "hook.text").length > 0} onChange={(e) => set({ hookText: e.target.value })} />
         </Field>
+        <fieldset className="flex flex-col gap-2" disabled={lock}>
+          <legend className="text-body font-medium text-text">훅 음성 방식</legend>
+          <div className="flex flex-wrap gap-4">
+            <label className="inline-flex min-h-11 items-center gap-2 text-body">
+              <input type="radio" name="ed-audio-mode" checked={!draft.tts} onChange={() => draft.tts && set({ tts: null })} />
+              첨부 음성 업로드
+            </label>
+            <label className="inline-flex min-h-11 items-center gap-2 text-body">
+              <input type="radio" name="ed-audio-mode" checked={!!draft.tts} onChange={() => !draft.tts && set({ tts: defaultTts(draft.lang), audioAssetId: null })} />
+              TTS 음성 사용
+            </label>
+          </div>
+        </fieldset>
+        {draft.tts ? (
+          <>
+            <Field id="ed-tts-voice" label="TTS 음성(목소리)" issues={<IssueList list={[...issuesAt(errors, "hook.tts.voice"), ...loc("hook.tts.voice")]} />}>
+              <select id="ed-tts-voice" name="voice" className={INPUT} value={draft.tts.voice} disabled={lock} onChange={(e) => set({ tts: { ...draft.tts!, voice: e.target.value } })}>
+                {!voicesFor(draft.lang).some((v) => v.id === draft.tts!.voice) && <option value={draft.tts.voice}>{draft.tts.voice}</option>}
+                {voicesFor(draft.lang).map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field
+              id="ed-tts-rate"
+              label="TTS 속도"
+              hint="+50%·-10%처럼 부호와 숫자(1~3자리)·% 형식. 현재 TTS 음성을 쓰고 있습니다. 워커 설정에서 TTS가 꺼져 있으면 실패합니다. 파일을 올리면 첨부 음성으로 바뀝니다."
+              issues={<IssueList list={[...issuesAt(errors, "hook.tts.rate"), ...loc("hook.tts.rate")]} />}
+            >
+              <input id="ed-tts-rate" name="rate" className={INPUT} value={draft.tts.rate ?? ""} disabled={lock} aria-invalid={loc("hook.tts.rate").length > 0} onChange={(e) => set({ tts: { ...draft.tts!, rate: e.target.value } })} />
+            </Field>
+          </>
+        ) : null}
         <Field
           id="ed-audio"
           label="훅 음성 (첨부 업로드)"
-          hint={draft.audioAssetId ? "첨부 음성이 지정되어 있습니다." : draft.tts ? "현재 TTS 음성을 쓰고 있습니다. 워커 설정에서 TTS가 꺼져 있으면 실패합니다. 파일을 올리면 첨부 음성으로 바뀝니다." : "wav·mp3·m4a, 50MB 이하"}
+          hint={draft.audioAssetId ? "첨부 음성이 지정되어 있습니다." : draft.tts ? "파일을 올리면 TTS 대신 첨부 음성으로 바뀝니다." : "wav·mp3·m4a, 50MB 이하"}
           issues={<IssueList list={issuesAt(errors, "hook.audio_asset_id")} />}
         >
           <input ref={fileRef} id="ed-audio" type="file" accept={AUDIO_ACCEPT} disabled={lock} className={cn(INPUT, "py-2")} onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />

@@ -12,7 +12,7 @@ const JOB = { id: "00000000-0000-4000-8000-0000000000e1", title: "작업", statu
 const spec = (over: Record<string, unknown> = {}) => ({
   lang: "ko",
   header: { lines: ["첫째 줄", "둘째 줄"] },
-  hook: { text: "훅 <b>문구</b>", tts: { voice: "ko-voice", rate: "+50%" } },
+  hook: { text: "훅 <b>문구</b>", tts: { voice: "ko-KR-SunHiNeural", rate: "+50%" } },
   duration: 6,
   shots: [
     { start: 0, end: 3, scale: 1.2, y: 0 },

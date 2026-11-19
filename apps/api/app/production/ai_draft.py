@@ -244,6 +244,9 @@ def assemble_spec(
         "source_start_sec": float(job["source_start_sec"]),
         "preset_version": job["preset_version"],
     }
+    base_overlays = (base_spec or {}).get("overlays")
+    if isinstance(base_overlays, list) and base_overlays:
+        spec["overlays"] = base_overlays  # AI는 오버레이를 만들지 않는다: 사용자 입력 보존
     return spec
 
 

@@ -3,12 +3,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ProductionJobDetail } from "@/server/api/production";
 
 // task-033 인수 테스트(웹 쪽): CAT-08(오버레이·AI 초안·URL 원본) + TTS 실패 복귀 화면.
-// 근거: Nomadroom_Category_Shorts_PRD.md#5 CAT-08, tasks/task-029~032.md. 결함 재현은 it.fails.
+// 근거: Nomadroom_Category_Shorts_PRD.md#5 CAT-08, tasks/task-029~032.md.
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), replace: vi.fn(), push: vi.fn() }) }));
 
 const { EditForm } = await import("./edit/edit-form");
-const { buildSpec, toDraft } = await import("./edit/model");
+const editModel = await import("./edit/model");
+const { buildSpec, toDraft } = editModel;
 const { RunView } = await import("./run/run-view");
 const runModel = await import("./run/model");
 
@@ -51,6 +52,21 @@ describe("CAT-08 오버레이·편집안 왕복", () => {
     expect(s.overlays).toEqual([COMMENT, SOURCE]);
   });
 
+  it("TTS 속도·음성 형식이 서버 패턴과 다르면 보내지 않고 위치를 알려 준다", () => {
+    const d = toDraft(baseSpec({ text: "훅", tts: TTS }));
+    expect(buildSpec({ ...d, tts: { voice: TTS.voice, rate: "50" } })).toMatchObject({ ok: false, path: "hook.tts.rate" });
+    expect(buildSpec({ ...d, tts: { voice: "x", rate: "+50%" } })).toMatchObject({ ok: false, path: "hook.tts.voice" });
+  });
+
+  it("TTS 음성 목록은 편집안 lang 접두사 음성만, 기본값도 lang에 맞는다", () => {
+    expect(editModel.voicesFor("ko").every((v) => v.id.startsWith("ko-"))).toBe(true);
+    expect(editModel.voicesFor("ja").every((v) => v.id.startsWith("ja-"))).toBe(true);
+    expect(editModel.defaultTts("ja").voice.startsWith("ja-")).toBe(true);
+    const html = editHtml(baseSpec({ text: "훅", tts: TTS }));
+    expect(html).toContain("ko-KR-InJoonNeural");
+    expect(html).not.toContain("ja-JP-NanamiNeural");
+  });
+
   it("편집 화면에 AI 초안 버튼·댓글·출처 탭이 있다(review)", () => {
     const html = editHtml(baseSpec({ text: "훅", audio_asset_id: "a" }));
     expect(html).toContain("AI 초안 채우기");
@@ -78,13 +94,17 @@ describe("TTS 실패 복귀 화면(tts_failed)", () => {
     expect(html).not.toContain(">재시도<");
   });
 
-  // 결함 재현(🟡): API(A-?·W-09, 04_API)는 tts_failed·hook_too_long·text_too_long이면 job을 `review`로 되돌린다.
-  // 그런데 RunView는 job.status === "failed"일 때만 실패 사유·"편집안으로 돌아가 고치기"를 보여 준다.
-  // 실제 상태(review + latest_run failed)에서는 사유 없이 "승인됨 — 렌더 요청"만 보인다.
-  it.fails("실제 API 상태(job=review, latest_run=tts_failed)에서도 실패 사유와 편집 링크를 보인다", () => {
+  it("실제 API 상태(job=review, latest_run=tts_failed)에서도 실패 사유와 편집 링크를 보인다", () => {
     const html = renderToStaticMarkup(<RunView detail={detail("tts_failed", "review")} />);
     expect(html).toContain(runModel.REASON_TEXT.tts_failed!);
     expect(html).toContain("편집안으로 돌아가 고치기");
+  });
+
+  it("편집 사유 실패(review 복귀)에는 렌더 요청 섹션을 숨기고 링크는 하나만 둔다", () => {
+    const html = renderToStaticMarkup(<RunView detail={detail("hook_too_long", "review")} />);
+    expect(html).not.toContain(">렌더 요청<");
+    expect(html.split("편집안으로 돌아가 고치기").length - 1).toBe(1);
+    expect(html).toMatch(/\d+초/);
   });
 
   it("tts_failed는 편집 우선 코드다(자동 재시도 대상 아님)", () => {
@@ -97,14 +117,12 @@ describe("TTS 실패 복귀 화면(tts_failed)", () => {
     expect(html).toContain("파일을 올리면 첨부 음성으로 바뀝니다");
   });
 
-  // 결함 재현(🟡, task-030 알려진 빈틈): 편집 화면에 TTS 음성(voice)·속도(rate)를 고르는 UI가 없다.
-  // TTS는 API로 spec에 직접 넣어야만 켜지고, 화면에서는 끄기(첨부 업로드)만 가능하다.
-  it.fails("편집 화면에서 TTS 음성(voice)을 선택할 수 있다", () => {
+  it("편집 화면에서 TTS 음성(voice)을 선택할 수 있다", () => {
     const html = editHtml(baseSpec({ text: "훅", audio_asset_id: "a" }));
     expect(html).toMatch(/TTS[^<]{0,20}(음성|목소리)|<select[^>]*(voice|tts)/i);
   });
 
-  it.fails("편집 화면에서 TTS 속도(rate)를 조정할 수 있다", () => {
+  it("편집 화면에서 TTS 속도(rate)를 조정할 수 있다", () => {
     const html = editHtml(baseSpec({ text: "훅", tts: TTS }));
     expect(html).toMatch(/속도|id="ed-tts-rate"|name="rate"/);
   });

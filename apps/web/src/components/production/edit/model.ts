@@ -15,6 +15,19 @@ export type OverlayKind = "comment" | "source";
 export type OverlayDraft = { kind: OverlayKind; text: string; start: string; end: string; x: string; y: string; ref?: string };
 export type Tts = { voice: string; rate?: string };
 
+// 서버 spec.py의 Tts 패턴과 같다(edge-tts가 SSML에 그대로 넣어 형식 고정).
+export const TTS_VOICE_RE = /^[a-z]{2,3}-[A-Z]{2,4}-[A-Za-z0-9]+Neural$/;
+export const TTS_RATE_RE = /^[+-]\d{1,3}%$/;
+export const TTS_VOICES: { id: string; label: string }[] = [
+  { id: "ko-KR-SunHiNeural", label: "한국어 여성 (SunHi)" },
+  { id: "ko-KR-InJoonNeural", label: "한국어 남성 (InJoon)" },
+  { id: "ja-JP-NanamiNeural", label: "일본어 여성 (Nanami)" },
+  { id: "ja-JP-KeitaNeural", label: "일본어 남성 (Keita)" },
+];
+/** 편집안 lang과 같은 접두사 음성만(서버 hook.tts.voice_lang 검사와 같다). */
+export const voicesFor = (lang: string) => TTS_VOICES.filter((v) => v.id.split("-", 1)[0] === lang);
+export const defaultTts = (lang: string): Tts => ({ voice: (voicesFor(lang)[0] ?? TTS_VOICES[0]!).id, rate: "+50%" });
+
 /** 입력 중인 편집안. 숫자는 입력 문자열 그대로 두고, overlays 등 이 화면이 다루지 않는 필드는 rest로 통과시킨다. */
 export type Draft = {
   lang: string;
@@ -122,6 +135,10 @@ export function buildSpec(d: Draft): BuildResult {
     if (o.ref !== undefined) row.ref = o.ref;
     overlays.push(row);
   }
+  if (d.tts) {
+    if (!TTS_VOICE_RE.test(d.tts.voice)) return { ok: false, path: "hook.tts.voice", message: "허용된 음성을 고르세요." };
+    if (d.tts.rate !== undefined && !TTS_RATE_RE.test(d.tts.rate)) return { ok: false, path: "hook.tts.rate", message: "속도는 +50%, -10% 형식(부호·숫자 1~3자리·%)으로 입력하세요." };
+  }
   const hook: Record<string, unknown> = { text: d.hookText };
   if (d.audioAssetId) hook.audio_asset_id = d.audioAssetId;
   if (d.tts) hook.tts = d.tts;
@@ -147,6 +164,7 @@ const LABELS: Record<string, string> = {
   "duration.range": "길이 범위",
   "overlays.range": "오버레이 구간 범위",
   "overlays.overlap": "오버레이 구간 겹침",
+  "overlays.header_overlap": "오버레이가 제목과 겹침",
   "overlays.pos": "오버레이 위치 범위",
   "overlays.text.empty": "빈 오버레이 문구",
   "overlays.text.newline": "오버레이 줄바꿈 불가",
