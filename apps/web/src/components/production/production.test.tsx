@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), replace: vi.fn() }) }));
 
 const { EmptyJobs, JobTable, JobsError, JobsSkeleton, NoFilterResult, StatusFilter, jobHref } = await import("./job-list-view");
-const { SourceForm, isEditable } = await import("./source-form");
+const { SourceForm, isEditable, isYoutubeUrl } = await import("./source-form");
 const { CandidateCard } = await import("./source-view");
 const { candidateHref, validateSource, mimeOf, parseStatus } = await import("./format");
 const { createJob, putFile } = await import("./api");
@@ -79,11 +79,12 @@ describe("PROD-00 목록 상태", () => {
 });
 
 describe("PROD-01 폼 상태", () => {
-  it("첫 입력: 형식 카테고리형 고정, URL 안내, 편집안으로 비활성", () => {
+  it("첫 입력: 형식 카테고리형 고정, 파일 업로드 기본, 편집안으로 비활성", () => {
     const html = form(null);
     expect(html).toContain("카테고리형");
     expect(html).toContain("0 초과 180 이하");
-    expect(html).toContain("원본 URL 입력은 아직 지원하지 않습니다");
+    expect(html).toMatch(/<input(?=[^>]*value="upload")(?=[^>]*checked="")[^>]*>/);
+    expect(html).not.toContain('id="src-url"');
     expect(html).toMatch(/<button[^>]*\sdisabled=""[^>]*>편집안으로<\/button>/);
     expect(html).toMatch(/<button type="submit"[^>]*>원본 준비 시작<\/button>/);
     expect(html).not.toMatch(/type="submit"[^>]*\sdisabled=""/);
@@ -116,6 +117,25 @@ describe("PROD-01 폼 상태", () => {
     expect(isEditable({ status: "failed", failed_stage: "prepare" })).toBe(true);
     expect(isEditable({ status: "failed", failed_stage: "render" })).toBe(false);
   });
+  it("URL 원본: 권한 확인 전에는 URL 입력 비활성 + 안내", () => {
+    const html = form(job({ rights_confirmed: false, source_kind: "url", source_url: null }));
+    expect(html).toMatch(/<input id="src-url"[^>]*\sdisabled=""/);
+    expect(html).toContain("사용 권한 확인 후 입력할 수 있습니다");
+    expect(html).toMatch(/<input id="src-file"[^>]*\sdisabled=""/);
+  });
+  it("URL 원본: 권한 확인 뒤 입력 가능, 값 이스케이프", () => {
+    const html = form(job({ source_kind: "url", source_url: "https://youtu.be/a\"<x>" }));
+    expect(html).not.toMatch(/<input id="src-url"[^>]*\sdisabled=""/);
+    expect(html).toContain("YouTube 주소만");
+    expect(html).not.toContain("<x>");
+  });
+  it("URL 받기 실패(url_unavailable): 사유 안내 + 파일 업로드로 전환", () => {
+    const html = form(job({ status: "failed", failed_stage: "prepare", error_code: "url_unavailable", source_kind: "url", source_url: "https://youtu.be/abc" }));
+    expect(html).toContain("URL에서 원본을 받지 못했습니다");
+    expect(html).toContain("파일을 업로드해 진행하세요");
+    expect(html).toMatch(/<input(?=[^>]*value="upload")(?=[^>]*checked="")[^>]*>/);
+    expect(html).not.toContain('id="src-url"');
+  });
   it("준비 완료: 편집안으로 링크 활성", () => {
     const html = form(job({ status: "review" }), { hasReadySource: true });
     expect(html).toMatch(new RegExp(`<a[^>]*href="/production/${ID}/edit"[^>]*>편집안으로</a>`));
@@ -124,6 +144,10 @@ describe("PROD-01 폼 상태", () => {
 });
 
 describe("순수 함수", () => {
+  it("isYoutubeUrl: YouTube https만", () => {
+    for (const ok of ["https://www.youtube.com/watch?v=a", "https://youtu.be/a", "https://m.youtube.com/shorts/a", "https://youtube.com:443/watch?v=a"]) expect(isYoutubeUrl(ok)).toBe(true);
+    for (const bad of ["http://www.youtube.com/watch?v=a", "https://127.0.0.1/v", "https://[::1]/v", "file:///etc/passwd", "https://vimeo.com/1", "https://u:p@youtu.be/a", "https://youtu.be:8443/a", "https://www.youtube.com.evil.test/", "javascript:alert(1)", ""]) expect(isYoutubeUrl(bad)).toBe(false);
+  });
   const base = { title: "t", start: "0", len: "30", rights: true, hasFile: true, hasReadySource: false };
   it("구간·권한·파일 검증", () => {
     expect(validateSource(base, true)).toEqual({});

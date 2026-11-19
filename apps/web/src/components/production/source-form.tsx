@@ -7,7 +7,9 @@ import { cn } from "@/lib/utils";
 import { EVIDENCE_SESSION_EXPIRED_PATH as SESSION_EXPIRED_PATH } from "@/components/evidence/evidence";
 import { createIntentKey } from "@/components/monitoring/intent-key";
 import type { ProductionStatus } from "@/server/api/production";
-import { completeUpload, createJob, patchJob, prepareJob, putFile, requestUpload, type Result } from "./api";
+import { completeUpload, createJob, isYoutubeUrl, patchJob, prepareJob, putFile, requestUpload, type Result } from "./api";
+
+export { isYoutubeUrl };
 import { FILE_ACCEPT, MAX_FILE_BYTES, STAGE_LABEL, STATUS_LABEL, STATUS_TONE, formatBytes, mimeOf, validateSource, type SourceErrors } from "./format";
 
 // PROD-01 원본·구간·출처 폼. 순서: (생성 | 저장) → 업로드(서명 PUT) → 완료 확인 → 준비 시작(A-11).
@@ -31,11 +33,15 @@ export type SourceJob = {
   credit: string | null;
   source_start_sec: number;
   segment_len_sec: number;
+  source_kind?: "upload" | "url";
+  source_url?: string | null;
 };
 
 export type CandidateInfo = { id: string; title: string; license_cc: boolean | null };
 type Phase = "idle" | "saving" | "uploading" | "confirming" | "preparing";
 type License = "unknown" | "cc" | "other";
+type SourceKind = "upload" | "url";
+type FormErrors = SourceErrors & { url?: string };
 
 const LICENSE_LABEL: Record<License, string> = { unknown: "미확인", cc: "CC(재사용 허용)", other: "그 외" };
 const PHASE_LABEL: Record<Exclude<Phase, "idle">, string> = {
@@ -99,7 +105,10 @@ export function SourceForm({
   const [license, setLicense] = useState<License>(toLicense(job?.license_cc ?? candidate?.license_cc ?? null));
   const [credit, setCredit] = useState(job?.credit ?? "");
   const [file, setFile] = useState<File | null>(null);
-  const [errors, setErrors] = useState<SourceErrors>({});
+  // URL 받기 실패(url_unavailable)면 파일 업로드로 전환해 보여준다(PROD-01 오류 상태).
+  const [kind, setKind] = useState<SourceKind>(job?.error_code === "url_unavailable" ? "upload" : (job?.source_kind ?? "upload"));
+  const [url, setUrl] = useState(job?.source_url ?? "");
+  const [errors, setErrors] = useState<FormErrors>({});
   const [phase, setPhase] = useState<Phase>("idle");
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const busy = phase !== "idle";
@@ -121,6 +130,7 @@ export function SourceForm({
       window.location.assign(SESSION_EXPIRED_PATH);
       return;
     }
+    if (r.field === "source_url") setErrors((e) => ({ ...e, url: r.message }));
     if (r.field === "title" || r.field === "segment_len_sec" || r.field === "rights_confirmed") {
       const key = r.field === "title" ? "title" : r.field === "rights_confirmed" ? "rights" : "len";
       setErrors((e) => ({ ...e, [key]: r.message }));
@@ -132,8 +142,10 @@ export function SourceForm({
   async function submit(mode: "save" | "start") {
     if (busy || !editable) return;
     setMessage(null);
-    const errs = validateSource({ title, start, len, rights, hasFile: !!file, hasReadySource }, mode === "start");
-    if (file) {
+    const useUrl = kind === "url";
+    const errs: FormErrors = validateSource({ title, start, len, rights, hasFile: useUrl || !!file, hasReadySource }, mode === "start");
+    if (useUrl && !isYoutubeUrl(url)) errs.url = "YouTube 주소(https)만 입력할 수 있습니다.";
+    if (!useUrl && file) {
       if (!mimeOf(file)) errs.file = "mp4·mov·webm·mkv 파일만 올릴 수 있습니다.";
       else if (file.size > MAX_FILE_BYTES) errs.file = "파일 크기는 500MB 이하여야 합니다.";
       else if (file.size === 0) errs.file = "빈 파일입니다.";
@@ -147,6 +159,8 @@ export function SourceForm({
       credit: credit.trim() || null,
       source_start_sec: Number(start),
       segment_len_sec: Number(len),
+      source_kind: kind,
+      source_url: useUrl ? url.trim() : null,
     };
     setPhase("saving");
     let id = job?.id ?? createdId.current;
@@ -163,7 +177,7 @@ export function SourceForm({
     }
 
     if (mode === "start") {
-      if (file) {
+      if (!useUrl && file) {
         const mime = mimeOf(file)!;
         const t = await requestUpload(id, file.size, mime);
         if (!t.ok) return fail(t);
@@ -193,6 +207,7 @@ export function SourceForm({
 
   const lock = !editable || busy;
   const failedPrepare = job?.status === "failed" && job.failed_stage === "prepare";
+  const urlFailed = failedPrepare && job?.error_code === "url_unavailable";
 
   return (
     <form
@@ -211,7 +226,9 @@ export function SourceForm({
             {preparing && <span className="text-body text-text-muted">원본 준비 중</span>}
             {failedPrepare && (
               <span className="text-body text-danger" role="alert">
-                {STAGE_LABEL.prepare} 단계 실패{job.error_code ? ` (${job.error_code})` : ""}. 다시 시작할 수 있습니다.
+                {urlFailed
+                  ? "URL에서 원본을 받지 못했습니다(권한·접근 제한·네트워크). 파일을 업로드해 진행하세요."
+                  : `${STAGE_LABEL.prepare} 단계 실패${job.error_code ? ` (${job.error_code})` : ""}. 다시 시작할 수 있습니다.`}
               </span>
             )}
             {job.status === "failed" && !failedPrepare && (
@@ -246,7 +263,7 @@ export function SourceForm({
             id="src-file"
             type="file"
             accept={FILE_ACCEPT}
-            disabled={lock || hasReadySource}
+            disabled={lock || hasReadySource || kind === "url"}
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             aria-invalid={!!errors.file}
             aria-describedby="src-file-hint src-file-err"
@@ -268,6 +285,23 @@ export function SourceForm({
           </div>
         </div>
 
+        <fieldset className="flex flex-col gap-2">
+          <legend className="text-body font-medium text-text">원본 방식</legend>
+          <div className="flex flex-wrap gap-4">
+            {(["upload", "url"] as const).map((k) => (
+              <label key={k} className="flex min-h-11 items-center gap-2 text-body text-text">
+                <input type="radio" name="src-kind" value={k} checked={kind === k} disabled={lock} onChange={() => setKind(k)} className="size-5 accent-primary" />
+                {k === "upload" ? "파일 업로드" : "YouTube URL"}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        {kind === "url" && (
+          <Field id="src-url" label="원본 URL" required hint={rights ? "YouTube 주소만(로그인·쿠키가 필요한 영상은 받을 수 없습니다). 받지 못하면 파일 업로드로 진행하세요." : "사용 권한 확인 후 입력할 수 있습니다."} error={errors.url}>
+            <input id="src-url" type="url" inputMode="url" className={INPUT} value={url} maxLength={2048} disabled={lock || !rights} onChange={(e) => setUrl(e.target.value)} aria-invalid={!!errors.url} aria-describedby="src-url-hint src-url-err" placeholder="https://www.youtube.com/watch?v=…" />
+          </Field>
+        )}
+
         <div className="grid gap-4 tablet:grid-cols-2">
           <Field id="src-start" label="원본 시작(초)" required error={errors.start}>
             <input id="src-start" inputMode="decimal" className={INPUT} value={start} disabled={lock} onChange={(e) => setStart(e.target.value)} aria-invalid={!!errors.start} aria-describedby="src-start-err" />
@@ -288,7 +322,6 @@ export function SourceForm({
             </select>
           </Field>
         </div>
-        <p className="text-caption text-text-muted">원본 URL 입력은 아직 지원하지 않습니다. 파일을 업로드하세요.</p>
       </section>
 
       {busy && (

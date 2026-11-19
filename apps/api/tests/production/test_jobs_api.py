@@ -553,11 +553,12 @@ def test_candidate_from_other_workspace_404(api, auth, db):
 
 
 def test_d6_url_source_rejected(api, auth, db):
+    # task-031: URL 원본은 YouTube만(나머지 검사는 test_url_guard.py)
     r = post_job(
         api, auth, source_kind="url", source_url="https://example.com/v", rights_confirmed=True
     )
     assert r.status_code == 400
-    assert r.json()["message"] == "준비 중인 기능입니다."
+    assert r.json()["field"] == "source_url"
     assert db.jobs == []
 
 

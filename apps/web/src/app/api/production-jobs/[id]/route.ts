@@ -1,6 +1,7 @@
 import { patchProductionJob, type PatchProductionJob } from "@/server/api/production";
 import { assertSameOrigin } from "@/server/auth/same-origin";
 import { isUuid } from "@/components/monitoring/query";
+import { URL_ONLY, isYoutubeUrl } from "@/components/production/api";
 import { INVALID, fromApiError, isCredit, isLicense, json, readBody, segmentError } from "../_shared";
 
 // PROD-01 저장 중계(A-09 PATCH). 보낸 필드만 전달한다.
@@ -14,6 +15,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!b) return json(400, INVALID);
 
   const patch: PatchProductionJob = {};
+  // task-031: 원본 방식·URL(1차 검사, 보낸 값과 저장 값의 조합 검사는 API)
+  if ("source_kind" in b) {
+    if (b.source_kind !== "upload" && b.source_kind !== "url") return json(400, { code: "VALIDATION", message: "원본 방식이 올바르지 않습니다.", field: "source_kind" });
+    patch.source_kind = b.source_kind;
+  }
+  if ("source_url" in b) {
+    if (b.source_url !== null && !(typeof b.source_url === "string" && isYoutubeUrl(b.source_url))) return json(400, { code: "VALIDATION", message: URL_ONLY, field: "source_url" });
+    patch.source_url = typeof b.source_url === "string" ? b.source_url.trim() : null;
+  }
   if ("rights_confirmed" in b) {
     if (typeof b.rights_confirmed !== "boolean") return json(400, INVALID);
     patch.rights_confirmed = b.rights_confirmed;

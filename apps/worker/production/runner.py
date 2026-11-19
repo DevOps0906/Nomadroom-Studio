@@ -20,6 +20,7 @@ from production.errors import (
     TaskFailed,
     TransferError,
 )
+from production.fetch_url import fetch_url
 from production.hook_audio import make_hook
 from production.media import Cancel, Media, MediaError
 from production.paths import WorkDir
@@ -137,15 +138,18 @@ def _prepare(
     api: WorkerApi, task: Task, work: WorkDir, media: Media, cancel: Cancel, reporter: Reporter
 ) -> dict:
     reporter.set("download", 0)
-    src = api.inputs(task).get("source_upload")
-    if src is None:
-        raise TaskFailed("prepare", "input_invalid", "원본 업로드 없음")
-    raw = work.path("input.bin")
-    try:
-        _download(api, task, src, raw, cancel)
-    except TransferError as exc:
-        raise TaskFailed("prepare", "download_failed", str(exc)) from None
     start = float(task.source_start_sec or 0.0)
+    if task.source_kind == "url":  # task-031: 로컬 yt-dlp(실패하면 url_unavailable → 업로드 안내)
+        raw = fetch_url(task.source_url, work, cancel, reporter.set, start, task.segment_len_sec)
+    else:
+        src = api.inputs(task).get("source_upload")
+        if src is None:
+            raise TaskFailed("prepare", "input_invalid", "원본 업로드 없음")
+        raw = work.path("input.bin")
+        try:
+            _download(api, task, src, raw, cancel)
+        except TransferError as exc:
+            raise TaskFailed("prepare", "download_failed", str(exc)) from None
     out = prepare(raw, work, start, task.segment_len_sec, media, cancel, reporter.set)
     reporter.set("upload", 0)
     files = [

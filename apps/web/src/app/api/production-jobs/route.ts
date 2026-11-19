@@ -1,6 +1,7 @@
 import { createProductionJob } from "@/server/api/production";
 import { assertSameOrigin } from "@/server/auth/same-origin";
 import { isUuid } from "@/components/monitoring/query";
+import { URL_ONLY, isYoutubeUrl } from "@/components/production/api";
 import { INVALID, fromApiError, isCredit, isLicense, json, readBody, segmentError } from "./_shared";
 
 // PROD-01 작업 생성 중계(A-09 POST). Idempotency-Key는 브라우저가 의도 단위로 만든다.
@@ -18,7 +19,10 @@ export async function POST(request: Request) {
   const title = typeof b.title === "string" ? b.title.trim() : "";
   if (title.length < 1 || title.length > 200) return json(400, { code: "VALIDATION", message: "제목은 1~200자로 입력하세요.", field: "title" });
   if (b.rights_confirmed !== true) return json(400, { code: "VALIDATION", message: "사용 권한을 확인해야 합니다.", field: "rights_confirmed" });
-  if (b.source_kind !== "upload") return json(400, { code: "VALIDATION", message: "원본은 파일 업로드만 지원합니다.", field: "source_kind" });
+  if (b.source_kind !== "upload" && b.source_kind !== "url") return json(400, { code: "VALIDATION", message: "원본 방식이 올바르지 않습니다.", field: "source_kind" });
+  // task-031: URL 원본은 YouTube https만(1차 검사, 정본은 API url_guard). 업로드면 URL 없음.
+  if (b.source_kind === "url" ? !(typeof b.source_url === "string" && isYoutubeUrl(b.source_url)) : b.source_url !== undefined && b.source_url !== null)
+    return json(400, { code: "VALIDATION", message: URL_ONLY, field: "source_url" });
   if (b.candidate_id !== undefined && !isUuid(b.candidate_id)) return json(400, { code: "VALIDATION", message: "잘못된 후보 id입니다." });
   const seg = segmentError(b.source_start_sec, b.segment_len_sec);
   if (seg) return json(400, { code: "VALIDATION", message: seg, field: "segment_len_sec" });
@@ -30,7 +34,8 @@ export async function POST(request: Request) {
         title,
         format: "category",
         candidate_id: b.candidate_id as string | undefined,
-        source_kind: "upload",
+        source_kind: b.source_kind,
+        source_url: b.source_kind === "url" ? (b.source_url as string).trim() : null,
         rights_confirmed: true,
         license_cc: b.license_cc as boolean | null | undefined,
         credit: (b.credit as string | null | undefined) || null,

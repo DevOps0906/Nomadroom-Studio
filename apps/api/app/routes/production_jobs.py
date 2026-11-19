@@ -22,6 +22,7 @@ from app.jobs.state import OFFLINE_AFTER
 from app.production import storage
 from app.production.runs import expire_offline
 from app.production.spec import TOL, validate_spec
+from app.production.url_guard import check_source_url
 from app.routes.collect_jobs import _worker_last_seen
 from app.routes.profiles import _json_list, _send
 from app.routes.verify_runs import _KEY_RE
@@ -478,6 +479,19 @@ def _rights_patch(new: bool, current: bool, user: CurrentUser, now: datetime) ->
     }
 
 
+def _check_url_source(kind: str, url: str | None, rights: bool) -> None:
+    """task-031 G1·G8: url 작업은 권리 확인 + 허용 URL 필수, upload 작업은 URL 없음."""
+    if kind == "url":
+        if not rights:
+            raise ApiError(
+                400, "VALIDATION", "URL 원본은 사용 권한 확인이 필요합니다.", "rights_confirmed"
+            )
+        if url is None:
+            raise ApiError(400, "VALIDATION", "URL을 입력하세요.", "source_url")
+    elif url is not None:
+        raise ApiError(400, "VALIDATION", "업로드 작업에는 URL을 쓰지 않습니다.", "source_url")
+
+
 def _http(request: Request) -> Any:
     return request.app.state.http
 
@@ -505,8 +519,8 @@ async def create_job(
 
     if body.format != "category":
         raise _not_ready_yet("format")  # variety는 task-035, shopping은 task-042
-    if body.source_kind == "url" or body.source_url is not None:
-        raise _not_ready_yet("source_kind")  # D6: URL 원본은 task-031(SSRF)
+    source_url = check_source_url(body.source_url) if body.source_url is not None else None
+    _check_url_source(body.source_kind, source_url, body.rights_confirmed)
     if body.candidate_id is not None:
         found = await _rows(
             request,
@@ -524,6 +538,7 @@ async def create_job(
         "format": body.format,
         "candidate_id": str(body.candidate_id) if body.candidate_id else None,
         "source_kind": body.source_kind,
+        "source_url": source_url,
         "license_cc": body.license_cc,
         "credit": body.credit or None,
         "source_start_sec": body.source_start_sec,
@@ -649,13 +664,23 @@ async def patch_job(
     for name in _PATCH_NOT_NULL:
         if name in sent and getattr(body, name) is None:
             raise ApiError(400, "VALIDATION", "입력값이 올바르지 않습니다.", name)
-    if body.source_kind == "url" or "source_url" in sent:
-        raise _not_ready_yet("source_kind")  # D6
+    url_sent = "source_url" in sent
+    new_url = check_source_url(body.source_url) if body.source_url is not None else None
 
     ws = user.workspace_id
     job = await _get_job(request, ws, job_id)
     if not _is_prepare_state(job):
         raise _state_conflict(job["status"])
+    # 보낸 값과 저장된 값을 합친 최종 상태로 검사(G8: url 작업의 권리 해제 400)
+    kind = body.source_kind if "source_kind" in sent else job["source_kind"]
+    if url_sent:
+        url = new_url
+    elif kind == "upload":
+        url = None  # upload로 바꾸면 남은 URL은 지운다
+    else:
+        url = job.get("source_url")
+    rights = body.rights_confirmed if "rights_confirmed" in sent else job["rights_confirmed"]
+    _check_url_source(kind, url, bool(rights))
 
     data: dict[str, Any] = {}
     for name in ("source_kind", "license_cc", "credit", "source_start_sec", "segment_len_sec"):
@@ -663,6 +688,8 @@ async def patch_job(
             data[name] = getattr(body, name)
     if "credit" in data:
         data["credit"] = data["credit"] or None
+    if url_sent or "source_kind" in sent:
+        data["source_url"] = url
     now = datetime.now(UTC)
     if "rights_confirmed" in sent:
         data.update(
@@ -675,6 +702,7 @@ async def patch_job(
         "workspace_id": f"eq.{ws}",
         "status": f"eq.{job['status']}",
         "rights_confirmed": f"is.{str(bool(job['rights_confirmed'])).lower()}",
+        "source_kind": f"eq.{job['source_kind']}",  # task-031 리뷰: 원본 방식 동시 전환도 409
     }
     if job["status"] == "failed":
         params["failed_stage"] = "eq.prepare"
@@ -860,6 +888,11 @@ async def prepare_job(
     retry = job["status"] == "failed"
     if retry and job["retry_count"] >= MAX_PREPARE_RETRY:
         raise ApiError(409, "CONFLICT", "재시도 횟수를 넘었습니다.")
+    if job["source_kind"] == "url" and not (job["rights_confirmed"] and job.get("source_url")):
+        # task-031 리뷰: URL 원본은 권리 확인 + URL이 있어야 준비 시작(DB check와 이중 방어)
+        raise ApiError(
+            400, "VALIDATION", "URL 원본은 사용 권한 확인이 필요합니다.", "rights_confirmed"
+        )
     if job["source_kind"] == "upload":
         uploads = await _uploads(request, ws, job_id)
         if not any(a["status"] == "ready" for a in uploads):

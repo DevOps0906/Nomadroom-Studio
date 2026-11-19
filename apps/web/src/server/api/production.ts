@@ -16,6 +16,7 @@ export type ProductionJob = {
   error_code: string | null;
   candidate_id: string | null;
   source_kind: "upload" | "url";
+  source_url: string | null;
   rights_confirmed: boolean;
   rights_confirmed_by: string | null;
   rights_confirmed_at: string | null;
@@ -77,7 +78,8 @@ export type CreateProductionJob = {
   title: string;
   format?: "category";
   candidate_id?: string;
-  source_kind: "upload";
+  source_kind: "upload" | "url";
+  source_url?: string | null;
   rights_confirmed: boolean;
   license_cc?: boolean | null;
   credit?: string | null;
@@ -86,7 +88,7 @@ export type CreateProductionJob = {
 };
 
 export type PatchProductionJob = Partial<
-  Pick<CreateProductionJob, "source_kind" | "rights_confirmed" | "license_cc" | "credit" | "source_start_sec" | "segment_len_sec">
+  Pick<CreateProductionJob, "source_kind" | "source_url" | "rights_confirmed" | "license_cc" | "credit" | "source_start_sec" | "segment_len_sec">
 >;
 
 export type UploadKind = "source_upload" | "hook_audio";

@@ -45,6 +45,7 @@ class Task(BaseModel):
     source_start_sec: float | None = None
     segment_len_sec: float | None = None
     source_kind: str | None = None
+    source_url: str | None = None  # task-031: rights_confirmed URL 작업의 prepare만
     spec: dict[str, Any] | None = None
 
 

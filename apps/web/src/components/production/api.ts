@@ -21,11 +21,26 @@ async function call<T>(url: string, method: string, body?: unknown, headers: Rec
   }
 }
 
+// task-031: URL 원본은 YouTube(https)만. 웹(화면·Route Handler) 검사는 1차이고 정본 검사는 API(url_guard)·워커가 한다.
+const YT_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"]);
+export const URL_ONLY = "YouTube 주소(https)만 입력할 수 있습니다. 업로드 작업에는 URL을 쓰지 않습니다.";
+export function isYoutubeUrl(value: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(value.trim());
+  } catch {
+    return false;
+  }
+  return u.protocol === "https:" && YT_HOSTS.has(u.hostname.toLowerCase()) && !u.username && !u.password && (u.port === "" || u.port === "443");
+}
+
 const base = (id: string) => `/api/production-jobs/${encodeURIComponent(id)}`;
 
 export type SaveBody = {
   title?: string;
   candidate_id?: string;
+  source_kind?: "upload" | "url"; // 없으면 upload
+  source_url?: string | null;
   rights_confirmed: boolean;
   license_cc: boolean | null;
   credit: string | null;
@@ -34,7 +49,7 @@ export type SaveBody = {
 };
 
 export const createJob = (body: SaveBody & { title: string }, key: string, f?: typeof fetch) =>
-  call<{ job: { id: string; status: string } }>("/api/production-jobs", "POST", { ...body, format: "category", source_kind: "upload" }, { "Idempotency-Key": key }, f);
+  call<{ job: { id: string; status: string } }>("/api/production-jobs", "POST", { source_kind: "upload", ...body, format: "category" }, { "Idempotency-Key": key }, f);
 
 export const patchJob = (id: string, body: Omit<SaveBody, "title" | "candidate_id">, f?: typeof fetch) =>
   call<{ job: { id: string; status: string } }>(base(id), "PATCH", body, {}, f);

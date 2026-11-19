@@ -32,7 +32,7 @@
 | task-028 | P0 인수 테스트 CAT-01~07 | W4 | 024, 026, 027 | 보통 | tester | 완료 |
 | task-029 | AI 초안 A-14 (Claude) | W5 | 028 | 높음 | builder + tester | 완료 |
 | task-030 | TTS (edge-tts, 워커 전용) | W5 | 028 | 높음 | builder | 완료 |
-| task-031 | URL 원본 (권리 확인 · yt-dlp · SSRF 방지) | W5 | 028 | 높음 | builder + tester | 대기 |
+| task-031 | URL 원본 (권리 확인 · yt-dlp · SSRF 방지) | W5 | 028 | 높음 | builder + tester | 완료 |
 | task-032 | 댓글·출처 오버레이 레이어 | W5 | 028 | 보통 | builder | 완료 |
 | task-033 | P1 인수 테스트 CAT-08 + 회귀 | W5 | 029, 030, 031, 032 | 보통 | tester | 대기 |
 | task-034 | 예능형 편집안 검증 모듈 | W6 | 021, 028 | 보통 | builder + tester | 대기 |
