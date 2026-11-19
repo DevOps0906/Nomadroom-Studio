@@ -1,7 +1,7 @@
 # NOW — 재진입 스냅샷 (30줄 이내, 매 작업 끝에 덮어쓴다)
 
 - 갱신: 2026-11-19
-- 현재 작업: W7 040 완료(8ec2abf), 039 보류(GPL). W8 042·043 완료. 진행 중(병렬): task-044 쇼핑 API(opus, 000023, 로컬 DB 사용) · task-041 예능형 P1 인수(tester, DB·실환경 없이). 다음: 045 쇼핑 렌더러·046 쇼핑 화면 → 047 쇼핑 인수(실환경 종단 포함) → W9 048·054
+- 현재 작업: W7 완료(039 보류), W8 042·043·044(3d46771) 완료. 진행 중(병렬): task-045 쇼핑 렌더러(opus, 000024, 로컬 DB 사용) · task-046 쇼핑 화면(sonnet). 다음: 047 쇼핑 인수(실환경 종단) → W9 048·054. API는 apps/api/.env.local도 읽음(baf6a2d)
 - 단계: W5(P1: 029~033) → W6·W7 예능형(034~041, 브리프 `tasks/plan-variety-shorts.md`, 미결 Q9~Q11) → W8~W10 쇼핑·AI 영상·일본어판(042~054, 브리프 `tasks/plan-shopping-japanese.md`, 미결 Q12~Q16). 카테고리형 브리프 `tasks/plan-category-shorts.md`
 - 다음 한 걸음: `/next` (task-029). 사용자 지시(2026-11-19): W5~W9(029~048·054) 멈추지 말고 연속 진행. Q9~Q16·Claude API 목 전용 결정은 `tasks/plan-*.md#사용자 결정`
 - W4 결과(커밋 7fb183f·b5267ec·634d949·131a458·1f83631·1fc1d2c·a3bfed5 + 028): 제작 API A-09~A-18·워커 API W-05~W-09(000016·000017 RPC), 화면 PROD-00~03, 로컬 제작 워커 `apps/worker`(배포본 이식, 사용자 권리 확인). 결정은 각 task 파일 "착수 결정·구현 결정·리뷰 반영 결정"
@@ -21,7 +21,7 @@
 - 열린 결정: vidIQ 준비 중(수집은 YouTube 검색) · 구간별 폰트 최종값 · Dependabot PR 9건 · GitHub 보안 알림 켜기(사람) · .env.example API_BASE_URL 중복 줄 · nomad-agent-os 미커밋 21파일
 - 커밋 안 된 사용자 수정: AGENTS.md·CLAUDE.md·.claude/rules/db.md(건드리지 않음)
 - SDLC 단계: 06 구현
-- 테스트 상태: supabase test db 495 · api pytest 1043 + integration 13 · web test 445 · worker pytest 308(skip 0)
+- 테스트 상태: supabase test db 524 · api pytest 1149 + integration 13 · web test 445 · worker pytest 308(skip 0)
 
 ## task-033 인수 결과 (2026-11-19, tester) — 상세 `tasks/task-033.md#구현 결정`
 | CAT | 결과 | 근거(실환경=로컬 Supabase+API+워커, 목: Claude·edge-tts·yt-dlp) |
