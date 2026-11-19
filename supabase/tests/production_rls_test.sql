@@ -13,10 +13,10 @@ insert into public.workspaces (id, name) values
   ('cccccccc-0000-4000-8000-000000000002', 'prod-ws-b');
 insert into public.workspace_members (workspace_id, user_id, role) values
   ('cccccccc-0000-4000-8000-000000000001', '33333333-3333-4333-8333-333333333333', 'member');
-insert into public.production_jobs (id, workspace_id, title, segment_len_sec, preset_version) values
-  ('cccccccc-0000-4000-8000-000000000011', 'cccccccc-0000-4000-8000-000000000001', 'job-a1', 60, 'category-v1'),
-  ('cccccccc-0000-4000-8000-000000000012', 'cccccccc-0000-4000-8000-000000000001', 'job-a2', 60, 'category-v1'),
-  ('cccccccc-0000-4000-8000-000000000021', 'cccccccc-0000-4000-8000-000000000002', 'job-b1', 60, 'category-v1');
+insert into public.production_jobs (id, workspace_id, title, segment_len_sec, preset_version, idempotency_key) values
+  ('cccccccc-0000-4000-8000-000000000011', 'cccccccc-0000-4000-8000-000000000001', 'job-a1', 60, 'category-v1', 'pj-a1'),
+  ('cccccccc-0000-4000-8000-000000000012', 'cccccccc-0000-4000-8000-000000000001', 'job-a2', 60, 'category-v1', 'pj-a2'),
+  ('cccccccc-0000-4000-8000-000000000021', 'cccccccc-0000-4000-8000-000000000002', 'job-b1', 60, 'category-v1', 'pj-b1');
 insert into public.edit_revisions (id, workspace_id, job_id, rev_no) values
   ('cccccccc-0000-4000-8000-000000000031', 'cccccccc-0000-4000-8000-000000000001', 'cccccccc-0000-4000-8000-000000000011', 1),
   ('cccccccc-0000-4000-8000-000000000032', 'cccccccc-0000-4000-8000-000000000001', 'cccccccc-0000-4000-8000-000000000012', 1),

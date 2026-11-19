@@ -1,7 +1,7 @@
 # NOW — 재진입 스냅샷 (30줄 이내, 매 작업 끝에 덮어쓴다)
 
 - 갱신: 2026-11-19
-- 현재 작업: task-021 완료 → 다음: task-022 제작 작업 API A-09~A-13·A-17·A-18(높음·opus·challenger 먼저, 선행 020·021 완료) — 상태: 대기
+- 현재 작업: task-022 완료 → 다음: task-023 렌더 요청·W-05~W-09(높음·opus·challenger 먼저). 023 주의: W-07 업로드 서명도 Supabase 고정 2시간(022 D4 실측) · worker_online은 제작 워커 하트비트 필요 · 이후 025→024·026·027→028 연속 진행(사용자 지시)
 - 단계: W4(P0: 020~028) → W5(P1: 029~033). 팀장 브리프·결정 `tasks/plan-category-shorts.md`. 대부분 위험도 높음 → 워커 opus + challenger + code·security
 - 예능형 기획 추가(2026-11-19): W6(P0: 034~038)·W7(P1: 039~041), 카테고리형 W4 뒤. 브리프·결정 `tasks/plan-variety-shorts.md`(D-V1~4·R1~R8), 근거 `docs/research/variety-shorts-zip-analysis.md`. 020·022에 format 칸 선반영. 미결 Q9 글꼴·Q10 whisper·Q11 한도
 - 쇼핑쇼츠·일본어판 기획 추가(2026-11-19): 유형 general(조회수)/shopping(제휴: 상품·여행), 언어 ko/ja 공통. W8 쇼핑 P0(042~047)·W9 AI 대본·AI 영상 연동(048·054)·W10 일본어판(049~053). 브리프 `tasks/plan-shopping-japanese.md`, 근거 `docs/research/shopping-shorts-notion-analysis.md`. AI 영상: quality=힉스필드·economy=그록, 예산 상한·컷 검수 3항목. 미결 Q12~Q16
@@ -27,4 +27,4 @@
 - 열린 결정: vidIQ는 구현 안 함·준비 중(2026-11-17 사용자 결정: 후보 수집은 YouTube 검색 = task-019) · 구간별 폰트 최종값 · Dependabot PR 9건(TS 7은 ci 실패) · GitHub Dependabot alerts·비공개 신고 켜기(사람) · 미확인 방송사 채널(tvN 본채널·SBS NOW·NHK 뉴스·CJ ENM 계열) · .env.example의 API_BASE_URL 중복 줄(사람 확인) · nomad-agent-os 미커밋 변경 21파일
 - 커밋 안 된 사용자 수정: AGENTS.md·CLAUDE.md·.claude/rules/db.md(건드리지 않음)
 - SDLC 단계: 06 구현
-- 테스트 상태: supabase test db 311 · api pytest 563 + integration 13 · web test 274 · E2E는 scratchpad(미커밋)
+- 테스트 상태: supabase test db 346 · api pytest 618 + integration 13 · web test 274 · E2E는 scratchpad(미커밋)

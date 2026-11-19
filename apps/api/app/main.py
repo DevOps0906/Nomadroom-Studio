@@ -17,6 +17,7 @@ from app.routes import (
     candidates_used,
     collect_jobs,
     dashboard,
+    production_jobs,
     profiles,
     verify_runs,
     worker,
@@ -58,6 +59,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(dashboard.router)
     app.include_router(verify_runs.router)
     app.include_router(collect_jobs.router)
+    app.include_router(production_jobs.router)
     app.include_router(worker.router)
     app.add_middleware(worker.WorkerBodyLimit)
 
