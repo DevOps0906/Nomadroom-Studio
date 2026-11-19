@@ -15,6 +15,7 @@ import {
   toHref,
   type CandidateQuery,
 } from "./query";
+import { candidateHref } from "@/components/production/format";
 import { FiltersDisclosure } from "./filters-disclosure";
 import { safeThumbnailUrl } from "./thumbnail";
 import { UsedToggle } from "./UsedToggle";
@@ -236,6 +237,12 @@ export function CandidateCard({ item, opsUrl }: { item: CandidateItem; opsUrl: s
       <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-1">
         <EvidenceButton candidateId={item.id} title={item.title} opsUrl={opsUrl} />
         <UsedToggle candidateId={item.id} used={item.used} />
+        <Link
+          href={candidateHref(item)}
+          className={cn("inline-flex min-h-11 items-center rounded-control border border-border bg-surface px-3 text-body font-semibold text-text hover:bg-surface-alt", FOCUS)}
+        >
+          내부 제작
+        </Link>
         {item.status === "producible" && opsUrl && (
           <a
             href={opsUrl}

@@ -21,3 +21,13 @@
 ## 완료 조건 (실행 가능한 확인)
 - [ ] `pnpm typecheck && pnpm lint && pnpm test` 통과(상태별 렌더·타 Origin 403 테스트 포함)
 - [ ] hex·px 직접 사용 0건(`grep -rnE "#[0-9a-fA-F]{6}|[0-9]px" apps/web/src/components/production`)
+
+## 구현 결정
+- 목록(PROD-00)은 서버 컴포넌트 + Suspense(스켈레톤), 상태 필터·페이지는 쿼리(`status`·`page`, 20건). 열은 제목·형식·상태(+실패 단계·코드)·수정 시각. 유형·언어·원본·최근 리비전 열과 검색·"제작 시작" 모달은 API 미구현(kind·lang·vertical·langs[], task-042·049) 또는 task-037 범위라 뺐다.
+- PROD-01은 `/production/new`(생성 전)와 `/production/[id]/source`(생성 후) 같은 폼. "원본 준비 시작" = 생성 또는 PATCH → 업로드 서명(A-10) → 브라우저가 서명 URL로 PUT → complete → prepare(A-11). "저장"은 생성/PATCH만. 생성 키는 `createIntentKey`(본문 지문 단위, 전송 실패 시 유지).
+- Route Handler 5개(`/api/production-jobs`, `[id]`, `[id]/uploads`, `[id]/uploads/[assetId]/complete`, `[id]/prepare`) 모두 첫 줄 `assertSameOrigin`, 응답은 id·status만(upload_url만 예외, no-store). 400·409·429는 API 문구 전달, 404는 일반 문구.
+- 준비 중에는 3초마다 `router.refresh()`. 형식은 카테고리형 고정(예능형 옵션은 비활성 "준비 중"), URL 원본은 안내문만.
+- MON-01 카드에 "내부 제작"(`/production/new?candidate_id&title&license`) 추가, "영상 만들기 →" 유지. 후보 원본 URL은 A-04 응답에 없어 전달하지 않았다.
+- 미구현·후속: 출처 URL 입력(A-09에 필드 없음), 원본 미리보기 player(A-18 다운로드 URL 필요), 사이드바 "제작·업로드"는 외부 링크 항목이라 그대로(PROD-00 진입 링크는 팀장 결정).
+- task-026·027이 /production/[id]·/production/[id]/edit 라우트를 만들 때까지 이 링크들은 임시 404다.
+- 제목은 A-09 PATCH에 없어 작업 생성 후(또는 생성 직후) 읽기 전용으로 잠근다.
