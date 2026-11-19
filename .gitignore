@@ -22,3 +22,6 @@ next-env.d.ts
 worker-profile/
 .chrome-profile/
 **/chrome-profile/
+
+# 에이전트 git worktree
+.claude/worktrees/
