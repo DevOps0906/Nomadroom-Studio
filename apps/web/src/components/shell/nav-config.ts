@@ -23,6 +23,7 @@ export const NAV: NavEntry[] = [
   },
   { key: "topic", label: "주제 발굴", icon: "search" },
   { key: "make", label: "제작·업로드", icon: "clapper" },
+  { key: "production", label: "제작", href: "/production", icon: "clapper" },
   { key: "diag", label: "진단 · 채널 관리", icon: "stethoscope" },
   { key: "learn", label: "배우기", icon: "book" },
 ];

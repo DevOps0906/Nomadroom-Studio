@@ -173,3 +173,21 @@ export function getProductionDownloadUrl(id: string, assetId: string) {
     `${jobPath(id)}/assets/${encodeURIComponent(assetId)}/download-url`,
   );
 }
+
+export type RenderRun = { id: string; status: "queued" | "running" | "done" | "failed"; attempt: number };
+
+/** A-15 렌더 요청(승인본·언어). 같은 키 재요청은 200 + 기존 run. */
+export async function requestProductionRender(id: string, revisionId: string, lang: "ko", idempotencyKey: string): Promise<RenderRun> {
+  const res = await apiFetch<{ render_run: RenderRun }>(`${jobPath(id)}/render-runs`, {
+    method: "POST",
+    body: { revision_id: revisionId, lang },
+    idempotencyKey,
+  });
+  return res.render_run;
+}
+
+/** A-16 실패 run 재시도(새 run, attempt+1). */
+export async function retryProductionRender(id: string, runId: string): Promise<RenderRun> {
+  const res = await apiFetch<{ render_run: RenderRun }>(`${jobPath(id)}/render-runs/${encodeURIComponent(runId)}/retry`, { method: "POST" });
+  return res.render_run;
+}
