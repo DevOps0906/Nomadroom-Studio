@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from production.adapter import PRESET_VERSION, to_project
+from production.adapter_variety import PRESET_VERSION as VARIETY_PRESET
+from production.adapter_variety import to_variety_project
 from production.api import SignedUrl, Task, UrlRejected, WorkerApi
 from production.config import TtsSettings
 from production.errors import (
@@ -27,6 +29,7 @@ from production.paths import WorkDir
 from production.prepare import prepare
 from production.render import CAPTION_FONT, TITLE_FONT, render
 from production.tts import TtsFailed, synthesize
+from production.variety.render import render_variety
 
 logger = logging.getLogger("nomadroom.worker.production")
 
@@ -178,6 +181,8 @@ def _render(
     reporter: Reporter,
     tts_cfg: TtsSettings,
 ) -> dict:
+    if task.format == "variety":  # W1: 형식 분기(preset·lang 확인은 형식별로 각 함수 안에서)
+        return _render_variety(api, task, work, media, cancel, reporter)
     if task.preset_version != PRESET_VERSION:  # F9
         raise RenderFailed("preset_version 불일치")
     if task.format != "category":
@@ -249,6 +254,75 @@ def _render(
         {"kind": "output_mp4", "path": output, "mime": "video/mp4", "duration": result["duration"]},
         {"kind": "report", "path": report, "mime": "application/json"},
         {"kind": "hook_audio", "path": hook_wav, "mime": "audio/wav", "duration": hook_duration},
+    ]
+    try:
+        ids = _upload_all(api, task, files, reporter, cancel)
+    except TransferError as exc:
+        raise RenderFailed(str(exc)) from None
+    return {"status": "done", "asset_ids": ids}
+
+
+def _render_variety(
+    api: WorkerApi, task: Task, work: WorkDir, media: Media, cancel: Cancel, reporter: Reporter
+) -> dict:
+    """예능형 렌더(task-036). 입력은 source만(훅 음성 없음), 산출물은 output_mp4·report."""
+    if task.preset_version != VARIETY_PRESET:  # F9
+        raise RenderFailed("preset_version 불일치")
+    if task.lang != "ko":
+        raise RenderFailed("지원하지 않는 언어")
+    reporter.set("download", 0)
+    inputs = api.inputs(task)
+    if "source" not in inputs:
+        raise RenderFailed("source 없음")
+    source = work.path("source.mp4")
+    try:
+        src_used = _download(api, task, inputs["source"], source, cancel)
+    except TransferError as exc:
+        raise RenderFailed(str(exc)) from None
+    try:
+        source_meta = media.probe(source, cancel)
+    except MediaError:
+        raise RenderFailed("source를 읽을 수 없음") from None
+    if source_meta["demuxer"] != "mov" or not source_meta["has_video"]:
+        raise RenderFailed("source 형식 오류")
+    project = to_variety_project(task.spec, task.lang, source_meta)  # W6·W3 재검증
+    work.path("variety_project.json").write_text(
+        json.dumps(project, ensure_ascii=False), encoding="utf-8"
+    )
+    output = work.path("result_ko.mp4")
+    result = render_variety(project, source, source_meta, output, media, cancel, reporter.set)
+    report = work.path("report.json")
+    report.write_text(
+        json.dumps(
+            {
+                "output": "result_ko.mp4",
+                "format": "variety",
+                **result,
+                "preset_version": VARIETY_PRESET,
+                "source_asset_id": str(src_used.asset_id),
+                "cut_count": len(project["cuts"]),
+                "cuts": [
+                    {
+                        "out_start": round(c["out_start"], 3),
+                        "src_start": round(c["src_start"], 3),
+                        "length": round(c["src_end"] - c["src_start"], 3),
+                        "frames": c["frames"],
+                    }
+                    for c in project["cuts"]
+                ],
+                # W8: 예제 글꼴(Cafe24 Ohsquare·잘난체)은 라이선스 근거 없음 → Pretendard 대체
+                "font_substituted": True,
+                "review_required": "Watch final video and inspect every cut before delivery.",
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    reporter.set("upload", 0)
+    files = [
+        {"kind": "output_mp4", "path": output, "mime": "video/mp4", "duration": result["duration"]},
+        {"kind": "report", "path": report, "mime": "application/json"},
     ]
     try:
         ids = _upload_all(api, task, files, reporter, cancel)

@@ -166,3 +166,36 @@ def test_subtitle_short_tolerance_and_max_end_overlap():
         "subtitles.1",
         "subtitles.2",
     ]
+
+
+# === task-036 리뷰 반영: 줄 수 상한·비BMP 문자 거부(스키마 오류) ===================
+
+
+def test_text_line_cap_three_lines():
+    for field_name in ("subtitles", "reactions"):
+        ok = good()
+        ok[field_name][0]["text"] = "하나\n둘\r\n셋"
+        assert run(ok)["errors"] == []
+        for bad in (
+            "a" + "\n" * 198,
+            "하나\n둘\n셋\n넷",
+            "하나\r둘\r셋\r넷",
+            "하나\r\n둘\r\n셋\r\n넷",
+        ):
+            s = good()
+            s[field_name][0]["text"] = bad
+            assert codes(run(s)) == ["schema.value_error"], (field_name, bad)
+
+
+def test_non_bmp_chars_rejected():
+    emoji = "웃음 " + chr(0x1F602)
+    for path in ("header", "subtitles", "reactions"):
+        s = good()
+        if path == "header":
+            s["header"]["lines"][0] = emoji
+        else:
+            s[path][0]["text"] = emoji
+        assert codes(run(s)) == ["schema.value_error"], path
+    s = good()
+    s["subtitles"][0]["text"] = "관상 " + chr(0x89C0) + chr(0x76F8)  # BMP 한자는 허용
+    assert run(s)["errors"] == []

@@ -51,8 +51,11 @@ def _envelope(body: object) -> tuple[RenderRunEnvelope, bool]:
     )
 
 
-async def _require_category(request: Request, user: CurrentUser, job_id: uuid.UUID) -> None:
-    """task-035 V2: 예능형 렌더러(task-036) 전까지 렌더 요청·재시도 409. 없는 작업은 404."""
+RENDER_FORMATS = ("category", "variety")  # task-036: 예능형 렌더러 연결
+
+
+async def _require_render_format(request: Request, user: CurrentUser, job_id: uuid.UUID) -> None:
+    """렌더러가 없는 형식(shopping 등)은 렌더 요청·재시도 409. 없는 작업은 404."""
     jobs = _json_list(
         await _send(
             request,
@@ -69,7 +72,7 @@ async def _require_category(request: Request, user: CurrentUser, job_id: uuid.UU
     )
     if not jobs:
         raise not_found()
-    if jobs[0]["format"] != "category":
+    if jobs[0]["format"] not in RENDER_FORMATS:
         raise ApiError(409, "CONFLICT", "이 형식의 렌더는 아직 준비 중입니다.", "format")
 
 
@@ -87,7 +90,7 @@ async def request_render(
     if body.lang == "ja":
         # E8: 일본어 렌더는 task-049 전까지 준비 중
         raise ApiError(400, "VALIDATION", "준비 중인 기능입니다.", "lang")
-    await _require_category(request, user, job_id)  # task-035 V2
+    await _require_render_format(request, user, job_id)  # task-035 V2·task-036
     await runs.expire_offline(request, user.workspace_id)  # E3
     out, created = _envelope(
         await runs.rpc(
@@ -120,7 +123,7 @@ async def retry_render(
     request: Request,
     user: CurrentUser = Depends(get_current_user),
 ) -> RenderRunEnvelope:
-    await _require_category(request, user, job_id)  # task-035 V2
+    await _require_render_format(request, user, job_id)  # task-035 V2·task-036
     await runs.expire_offline(request, user.workspace_id)  # E3
     out, _ = _envelope(
         await runs.rpc(

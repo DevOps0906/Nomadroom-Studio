@@ -62,6 +62,7 @@ project.json 열은 배포본 규격 사본 `research/category-shorts-ref/projec
 - 경로·URL 문자열 필드 금지(자산은 ID만, 위반 400 `VALIDATION`)는 카테고리형과 같다. 렌더 어댑터가 승인 리비전을 `variety_project.json`(Nomadroom 자체 형식, CapCut 읽기·쓰기 없음)으로 변환한다. 코드는 서버 검증 코드이고 렌더 실패 코드는 `04_API.md` W-09.
 - 리포트(`report`): 해상도·길이·오디오 유무·컷 수·컷별(출력 시작·원본 시작·길이)·사용 글꼴과 대체 여부.
 - 글꼴(Cafe24 Ohsquare·잘난체)은 라이선스 확인 전(`01_PRD.md#7` Q9, 미확인). 실패 시 Pretendard Black(OFL)로 대체하고 리포트에 기록.
+- 렌더 프리셋 `variety-1080-v1` 상수(task-036, 워커 `production/variety/text.py`·`adapter_variety.py`, 분석 #3 실측 + 가정): 제목 Pretendard-Black 76px(자동 축소 최소 24) 빨강 `#E8202A`+흰 테두리 6px, 2줄 중심 y 370·454(1줄 412) · 대사 자막 알약 중심 y 1240, `line` 52px 흰 글자+검정(알파 230) · `punch` 60px 흰 글자+빨강, 안쪽 여백 28×16 · 반응 자막 48px 빨강+흰 테두리 5px, 중심 (x, y)를 캔버스 안으로 당김 · 문구 최대 폭 1000px(넘으면 `text_too_long`) · 컷 경계 = 누적 출력 시각×30 반올림 프레임, 소리도 같은 경계(1프레임 = 1600샘플@48kHz) · 음량 loudnorm I=-14 · H.264 CRF 18(medium)/AAC 192k.
 
 ### 쇼핑·일본어판 확장 (흐름 `02b_PRODUCTION_FLOW.md#유형-분기`) {#쇼핑-확장}
 위 제작 테이블 행의 의미는 바꾸지 않고 컬럼·규칙만 더한다. 수치는 모두 가정.

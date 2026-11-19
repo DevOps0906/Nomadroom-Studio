@@ -36,6 +36,7 @@ MAX_SUBTITLES = 200
 MAX_REACTIONS = 200
 MAX_HEADER_LINE_CHARS = 60
 MAX_TEXT_CHARS = 200
+MAX_TEXT_LINES = 3  # task-036 리뷰 반영(가정): 자막·반응 문구 줄 수 상한
 # 제어·보이지 않는 문자 거부: C0(LF·CR 제외, header.invalid가 따로 판정)·DEL·C1·제로폭·
 # 방향 표시/제어·BOM·줄/문단 구분(U+2028·U+2029). task-035 리뷰 반영
 _CONTROL = re.compile(
@@ -51,10 +52,33 @@ def _no_control(v: str) -> str:
     return v
 
 
+def _bmp_only(v: str) -> str:
+    """task-036 리뷰 반영: U+10000 이상(이모지 등)은 렌더 글꼴에 없어 승인 전에 거부."""
+    if any(ord(ch) > 0xFFFF for ch in v):
+        raise ValueError("이모지 등 지원하지 않는 문자는 사용할 수 없습니다")
+    return v
+
+
+def _max_lines(v: str) -> str:
+    """task-036 리뷰 반영: 자막·반응 문구는 최대 MAX_TEXT_LINES줄(CRLF·CR은 LF로 센다)."""
+    if v.replace("\r\n", "\n").replace("\r", "\n").count("\n") >= MAX_TEXT_LINES:
+        raise ValueError(f"문구는 최대 {MAX_TEXT_LINES}줄입니다")
+    return v
+
+
 _HeaderLine = Annotated[
-    str, StringConstraints(max_length=MAX_HEADER_LINE_CHARS), AfterValidator(_no_control)
+    str,
+    StringConstraints(max_length=MAX_HEADER_LINE_CHARS),
+    AfterValidator(_no_control),
+    AfterValidator(_bmp_only),
 ]
-_Text = Annotated[str, StringConstraints(max_length=MAX_TEXT_CHARS), AfterValidator(_no_control)]
+_Text = Annotated[
+    str,
+    StringConstraints(max_length=MAX_TEXT_CHARS),
+    AfterValidator(_no_control),
+    AfterValidator(_bmp_only),
+    AfterValidator(_max_lines),
+]
 
 
 class _M(BaseModel):
