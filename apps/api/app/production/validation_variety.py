@@ -134,6 +134,7 @@ def validate_for_format(
     segment_len: float | None = None,
     source_size: tuple[float, float] | None = None,
     job_lang: str | None = None,
+    assets: Any = None,
 ) -> dict[str, list[dict[str, str]]]:
     """format(`category`·`variety`)으로 검증 모듈을 고른다. 모르는 format은 오류."""
     if fmt == "category":
@@ -142,6 +143,15 @@ def validate_for_format(
         return validate_variety_spec(
             raw, segment_len=segment_len, source_size=source_size, job_lang=job_lang
         )
+    if (
+        fmt == "shopping"
+    ):  # 순환 import 회피용 지연 import. 자산 검사는 validate_shopping_spec 직접 호출
+        from app.production.validation_shopping import validate_shopping_spec
+
+        if assets is None:  # fail-closed: 자산 없이는 통과시키지 않는다
+            msg = "쇼핑 검증은 이 작업 소유 자산 정보가 필요합니다."
+            return {"errors": [_e("assets.required", "", msg)], "warnings": []}
+        return validate_shopping_spec(raw, assets=assets, job_lang=job_lang)
     return {"errors": [_e("format.unknown", "", "알 수 없는 format입니다.")], "warnings": []}
 
 
