@@ -2,7 +2,7 @@
 -- 근거: tasks/task-029.md#착수-결정 H1·H2·H3
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(30);
+select plan(34);
 
 insert into auth.users (id, email, aud, role) values
   ('66666666-6666-4666-8666-666666666666', 'prod-ai@test.local', 'authenticated', 'authenticated');
@@ -17,9 +17,12 @@ insert into public.production_jobs
   ('eeeeeeee-0000-4000-8000-000000000012', 'eeeeeeee-0000-4000-8000-000000000001', 'j12', 'category', 60, 'category-1080-v1', 'k12', 'inspect', 0),
   ('eeeeeeee-0000-4000-8000-000000000013', 'eeeeeeee-0000-4000-8000-000000000001', 'j13', 'variety', 60, 'variety-1080-v1', 'k13', 'review', 0),
   ('eeeeeeee-0000-4000-8000-000000000014', 'eeeeeeee-0000-4000-8000-000000000001', 'j14', 'category', 60, 'category-1080-v1', 'k14', 'review', 3),
-  ('eeeeeeee-0000-4000-8000-000000000015', 'eeeeeeee-0000-4000-8000-000000000001', 'j15', 'category', 60, 'category-1080-v1', 'k15', 'review', 0);
+  ('eeeeeeee-0000-4000-8000-000000000015', 'eeeeeeee-0000-4000-8000-000000000001', 'j15', 'category', 60, 'category-1080-v1', 'k15', 'review', 0),
+  ('eeeeeeee-0000-4000-8000-000000000016', 'eeeeeeee-0000-4000-8000-000000000001', 'j16', 'category', 60, 'category-1080-v1', 'k16', 'review', 0),
+  ('eeeeeeee-0000-4000-8000-000000000017', 'eeeeeeee-0000-4000-8000-000000000001', 'j17', 'category', 60, 'category-1080-v1', 'k17', 'review', 0);
 insert into public.edit_revisions (id, workspace_id, job_id, rev_no, spec, approved_at) values
-  ('eeeeeeee-0000-4000-8000-000000000031', 'eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000011', 1, '{"user": "edit"}', null);
+  ('eeeeeeee-0000-4000-8000-000000000031', 'eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000011', 1, '{"user": "edit"}', null),
+  ('eeeeeeee-0000-4000-8000-000000000037', 'eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000017', 1, '{"user": "edit"}', null);
 update public.production_jobs j set current_revision_id = r.id
   from public.edit_revisions r where r.job_id = j.id;
 
@@ -119,6 +122,28 @@ select is((select ai_draft_count from public.production_jobs where id = 'eeeeeee
 -- 7. 같은 키 재요청은 60초 간격 검사보다 먼저(기존 결과 200)
 select is((select ai_draft_count from public.production_jobs where id = 'eeeeeeee-0000-4000-8000-000000000014'),
   3, '상한 거부는 횟수 그대로');
+
+-- 8. 5분 넘은 pending은 같은 키 재요청 때 failed로 확정(영구 409 방지)
+select lives_ok(
+  $$select public.reserve_ai_draft('eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000016',
+    '66666666-6666-4666-8666-666666666666', 'ai-8', 3)$$, '작업 16 예약');
+update public.production_jobs
+  set ai_draft_requests = jsonb_set(ai_draft_requests, '{0,created_at}', to_jsonb(now() - interval '10 minutes'))
+  where id = 'eeeeeeee-0000-4000-8000-000000000016';
+select is(
+  public.reserve_ai_draft('eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000016',
+    '66666666-6666-4666-8666-666666666666', 'ai-8', 3) ->> 'request_status', 'failed', '오래된 pending 재요청: failed');
+
+-- 9. 호출 중 사용자가 현재 리비전을 저장하면 AI 리비전 생성 거부(NR010), 현재 리비전 유지
+select lives_ok(
+  $$select public.reserve_ai_draft('eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000017',
+    '66666666-6666-4666-8666-666666666666', 'ai-9', 3)$$, '작업 17 예약');
+update public.edit_revisions set spec = '{"user": "saved during call"}', updated_at = now() + interval '1 second'
+  where id = 'eeeeeeee-0000-4000-8000-000000000037';
+select throws_ok(
+  $$select public.create_ai_draft_revision('eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000017',
+    '66666666-6666-4666-8666-666666666666', 'ai-9', '{"ai": true}', '{"errors": [], "warnings": []}')$$,
+  'NR010', null, '기준 리비전이 바뀌면 NR010');
 
 select * from finish();
 rollback;

@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 // task-029 AI 초안 중계(A-14) Route Handler + PROD-02 "AI 초안 채우기" 버튼·브라우저 호출.
 
-const h = vi.hoisted(() => ({ calls: [] as string[], fail: null as number | null }));
+const h = vi.hoisted(() => ({ calls: [] as string[], fail: null as number | null, replay: false }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/supabase/client", () => ({ createServerSupabase: vi.fn() }));
 
@@ -16,6 +16,7 @@ vi.mock("@/server/api/production", () => ({
       revision: { id: "r2", rev_no: 2, spec: { lang: "ko" }, origin: "ai_draft", validation: { errors: [], warnings: [] }, approved_at: null, secret: "x" },
       ai_draft_count: 1,
       previous_rev_no: 1,
+      replay: h.replay,
       secret: "x",
     };
   },
@@ -41,6 +42,7 @@ describe("A-14 AI 초안 중계", () => {
     vi.stubEnv("APP_ORIGIN", ORIGIN);
     h.calls = [];
     h.fail = null;
+    h.replay = false;
   });
 
   it.each([["https://evil.com"], [null]])("Origin이 다르거나 없으면 403, API 호출 없음: %s", async (origin) => {
@@ -54,9 +56,9 @@ describe("A-14 AI 초안 중계", () => {
     expect(h.calls).toHaveLength(0);
   });
 
-  it("성공: 키 전달·no-store·필요 필드만", async () => {
+  it("성공: 키 전달·no-store·필요 필드만(새 초안 201)", async () => {
     const res = await route.POST(req(), ctx);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     expect(res.headers.get("cache-control")).toBe("no-store");
     const body = await res.json();
     expect(h.calls).toEqual([`ai:${ID}:${KEY}`]);
@@ -64,6 +66,11 @@ describe("A-14 AI 초안 중계", () => {
     expect(body.revision.approved_at).toBeNull();
     expect(body.previous_rev_no).toBe(1);
     expect(JSON.stringify(body)).not.toContain("secret");
+  });
+
+  it("같은 키 재요청은 FastAPI처럼 200", async () => {
+    h.replay = true;
+    expect((await route.POST(req(), ctx)).status).toBe(200);
   });
 
   it("429는 API 문구 그대로, 502는 고정 문구(업스트림 사유 숨김)", async () => {

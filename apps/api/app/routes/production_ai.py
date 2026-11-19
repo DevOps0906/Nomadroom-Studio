@@ -40,6 +40,15 @@ class AiDraftOut(BaseModel):
     revision: RevisionOut
     ai_draft_count: int
     previous_rev_no: int | None
+    replay: bool  # 같은 키 재요청(200)이면 true. 웹 중계가 상태 코드를 그대로 옮기는 데 쓴다
+
+
+async def _fail(request: Request, ids: dict) -> None:
+    """실패 기록(정리용). 여기서 난 오류는 로그(예외 이름만)로 남기고 원래 오류를 살린다."""
+    try:
+        await _rpc(request, "fail_ai_draft", ids)
+    except Exception as exc:  # noqa: BLE001 - 정리 실패가 원래 오류를 가리면 안 된다
+        logger.warning("AI 초안 실패 기록 실패: job=%s err=%s", ids["p_job"], type(exc).__name__)
 
 
 async def _rpc(request: Request, name: str, payload: dict) -> Any:
@@ -77,6 +86,7 @@ def _out(result: Any) -> AiDraftOut:
         revision=RevisionOut.model_validate(result["revision"]),
         ai_draft_count=result["ai_draft_count"],
         previous_rev_no=result.get("previous_rev_no"),
+        replay=bool(result.get("replay")),
     )
 
 
@@ -233,11 +243,11 @@ async def create_ai_draft(
     try:
         spec, validation = await _draft(request, ws, job)
     except ai_draft.DraftFailed as exc:
-        await _rpc(request, "fail_ai_draft", ids)
+        await _fail(request, ids)
         logger.warning("AI 초안 실패: job=%s reason=%s", job_id, exc)
         raise ai_draft.upstream_failed() from None
     except Exception:
-        await _rpc(request, "fail_ai_draft", ids)
+        await _fail(request, ids)
         raise
     try:
         created = await _rpc(
@@ -247,7 +257,7 @@ async def create_ai_draft(
         )
     except ApiError:
         # 호출 사이에 상태가 바뀐 경우 등: 요청을 pending으로 남기지 않는다
-        await _rpc(request, "fail_ai_draft", ids)
+        await _fail(request, ids)
         raise
     out = _out(created)
     logger.info(

@@ -90,6 +90,7 @@ def no_network(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 class AiDB(FakeDB):
     blobs: dict[str, bytes] = field(default_factory=dict)
     storage_gets: list[str] = field(default_factory=list)
+    fail_broken: bool = False
 
     def _req(self, j: dict, key: str) -> dict | None:
         return next((e for e in j.setdefault("ai_draft_requests", []) if e["key"] == key), None)
@@ -120,7 +121,10 @@ class AiDB(FakeDB):
         req = self._req(j, body["p_key"])
         if req is not None:
             if req["status"] == "pending":
-                return _rpc_error("NR018")
+                stale = datetime.now(UTC) - timedelta(minutes=5)
+                if datetime.fromisoformat(req["created_at"]) > stale:
+                    return _rpc_error("NR018")
+                req["status"] = "failed"  # 5분 넘은 pending은 실패로 확정
             return self._json(j, req, True)
         if any(
             o is not j and o["workspace_id"] == j["workspace_id"] and self._req(o, body["p_key"])
@@ -139,6 +143,8 @@ class AiDB(FakeDB):
             "key": body["p_key"],
             "status": "pending",
             "base_rev_no": base["rev_no"] if base else None,
+            "base_revision_id": base["id"] if base else None,
+            "base_updated_at": base["updated_at"] if base else None,
             "revision_id": None,
             "created_at": _now(),
         }
@@ -153,6 +159,11 @@ class AiDB(FakeDB):
             return _rpc_error("NR009")
         req = self._req(j, body["p_key"])
         if req is None or req["status"] != "pending" or j["status"] != "review":
+            return _rpc_error("NR010")
+        cur = next((r for r in self.revisions if r["id"] == j["current_revision_id"]), None)
+        if j["current_revision_id"] != req["base_revision_id"] or (
+            cur is not None and cur["updated_at"] != req["base_updated_at"]
+        ):
             return _rpc_error("NR010")
         rev = {
             "id": str(uuid.uuid4()),
@@ -180,6 +191,8 @@ class AiDB(FakeDB):
 
     def fail(self, body: dict) -> httpx.Response:
         self.rpc_calls.append("fail")
+        if self.fail_broken:
+            return httpx.Response(500, json={"message": "db down"})
         j = self._locked_job(body)
         req = self._req(j, body["p_key"]) if j else None
         if req is not None and req["status"] == "pending":
@@ -390,6 +403,7 @@ def test_same_key_returns_existing_without_new_call(api, auth, db, claude):
     first = post(api, auth, job)
     again = post(api, auth, job)
     assert first.status_code == 201 and again.status_code == 200
+    assert first.json()["replay"] is False and again.json()["replay"] is True
     assert again.json()["revision"]["id"] == first.json()["revision"]["id"]
     assert again.json()["ai_draft_count"] == 1
     assert len(claude.calls) == 1 and job["ai_draft_count"] == 1
@@ -561,3 +575,70 @@ def test_unpatched_sdk_cannot_reach_network(api, auth, db, claude, monkeypatch):
     r = post(api, auth, job)
     assert r.status_code == 502
     assert blocked and all("anthropic" in h for h in blocked)
+
+
+# --- 리뷰 반영(task-029) ---------------------------------------------------------
+
+
+def test_stale_pending_same_key_becomes_failed_not_409(api, auth, db, claude):
+    job, _ = ready_job(db)
+    old = (datetime.now(UTC) - timedelta(minutes=10)).isoformat()
+    job["ai_draft_requests"] = [
+        {
+            "key": "stuck",
+            "status": "pending",
+            "base_rev_no": 1,
+            "revision_id": None,
+            "base_revision_id": None,
+            "base_updated_at": None,
+            "created_at": old,
+        }
+    ]
+    r = post(api, auth, job, "stuck")
+    assert r.status_code == 502  # 기존 결과(실패), 영구 409 아님
+    assert job["ai_draft_requests"][0]["status"] == "failed"
+    assert claude.calls == []
+
+
+def test_fresh_pending_same_key_409(api, auth, db, claude):
+    job, _ = ready_job(db)
+    job["ai_draft_requests"] = [
+        {
+            "key": "busy",
+            "status": "pending",
+            "base_rev_no": 1,
+            "revision_id": None,
+            "base_revision_id": None,
+            "base_updated_at": None,
+            "created_at": _now(),
+        }
+    ]
+    assert post(api, auth, job, "busy").status_code == 409
+
+
+def test_user_save_during_call_rejects_ai_revision(api, auth, db, claude, monkeypatch):
+    job, rev1 = ready_job(db)
+    revs = len(db.revisions)
+
+    async def user_saves(_self: Any, **kwargs: Any) -> Any:
+        claude.calls.append(kwargs)
+        rev1["spec"] = {"user": "saved during call"}
+        rev1["updated_at"] = _now()  # 같은 행 갱신(미승인 리비전 저장)
+        return tool_response(ai_output())
+
+    monkeypatch.setattr(AsyncMessages, "create", user_saves)
+    r = post(api, auth, job)
+    assert r.status_code == 409
+    assert len(db.revisions) == revs and job["current_revision_id"] == rev1["id"]
+    assert job["ai_draft_requests"][0]["status"] == "failed"
+
+
+def test_fail_cleanup_error_keeps_original_502(api, auth, db, claude, caplog):
+    claude.replies = [tool_response({"bad": 1})]
+    db.fail_broken = True
+    job, _ = ready_job(db)
+    with caplog.at_level(logging.WARNING):
+        r = post(api, auth, job)
+    assert r.status_code == 502 and r.json()["code"] == "UPSTREAM_ERROR"
+    assert "AI 초안 실패 기록 실패" in caplog.text and "ApiError" in caplog.text
+    assert "db down" not in caplog.text

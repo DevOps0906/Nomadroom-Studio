@@ -3,10 +3,11 @@
 -- 흐름: API가 reserve_ai_draft(잠금·검사·횟수+1·키 기록) 커밋 → 잠금 없이 Claude 호출 →
 --       성공은 create_ai_draft_revision, 실패는 fail_ai_draft. 횟수는 성공·실패 모두 센다.
 -- 멱등 키는 새 테이블 대신 작업 행의 ai_draft_requests(jsonb 배열, 작업당 상한 3건)에 둔다.
--- 원소: {key, status(pending·done·failed), base_rev_no, revision_id, created_at}.
+-- 원소: {key, status(pending·done·failed), base_rev_no, base_revision_id, base_updated_at, revision_id,
+--        requested_by, created_at, finished_at}. 5분 넘은 pending은 실패로 본다(서버 중단 대비).
 -- 오류 SQLSTATE(000016·000017을 잇는다): NR009 작업 없음 → 404, NR010 상태 불가 → 409,
 --   NR011 다른 작업의 멱등 키 → 409, NR016 작업당 상한 초과 → 429 QUOTA_EXCEEDED,
---   NR017 같은 작업 60초 내 새 키 → 429 RATE_LIMITED, NR018 같은 키 처리 중 → 409.
+--   NR017 같은 작업 60초 내 새 키 → 429 RATE_LIMITED, NR018 같은 키 처리 중(5분 이내 pending) → 409.
 
 alter table public.production_jobs
   add column ai_draft_requests jsonb not null default '[]'
@@ -33,6 +34,22 @@ as $$
       from public.edit_revisions r where r.id = (p_req ->> 'revision_id')::uuid));
 $$;
 
+-- 요청 원소 상태 바꾸기(내부) -------------------------------------------------------
+create function public._ai_draft_set(p_job uuid, p_key text, p_patch jsonb)
+returns jsonb
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.production_jobs j
+    set ai_draft_requests = (
+      select coalesce(jsonb_agg(case when e ->> 'key' = p_key then e || p_patch else e end
+                                order by o), '[]'::jsonb)
+      from jsonb_array_elements(j.ai_draft_requests) with ordinality as t(e, o))
+    where j.id = p_job
+    returning (select e from jsonb_array_elements(j.ai_draft_requests) e where e ->> 'key' = p_key);
+$$;
+
 -- H2 예약: 잠금·검사·횟수+1·키 기록 후 커밋(Claude 호출은 이 트랜잭션 밖) --------------
 create function public.reserve_ai_draft(
   p_workspace uuid, p_job uuid, p_user uuid, p_key text, p_limit integer
@@ -45,7 +62,7 @@ as $$
 declare
   v_job public.production_jobs%rowtype;
   v_req jsonb;
-  v_base integer;
+  v_base public.edit_revisions%rowtype;
 begin
   select * into v_job from public.production_jobs j
     where j.id = p_job and j.workspace_id = p_workspace
@@ -59,7 +76,12 @@ begin
     where e ->> 'key' = p_key;
   if v_req is not null then
     if v_req ->> 'status' = 'pending' then
-      raise exception '같은 요청을 처리 중입니다' using errcode = 'NR018';
+      if (v_req ->> 'created_at')::timestamptz > now() - interval '5 minutes' then
+        raise exception '같은 요청을 처리 중입니다' using errcode = 'NR018';
+      end if;
+      -- 5분 넘은 pending은 실패로 확정(같은 키 재요청이 영구 409가 되지 않게)
+      v_req := public._ai_draft_set(p_job, p_key,
+        jsonb_build_object('status', 'failed', 'finished_at', now()));
     end if;
     return public._ai_draft_json(v_req, v_job.ai_draft_count, true);
   end if;
@@ -86,10 +108,11 @@ begin
     raise exception 'AI 초안을 너무 자주 요청했습니다' using errcode = 'NR017';
   end if;
 
-  select r.rev_no into v_base from public.edit_revisions r
+  select * into v_base from public.edit_revisions r
     where r.id = v_job.current_revision_id and r.job_id = p_job;
   v_req := jsonb_build_object(
-    'key', p_key, 'status', 'pending', 'base_rev_no', v_base, 'revision_id', null,
+    'key', p_key, 'status', 'pending', 'base_rev_no', v_base.rev_no,
+    'base_revision_id', v_base.id, 'base_updated_at', v_base.updated_at, 'revision_id', null,
     'requested_by', p_user, 'created_at', now());
   update public.production_jobs j
     set ai_draft_count = j.ai_draft_count + 1,
@@ -100,22 +123,6 @@ end;
 $$;
 comment on function public.reserve_ai_draft(uuid, uuid, uuid, text, integer) is
   'A-14 AI 초안 예약(review·category·작업당 상한·60초 간격·멱등 키, 횟수+1) 한 트랜잭션. API 전용';
-
--- 요청 원소 상태 바꾸기(내부) -------------------------------------------------------
-create function public._ai_draft_set(p_job uuid, p_key text, p_patch jsonb)
-returns jsonb
-language sql
-security definer
-set search_path = ''
-as $$
-  update public.production_jobs j
-    set ai_draft_requests = (
-      select coalesce(jsonb_agg(case when e ->> 'key' = p_key then e || p_patch else e end
-                                order by o), '[]'::jsonb)
-      from jsonb_array_elements(j.ai_draft_requests) with ordinality as t(e, o))
-    where j.id = p_job
-    returning (select e from jsonb_array_elements(j.ai_draft_requests) e where e ->> 'key' = p_key);
-$$;
 
 -- H2 리비전 생성: 항상 새 rev_no, origin=ai_draft, 현재 리비전 이동(기존 편집은 보존) ---------
 create function public.create_ai_draft_revision(
@@ -145,6 +152,13 @@ begin
   end if;
   if v_job.status <> 'review' then
     raise exception '%', format('현재 상태(%s)에서는 할 수 없습니다.', v_job.status)
+      using errcode = 'NR010';
+  end if;
+  -- 호출 중 사용자가 저장한 편집(같은 행 갱신·새 rev) 위로 AI 초안이 현재가 되지 않게
+  if v_job.current_revision_id is distinct from (v_req ->> 'base_revision_id')::uuid
+     or (select r.updated_at from public.edit_revisions r where r.id = v_job.current_revision_id)
+        is distinct from (v_req ->> 'base_updated_at')::timestamptz then
+    raise exception 'AI 초안을 만드는 동안 편집안이 바뀌었습니다. 다시 불러온 뒤 시도하세요.'
       using errcode = 'NR010';
   end if;
 

@@ -45,3 +45,11 @@
 - 새 환경변수 이름(값은 `.env`에만, `.env.example`은 팀장이 추가): `ANTHROPIC_API_KEY`(없거나 공백이면 A-14만 503), `AI_DRAFT_MODEL`(기본 `claude-sonnet-5-5`), `AI_DRAFT_MAX_PER_JOB`(3), `AI_DRAFT_MAX_SHEETS`(16), `AI_DRAFT_MAX_TOKENS`(8192), `AI_DRAFT_MAX_ITEMS`(80), `AI_DRAFT_MAX_SHOTS`(40), `AI_DRAFT_TIMEOUT_SEC`(90).
 - 로그: `AI 초안 생성: job rev count errors`·`AI 초안 실패: job reason=<예외 이름·코드>`만. 키·프롬프트·응답 원문·SDK 예외 메시지 없음.
 - 웹: `AiDraftButton`("AI 초안 채우기", 실패 후 "AI 초안 다시 시도", 클릭마다 새 키 `ai-<uuid>`). 미저장 변경이 있으면 confirm. 성공 시 새 리비전을 양식에 반영하고 "AI 초안 rev N을 만들었습니다. 이전 편집안 rev M은 보관됨" 안내. 버튼은 job `review`일 때만 활성. edit-form.tsx 변경은 import·phase `drafting`·`applyDraft`·버튼 한 줄·빈 상태 안내 문구뿐.
+
+## 리뷰 반영 결정 (2026-11-19, code·security 리뷰 🔴 없음 · 🟡 반영)
+- 정리 호출 보호: `fail_ai_draft` 호출 오류는 로그(예외 이름만) 후 삼키고 원래 오류(502·409 등)를 그대로 던진다.
+- 멈춘 요청: `reserve_ai_draft`는 5분 넘은 pending을 같은 키 재요청 때 failed로 확정하고 기존 결과(502)를 돌려준다(영구 409 방지). 5분 이내 pending은 409(NR018).
+- 기준 리비전 확인: 예약 때 현재 리비전 id·updated_at을 `base_revision_id`·`base_updated_at`으로 기록하고, `create_ai_draft_revision`은 둘 중 하나라도 다르면 NR010(409)으로 거부한다(rev_no만 보면 미승인 리비전의 같은 행 저장을 놓쳐서 updated_at까지 비교). API는 409 전에 failed로 기록한다.
+- 로그 마스킹: `logging_mask`에 Anthropic 키 패턴 추가. 저장소 키 검사(`grep -rn "sk-ant" apps`)에 걸리지 않게 정규식은 `sk-a[n]t-`로 썼고, 테스트 키는 런타임 조립.
+- 상태 코드 전달: 웹 중계는 FastAPI와 같게 새 초안 201·같은 키 재요청 200. apiFetch가 상태 코드를 돌려주지 않아(client.ts는 범위 밖) API 응답에 `replay`(bool)를 추가해 구분한다(04_API A-14 반영). 웹 → FastAPI 호출 타임아웃은 A-14만 200초(기본 10초면 Claude 호출 중 끊김).
+- 노출 수용: `production_jobs.ai_draft_requests`는 같은 워크스페이스 구성원에게 select로 보인다. 내부 도구이고 담긴 값은 요청 키(클릭 UUID)·상태·rev 번호·시각뿐이라(비밀·토큰 없음) 수용한다.
