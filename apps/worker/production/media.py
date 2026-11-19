@@ -24,6 +24,10 @@ ALLOWED_DEMUXERS = {
 }
 
 
+# task-045 R6: 쇼핑 사진은 매직 바이트로 고른 단일 이미지 demuxer만(image2 패턴 확장 금지)
+IMAGE_DEMUXERS = ("jpeg_pipe", "png_pipe", "webp_pipe")
+MAX_IMAGE_PIXELS = 40_000_000  # 사진 면적 상한(가정, 디코드 메모리 방어)
+
 MAX_DIMENSION = 8192  # 리뷰 반영 1: 이보다 큰 영상은 거부(메모리·처리 시간 방어)
 DEFAULT_TIMEOUT = 600  # 리뷰 반영 2: ffmpeg 한 번 실행 상한(초)
 PROBE_TIMEOUT = 120
@@ -49,6 +53,19 @@ def sniff(path: Path) -> str | None:
         return "wav"
     if head.startswith(b"ID3") or (len(head) >= 2 and head[0] == 0xFF and head[1] & 0xE0 == 0xE0):
         return "mp3"
+    return None
+
+
+def sniff_image(path: Path) -> str | None:
+    """매직 바이트로 jpeg·png·webp만 고른다(확장자·ffprobe 추측을 믿지 않는다)."""
+    with Path(path).open("rb") as f:
+        head = f.read(16)
+    if head.startswith(bytes.fromhex("ffd8ff")):
+        return "jpeg_pipe"
+    if head.startswith(bytes.fromhex("89504e470d0a1a0a")):
+        return "png_pipe"
+    if head.startswith(b"RIFF") and head[8:12] == b"WEBP":
+        return "webp_pipe"
     return None
 
 
@@ -179,3 +196,43 @@ class Media:
             "height": height,
             "streams": streams,
         }
+
+    def probe_image(self, path: Path, cancel: Cancel) -> dict:
+        """사진(R6): 매직 바이트 → `-f *_pipe` 고정 ffprobe. 크기·면적 상한을 넘으면 MediaError."""
+        demuxer = sniff_image(path)
+        if demuxer is None:
+            raise MediaError("허용되지 않은 형식")
+        text, _ = self.run(
+            [
+                self.ffprobe,
+                "-v",
+                "error",
+                "-protocol_whitelist",
+                "file",
+                "-show_format",
+                "-show_streams",
+                "-of",
+                "json",
+                "-f",
+                demuxer,
+                "file:" + str(Path(path).resolve()),
+            ],
+            cancel,
+            timeout=PROBE_TIMEOUT,
+        )
+        try:
+            data = json.loads(text)
+        except ValueError:
+            raise MediaError("ffprobe 결과를 읽을 수 없음") from None
+        if (data.get("format") or {}).get("format_name") != demuxer:
+            raise MediaError("허용되지 않은 형식")
+        video = next((s for s in data.get("streams") or [] if s.get("codec_type") == "video"), None)
+        try:
+            width, height = int(video["width"]), int(video["height"])
+        except KeyError, TypeError, ValueError:
+            raise MediaError("크기를 읽을 수 없음") from None
+        if not (0 < width <= MAX_DIMENSION and 0 < height <= MAX_DIMENSION):
+            raise MediaError("사진 크기 상한 초과")
+        if width * height > MAX_IMAGE_PIXELS:
+            raise MediaError("사진 면적 상한 초과")
+        return {"demuxer": demuxer, "width": width, "height": height}

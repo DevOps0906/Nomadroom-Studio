@@ -2,6 +2,8 @@
 
 import copy
 
+import pytest
+
 from app.production.validation_shopping import validate_shopping_spec
 from app.production.validation_variety import validate_for_format
 
@@ -20,8 +22,14 @@ def _assets() -> dict:
         "a2": {"kind": "source_upload", "status": "ready", "duration_sec": 30, "rights": ok},
         "a3": {"kind": "image", "status": "ready", "rights": ok},
         "n1": {"kind": "narration", "status": "ready", "rights": None},
+        "n2": {"kind": "narration", "status": "ready", "rights": None},
+        "n3": {"kind": "narration", "status": "ready", "rights": None},
+        "n4": {"kind": "narration", "status": "ready", "rights": None},
         "b1": {"kind": "bgm", "status": "ready", "rights": {"basis": "licensed"}},
     }
+
+
+NARR = {"narration_asset_ids": ["n1", "n2", "n3", "n4"]}
 
 
 def good() -> dict:
@@ -151,16 +159,65 @@ def test_voice_xor() -> None:
     s = good()
     s["voice"] = {}
     assert "voice.missing" in codes(run(s))
-    s["voice"] = {"tts": {"voice": "ko-KR-SunHiNeural", "rate": "+0%"}, "narration_asset_id": "n1"}
+    s["voice"] = {"tts": {"voice": "ko-KR-SunHiNeural", "rate": "+0%"}, **NARR}
     assert "voice.both" in codes(run(s))
-    s["voice"] = {"narration_asset_id": "n1"}
+    s["voice"] = dict(NARR)
     assert run(s)["errors"] == []
-    s["voice"] = {"narration_asset_id": "a1"}
+    s["voice"] = {"narration_asset_ids": ["n1", "n2", "n3", "a1"]}
     assert "voice.asset_invalid" in codes(run(s))
     a = _assets()
     a["n1"]["status"] = "pending"
-    s["voice"] = {"narration_asset_id": "n1"}
+    s["voice"] = dict(NARR)
     assert "voice.asset_invalid" in codes(run(s, assets=a))
+
+
+@pytest.mark.parametrize(
+    "ids", [["n1", "n2", "n3"], ["n1", "n2", "n3", "n4", "n1"], ["n1", "n1", "n2", "n3"]]
+)
+def test_narration_exactly_four_distinct(ids) -> None:
+    # task-045 사용자 결정: TTS가 꺼져 있으면 문장별 녹음 4개(문장 순서)
+    s = good()
+    s["voice"] = {"narration_asset_ids": ids}
+    assert "voice.narration_count" in codes(run(s))
+
+
+def test_old_single_narration_field_rejected() -> None:
+    s = good()
+    s["voice"] = {"narration_asset_id": "n1"}
+    assert any(c.startswith("schema.") for c in codes(run(s)))
+
+
+@pytest.mark.parametrize(
+    "lang,text,ok",
+    [
+        ("ko", "제휴 링크 포함", True),
+        ("ko", "광고 포함", False),
+        ("ko", "제휴 링크 포함 ", False),
+        ("ja", "PR", True),
+        ("ja", "제휴 링크 포함", False),
+    ],
+)
+def test_disclosure_fixed_text(lang, text, ok) -> None:
+    # task-045 팀장 결정(Q12): ko "제휴 링크 포함", ja "PR" 고정
+    s = good()
+    s["lang"] = lang
+    s["voice"] = dict(NARR)
+    s["disclosure"] = {"text": text}
+    assert ("disclosure.fixed" in codes(run(s, job_lang=lang))) is not ok
+
+
+@pytest.mark.parametrize(
+    "basis,ok",
+    [("own", True), ("licensed", True), ("permission", False), ("quote", False)],
+)
+def test_image_basis_allowed_list(basis, ok) -> None:
+    # task-045 팀장 결정(Q13): 제휴처·숙소 제공 사진(permission 등) 금지
+    a = _assets()
+    a["a3"]["rights"] = {"basis": basis}
+    assert ("rights.image_basis" in codes(run(good(), assets=a))) is not ok
+    b = _assets()
+    b["a1"]["rights"] = {"basis": "permission"}  # 영상 원본에는 적용하지 않는다
+    assert "rights.image_basis" not in codes(run(good(), assets=b))
 
 
 def test_image_motion() -> None:
@@ -245,7 +302,7 @@ def test_format_branch_requires_assets() -> None:
 def test_assets_empty_means_everything_invalid() -> None:
     s = good()
     s["bgm_asset_id"] = "b1"
-    s["voice"] = {"narration_asset_id": "n1"}
+    s["voice"] = dict(NARR)
     r = run(s, assets={})
     c = codes(r)
     assert c.count("cuts.source_invalid") == 4
@@ -258,7 +315,7 @@ def test_not_ready_assets() -> None:
         a[k]["status"] = "pending"
     s = good()
     s["bgm_asset_id"] = "b1"
-    s["voice"] = {"narration_asset_id": "n1"}
+    s["voice"] = dict(NARR)
     c = codes(run(s, assets=a))
     assert {"cuts.source_invalid", "bgm.asset_invalid", "voice.asset_invalid"} <= set(c)
 

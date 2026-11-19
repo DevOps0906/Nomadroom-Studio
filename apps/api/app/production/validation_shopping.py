@@ -36,6 +36,11 @@ MOTION_TYPES = ("pan", "zoom", "none")
 VIDEO_KINDS = ("source", "source_upload")
 CUT_KINDS = (*VIDEO_KINDS, "image")
 MAX_START_SEC = 86400
+NARRATIONS = SENTENCES  # task-045 사용자 결정: 문장별 녹음 4개(문장 순서)
+# task-045 팀장 결정(Q12): 표기 고정 문구. 다른 값이면 오류
+DISCLOSURE_TEXT = {"ko": "제휴 링크 포함", "ja": "PR"}
+# task-045 팀장 결정(Q13): 사진은 직접 촬영·라이선스 구매·AI 생성(054 경로)만. 제휴처 제공 금지
+IMAGE_BASES = ("own", "licensed", "ai_generated")
 _TERMINATORS = ".?!。？！"
 # 종결 부호가 아닌 마침표: URL, 숫자 사이(3.5·v2.0)
 _NON_TERMINAL = re.compile(r"https?://\S+|www\.\S+|(?<=\d)\.(?=\d)")
@@ -77,7 +82,8 @@ class Tts(_M):
 
 class Voice(_M):
     tts: Tts | None = None
-    narration_asset_id: _Id | None = None
+    # 문장 i의 녹음 = narration_asset_ids[i](정확히 4개, 개수는 의미 검사 voice.narration_count)
+    narration_asset_ids: Annotated[list[_Id], Field(max_length=MAX_SCRIPT_ITEMS)] | None = None
 
 
 class Caption(_M):
@@ -130,7 +136,7 @@ def validate_shopping_spec(
     _check_script(s, lang, product_name, banned_phrases, errors, warnings)
     _check_cuts(s, assets, errors, warnings)
     _check_voice(s, assets, errors)
-    _check_captions(s, errors)
+    _check_captions(s, lang, errors)
     _check_rights(s, assets, errors)
     return {"errors": errors, "warnings": warnings}
 
@@ -152,8 +158,11 @@ def _check_paths(s: ShoppingSpec, errors: list[dict[str, str]]) -> None:
     items: list[tuple[str, str | None]] = [
         ("preset_version", s.preset_version),
         ("bgm_asset_id", s.bgm_asset_id),
-        ("voice.narration_asset_id", s.voice.narration_asset_id),
         ("voice.tts.voice", s.voice.tts.voice if s.voice.tts else None),
+    ]
+    items += [
+        (f"voice.narration_asset_ids.{i}", v)
+        for i, v in enumerate(s.voice.narration_asset_ids or [])
     ]
     items += [(f"cuts.{i}.source_asset_id", c.source_asset_id) for i, c in enumerate(s.cuts)]
     for path, value in items:
@@ -276,23 +285,32 @@ def _check_area(
 
 
 def _check_voice(s: ShoppingSpec, assets: _Assets, errors: list[dict[str, str]]) -> None:
-    has_tts, nid = s.voice.tts is not None, s.voice.narration_asset_id
-    if not has_tts and nid is None:
-        msg = "tts 또는 narration_asset_id 중 하나가 필요합니다."
+    has_tts, ids = s.voice.tts is not None, s.voice.narration_asset_ids
+    if not has_tts and ids is None:
+        msg = "tts 또는 narration_asset_ids 중 하나가 필요합니다."
         errors.append(_e("voice.missing", "voice", msg))
-    elif has_tts and nid is not None:
-        errors.append(_e("voice.both", "voice", "tts와 narration_asset_id는 함께 쓸 수 없습니다."))
-    if nid is not None:
-        if not _usable(assets.get(nid), ("narration",)):
-            msg = "이 작업의 준비된 narration 자산이 아닙니다."
-            errors.append(_e("voice.asset_invalid", "voice.narration_asset_id", msg))
+    elif has_tts and ids is not None:
+        msg = "tts와 narration_asset_ids는 함께 쓸 수 없습니다."
+        errors.append(_e("voice.both", "voice", msg))
+    if ids is not None:
+        if len(ids) != NARRATIONS or len(set(ids)) != len(ids):
+            msg = f"문장별 녹음은 서로 다른 {NARRATIONS}개(문장 순서)여야 합니다."
+            errors.append(_e("voice.narration_count", "voice.narration_asset_ids", msg))
+        for i, nid in enumerate(ids):
+            if not _usable(assets.get(nid), ("narration",)):
+                msg = "이 작업의 준비된 narration 자산이 아닙니다."
+                errors.append(_e("voice.asset_invalid", f"voice.narration_asset_ids.{i}", msg))
 
 
-def _check_captions(s: ShoppingSpec, errors: list[dict[str, str]]) -> None:
+def _check_captions(s: ShoppingSpec, lang: str | None, errors: list[dict[str, str]]) -> None:
     if not s.cta.text.strip():
         errors.append(_e("cta.empty", "cta.text", "4번 문장 화면 문구가 비어 있습니다."))
+    fixed = DISCLOSURE_TEXT.get(lang or "ko", DISCLOSURE_TEXT["ko"])
     if not s.disclosure.text.strip():
         errors.append(_e("disclosure.empty", "disclosure.text", "제휴 표기 문구가 비어 있습니다."))
+    elif s.disclosure.text != fixed:
+        msg = f"제휴 표기는 고정 문구 '{fixed}'만 쓸 수 있습니다."
+        errors.append(_e("disclosure.fixed", "disclosure.text", msg))
 
 
 def _check_rights(s: ShoppingSpec, assets: _Assets, errors: list[dict[str, str]]) -> None:
@@ -317,6 +335,9 @@ def _check_rights(s: ShoppingSpec, assets: _Assets, errors: list[dict[str, str]]
             code = "bgm.rights_missing" if is_bgm else "rights.missing"
             errors.append(_e(code, path, "권리 근거(basis)를 입력해야 합니다."))
             continue
+        if a.get("kind") == "image" and not is_bgm and rights.get("basis") not in IMAGE_BASES:
+            msg = "사진은 직접 촬영·라이선스 구매·AI 생성만 쓸 수 있습니다(제휴처 이미지 금지)."
+            errors.append(_e("rights.image_basis", path, msg))
         if rights.get("has_person") is True and rights.get("portrait_consent") is not True:
             errors.append(_e("rights.portrait_consent", path, "인물 초상 동의가 필요합니다."))
         if rights.get("basis") == "ai_generated":

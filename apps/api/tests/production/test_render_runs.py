@@ -289,6 +289,7 @@ class ProdDB(FakeDB):
     def claim(self, b: dict) -> httpx.Response:
         self.rpc_calls.append("claim")
         ws, worker = b["p_workspace"], b["p_worker"]
+        shop_ok = "shopping" in (b.get("p_formats") or [])  # 000024 R4: 지원 워커만 쇼핑
         now = iso(datetime.now(UTC))
         run = next(
             (
@@ -320,7 +321,7 @@ class ProdDB(FakeDB):
                     if j["workspace_id"] == ws
                     and j["status"] == "preparing"
                     and not j["claimed_by"]
-                    and j.get("kind") != "shopping"  # 000023 P4: task-045 전까지 쇼핑 보류
+                    and (shop_ok or j.get("kind") != "shopping")
                 ),
                 key=lambda j: j["created_at"],
             )
@@ -330,7 +331,7 @@ class ProdDB(FakeDB):
                     for r in self.runs
                     if r["workspace_id"] == ws
                     and r["status"] == "queued"
-                    and self.job(r["job_id"]).get("kind") != "shopping"
+                    and (shop_ok or self.job(r["job_id"]).get("kind") != "shopping")
                 ),
                 key=lambda r: r["created_at"],
             )
@@ -880,7 +881,7 @@ def test_v2_variety_retry_creates_new_run(api, auth, db):
 
 
 def test_v2_format_without_renderer_is_409_without_run(api, auth, db):
-    job = db.add_job(status="review", format="shopping")
+    job = db.add_job(status="review", format="unknown")  # task-045: shopping은 렌더러 연결
     rev = db.add_revision(job, approved=True)
     r = render(api, auth, job, rev)
     assert r.status_code == 409

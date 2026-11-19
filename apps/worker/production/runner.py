@@ -10,6 +10,16 @@ from pathlib import Path
 from typing import Any
 
 from production.adapter import PRESET_VERSION, to_project
+from production.adapter_shopping import (
+    MAX_IMAGE_SEC,
+    SRC_TOL,
+    bind_inputs,
+    covered,
+    layout,
+    sentence_frames,
+    to_shopping_project,
+)
+from production.adapter_shopping import PRESET_VERSION as SHOPPING_PRESET
 from production.adapter_variety import PRESET_VERSION as VARIETY_PRESET
 from production.adapter_variety import to_variety_project
 from production.api import SignedUrl, Task, UrlRejected, WorkerApi
@@ -24,10 +34,20 @@ from production.errors import (
 )
 from production.fetch_url import fetch_url
 from production.hook_audio import make_hook
-from production.media import Cancel, Media, MediaError
+from production.media import Cancel, Media, MediaError, MediaTimeout
 from production.paths import WorkDir
 from production.prepare import prepare
 from production.render import CAPTION_FONT, TITLE_FONT, render
+from production.shopping.audio import (
+    BGM_GAIN,
+    DUCK_GAIN,
+    bgm_track,
+    duck_track,
+    recorded_sentences,
+    tts_sentences,
+    voice_track,
+)
+from production.shopping.render import render_shopping
 from production.tts import TtsFailed, synthesize
 from production.variety.render import render_variety
 
@@ -36,6 +56,10 @@ logger = logging.getLogger("nomadroom.worker.production")
 MB = 1024 * 1024
 MAX_INPUT_BYTES = 500 * MB  # 버킷 상한(04_API.md W-07)
 MAX_HOOK_BYTES = 20 * MB  # 리뷰 반영 3: 훅 음성 다운로드 상한
+MAX_IMAGE_BYTES = 50 * MB  # task-045: 쇼핑 사진 다운로드 상한(가정)
+MAX_AUDIO_BYTES = 100 * MB  # task-045: 쇼핑 녹음·BGM 다운로드 상한(가정)
+MAX_TOTAL_INPUT_BYTES = 2048 * MB  # 리뷰 반영 2: 쇼핑 render 입력 누적 상한(가정)
+SHOPPING_MAX_SOURCE_SEC = 60.0  # 리뷰 반영 6: 쇼핑 원본마다 앞에서부터 최대 60초를 파생 source로
 
 
 class Reporter:
@@ -89,8 +113,10 @@ def _download(
     dest: Path,
     cancel: Cancel,
     max_bytes: int = MAX_INPUT_BYTES,
+    same_id: bool = False,
 ) -> SignedUrl:
-    """서명 GET. 만료·거부면 W-06을 다시 불러 같은 자산의 새 URL로 1회 재시도(F6)."""
+    """서명 GET. 만료·거부면 W-06을 다시 불러 새 URL로 1회 재시도(F6).
+    same_id(쇼핑, R2): 같은 asset_id의 URL만 받는다(없으면 실패). 아니면 같은 kind 최신."""
     try:
         api.download(signed, dest, max_bytes, cancel)
         return signed
@@ -98,7 +124,10 @@ def _download(
         logger.info("입력 URL 만료: 재발급 kind=%s", signed.kind)
     cancel.check()
     # W-06이 주는 최신 ready 자산(그 사이 바뀌었으면 새 자산 — 실제로 쓴 id를 돌려준다)
-    fresh = api.inputs(task).get(signed.kind)
+    if same_id:
+        fresh = next((s for s in api.input_list(task) if s.asset_id == signed.asset_id), None)
+    else:
+        fresh = api.inputs(task).get(signed.kind)
     if fresh is None:
         raise TransferError("입력 자산 없음")
     try:
@@ -118,6 +147,8 @@ def _upload_all(
         item = {"kind": f["kind"], "size_bytes": f["path"].stat().st_size, "mime": f["mime"]}
         if f.get("duration") is not None:
             item["duration_sec"] = round(float(f["duration"]), 3)
+        if f.get("parent") is not None:  # task-044 P1·045 R1: prepare 산출물의 원본
+            item["parent_asset_id"] = f["parent"]
         items.append(item)
     signed = api.outputs(task, items)
     ids: list[str] = []
@@ -140,8 +171,11 @@ def _upload_all(
 def _prepare(
     api: WorkerApi, task: Task, work: WorkDir, media: Media, cancel: Cancel, reporter: Reporter
 ) -> dict:
+    if task.job_kind == "shopping":
+        return _prepare_shopping(api, task, work, media, cancel, reporter)
     reporter.set("download", 0)
     start = float(task.source_start_sec or 0.0)
+    parent = None
     if task.source_kind == "url":  # task-031: 로컬 yt-dlp(실패하면 url_unavailable → 업로드 안내)
         raw = fetch_url(task.source_url, work, cancel, reporter.set, start, task.segment_len_sec)
     else:
@@ -150,26 +184,72 @@ def _prepare(
             raise TaskFailed("prepare", "input_invalid", "원본 업로드 없음")
         raw = work.path("input.bin")
         try:
-            _download(api, task, src, raw, cancel)
+            parent = str(_download(api, task, src, raw, cancel).asset_id)
         except TransferError as exc:
             raise TaskFailed("prepare", "download_failed", str(exc)) from None
     out = prepare(raw, work, start, task.segment_len_sec, media, cancel, reporter.set)
     reporter.set("upload", 0)
-    files = [
-        {
-            "kind": "source",
-            "path": out["source"],
-            "mime": "video/mp4",
-            "duration": out["meta"]["duration_sec"],
-        },
-        {"kind": "analysis", "path": out["analysis"], "mime": "application/json"},
-        *({"kind": "sheet", "path": p, "mime": "image/jpeg"} for p in out["sheets"]),
-    ]
+    files = _prepare_files(out, parent)
     try:
         ids = _upload_all(api, task, files, reporter, cancel)
     except TransferError as exc:
         raise TaskFailed("prepare", "unknown", str(exc)) from None
     return {"status": "done", "asset_ids": ids, "meta": out["meta"]}
+
+
+def _prepare_files(out: dict, parent: str | None) -> list[dict[str, Any]]:
+    return [
+        {
+            "kind": "source",
+            "path": out["source"],
+            "mime": "video/mp4",
+            "duration": out["meta"]["duration_sec"],
+            "parent": parent,
+        },
+        {"kind": "analysis", "path": out["analysis"], "mime": "application/json", "parent": parent},
+        *(
+            {"kind": "sheet", "path": p, "mime": "image/jpeg", "parent": parent}
+            for p in out["sheets"]
+        ),
+    ]
+
+
+def _prepare_shopping(
+    api: WorkerApi, task: Task, work: WorkDir, media: Media, cancel: Cancel, reporter: Reporter
+) -> dict:
+    """R1: ready 원본(source_upload)마다 prepare → 원본별 source·analysis·sheet(parent=원본).
+    원본마다 하위 폴더에서 처리하고 올린 뒤 지운다. meta는 첫 원본 값(가정).
+    리뷰 반영 6(팀장 결정): job 구간(source_start_sec·segment_len_sec)은 쓰지 않고 원본마다
+    0초부터 전체(최대 60초)를 파생 source로 만든다 — 컷 src 시각은 원본 0초 기준."""
+    reporter.set("download", 0)
+    sources = [s for s in api.input_list(task) if s.kind == "source_upload"]
+    if not sources:
+        raise TaskFailed("prepare", "input_invalid", "원본 업로드 없음")
+    ids: list[str] = []
+    meta = None
+    for src in sources:
+        sub = WorkDir(work.dir, src.asset_id)
+        sub.reset()
+        raw = sub.path("input.bin")
+        try:
+            _download(api, task, src, raw, cancel, same_id=True)
+        except TransferError as exc:
+            raise TaskFailed("prepare", "download_failed", str(exc)) from None
+        try:
+            length = min(media.probe(raw, cancel)["duration"], SHOPPING_MAX_SOURCE_SEC)
+        except MediaTimeout:
+            raise TaskFailed("prepare", "unknown", "ffmpeg 시간 초과") from None
+        except MediaError:
+            raise TaskFailed("prepare", "input_invalid", "원본을 읽을 수 없음") from None
+        out = prepare(raw, sub, 0.0, length, media, cancel, reporter.set)
+        meta = meta or out["meta"]
+        reporter.set("upload", 0)
+        try:
+            ids += _upload_all(api, task, _prepare_files(out, str(src.asset_id)), reporter, cancel)
+        except TransferError as exc:
+            raise TaskFailed("prepare", "unknown", str(exc)) from None
+        sub.remove()
+    return {"status": "done", "asset_ids": ids, "meta": meta}
 
 
 def _render(
@@ -183,6 +263,8 @@ def _render(
 ) -> dict:
     if task.format == "variety":  # W1: 형식 분기(preset·lang 확인은 형식별로 각 함수 안에서)
         return _render_variety(api, task, work, media, cancel, reporter)
+    if task.format == "shopping":
+        return _render_shopping(api, task, work, media, cancel, reporter, tts_cfg)
     if task.preset_version != PRESET_VERSION:  # F9
         raise RenderFailed("preset_version 불일치")
     if task.format != "category":
@@ -326,6 +408,190 @@ def _render_variety(
     ]
     try:
         ids = _upload_all(api, task, files, reporter, cancel)
+    except TransferError as exc:
+        raise RenderFailed(str(exc)) from None
+    return {"status": "done", "asset_ids": ids}
+
+
+def _shopping_inputs(
+    api: WorkerApi, task: Task, work: WorkDir, media: Media, cancel: Cancel, bound: dict
+) -> tuple[dict[str, Path], dict[str, dict]]:
+    """W-06 입력 중 spec이 쓰는 것만 asset_id별로 받고(R2) 컷 입력을 확인한다
+    (영상: mov·영상 스트림, 사진: 매직 바이트·크기·면적, R6)."""
+    wanted = [*bound["cuts"], *(bound["narration"] or [])]
+    if bound["bgm"] is not None:
+        wanted.append(bound["bgm"])
+    caps = {"image": MAX_IMAGE_BYTES, "narration": MAX_AUDIO_BYTES, "bgm": MAX_AUDIO_BYTES}
+    files: dict[str, Path] = {}
+    left = MAX_TOTAL_INPUT_BYTES  # 리뷰 반영 2: 누적 다운로드 상한(각 파일 상한과 함께)
+    for signed in wanted:
+        key = str(signed.asset_id)
+        if key in files:
+            continue
+        if left <= 0:
+            raise RenderFailed("입력 누적 크기 상한 초과")
+        dest = work.path(f"in_{len(files):02d}.bin")
+        cap = min(caps.get(signed.kind, MAX_INPUT_BYTES), left)
+        try:
+            _download(api, task, signed, dest, cancel, cap, same_id=True)
+        except TransferError as exc:
+            raise RenderFailed(str(exc)) from None
+        left -= dest.stat().st_size
+        files[key] = dest
+    metas: dict[str, dict] = {}
+    for signed in bound["cuts"]:
+        key = str(signed.asset_id)
+        if key in metas:
+            continue
+        try:
+            if signed.kind == "image":
+                metas[key] = media.probe_image(files[key], cancel)
+            else:
+                metas[key] = media.probe(files[key], cancel)
+        except MediaError:
+            raise RenderFailed("컷 입력을 읽을 수 없음") from None
+        if signed.kind != "image" and (
+            metas[key]["demuxer"] != "mov" or not metas[key]["has_video"]
+        ):
+            raise RenderFailed("source 형식 오류")
+    return files, metas
+
+
+def _check_cuts(project: dict, bound: dict, metas: dict[str, dict]) -> None:
+    """실제 입력 크기·길이로 덮임·범위를 다시 본다(서버 검증은 크기를 모른다)."""
+    for cut, signed in zip(project["cuts"], bound["cuts"], strict=True):
+        meta = metas[str(signed.asset_id)]
+        if not covered(cut["scale"], cut["x"], cut["y"], meta["width"], meta["height"]):
+            raise RenderFailed("cut 빈 화면")
+        if signed.kind == "image" and cut["src_end"] - cut["src_start"] > MAX_IMAGE_SEC:
+            raise RenderFailed("사진 컷 길이 상한 초과")
+        if signed.kind == "source" and cut["src_end"] > meta["duration"] + SRC_TOL:
+            raise RenderFailed("cut 범위 오류")
+
+
+def _shopping_report(project, timeline, bounds, durations, result, tts_note, mix) -> dict:
+    used = {c["input_id"] for c in timeline if c["frames"] > 0}
+    used |= set(project["narration_ids"] or [])
+    if project["bgm_id"] is not None:
+        used.add(project["bgm_id"])
+    return {
+        "output": "result_ko.mp4",
+        "format": "shopping",
+        **result,
+        "preset_version": SHOPPING_PRESET,
+        "lang": project["lang"],
+        "voice": "tts" if project["tts"] is not None else "recordings",
+        "tts": tts_note,
+        "narration_asset_ids": project["narration_ids"],
+        "sentences": [
+            {
+                "index": i + 1,
+                "duration": round(d, 3),
+                "frame_start": bounds[i],
+                "frame_end": bounds[i + 1],
+            }
+            for i, d in enumerate(durations)
+        ],
+        "cuts": [
+            {
+                "source_asset_id": c["asset_id"],
+                "input_asset_id": c["input_id"],
+                "kind": c["kind"],
+                "sentence": c["sentence"],
+                "motion": (c["motion"] or "zoom") if c["kind"] == "image" else None,
+                "masks": len(c["masks"]),
+                "frame_start": c["frame_start"],
+                "natural_frames": c["natural_frames"],
+                "frames": c["frames"],
+                "adjust": c["adjust"],
+            }
+            for c in timeline
+        ],
+        "source_audio": project["source_audio"],
+        "duck_gain": DUCK_GAIN if mix["duck"] else None,
+        "bgm_asset_id": project["bgm_id"],
+        "bgm_gain": BGM_GAIN if mix["bgm"] else None,
+        "disclosure": project["disclosure"],
+        # R7: 권리 목록은 서버가 이 id로 만든다(워커는 쓴 자산 id만, 게시 문구 없음)
+        "assets_used": sorted(used),
+        "review_required": "Watch final video and inspect every cut before delivery.",
+    }
+
+
+def _render_shopping(
+    api: WorkerApi,
+    task: Task,
+    work: WorkDir,
+    media: Media,
+    cancel: Cancel,
+    reporter: Reporter,
+    tts_cfg: TtsSettings,
+) -> dict:
+    """쇼핑 렌더(task-045). 입력은 W-06이 준 spec 참조 자산만, 산출물은 output_mp4·report."""
+    if task.preset_version != SHOPPING_PRESET:  # F9
+        raise RenderFailed("preset_version 불일치")
+    project = to_shopping_project(task.spec, task.lang)
+    reporter.set("download", 0)
+    bound = bind_inputs(project, api.input_list(task))
+    files, metas = _shopping_inputs(api, task, work, media, cancel, bound)
+    _check_cuts(project, bound, metas)
+
+    reporter.set("audio", 0)
+    if project["tts"] is not None:
+        wavs, durations, tts_note = tts_sentences(
+            project["script"], project["tts"], work.dir, media, cancel, tts_cfg
+        )
+    else:
+        raws = [files[str(s.asset_id)] for s in bound["narration"]]
+        wavs, durations = recorded_sentences(raws, work.dir, media, cancel)
+        tts_note = "supplied recordings"
+    bounds = sentence_frames(durations)
+    frames = bounds[-1]
+    timeline = []
+    for c in layout(project, bounds):
+        signed = bound["cuts"][c["index"]]
+        timeline.append({**c, "input_id": str(signed.asset_id), "kind": signed.kind})
+    sources = {k: (files[k], metas[k]) for k in metas}
+    voice_wav = voice_track(wavs, frames, work.path("voice.wav"))
+    duck_wav = None
+    if project["source_audio"] == "duck":
+        duck_wav = duck_track(media, timeline, sources, frames, work.path("duck.wav"), cancel)
+    bgm_wav = None
+    if bound["bgm"] is not None:
+        bgm_raw = files[str(bound["bgm"].asset_id)]
+        bgm_wav = bgm_track(media, bgm_raw, frames, work.path("bgm.wav"), cancel)
+    output = work.path("result_ko.mp4")
+    result = render_shopping(
+        project,
+        timeline,
+        bounds,
+        sources,
+        voice_wav,
+        duck_wav,
+        bgm_wav,
+        output,
+        media,
+        cancel,
+        reporter.set,
+    )
+    report = work.path("report.json")
+    body = _shopping_report(
+        project,
+        timeline,
+        bounds,
+        durations,
+        result,
+        tts_note,
+        {"duck": duck_wav is not None, "bgm": bgm_wav is not None},
+    )
+    report.write_text(json.dumps(body, ensure_ascii=False, indent=2), encoding="utf-8")
+    reporter.set("upload", 0)
+    files_out = [
+        {"kind": "output_mp4", "path": output, "mime": "video/mp4", "duration": result["duration"]},
+        {"kind": "report", "path": report, "mime": "application/json"},
+    ]
+    try:
+        ids = _upload_all(api, task, files_out, reporter, cancel)
     except TransferError as exc:
         raise RenderFailed(str(exc)) from None
     return {"status": "done", "asset_ids": ids}

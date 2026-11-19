@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 
 from app.logging_mask import setup_logging
+from app.production import shopping
 from tests.production import test_jobs_api as ja
 from tests.production.test_jobs_api import OTHER_WS, URL, FakeDB, _now, create_body
 from tests.production.test_validation_shopping import good as shopping_good
@@ -350,7 +351,7 @@ def test_general_complete_race_still_409(api, auth, db):
 # === A-11 =========================================================================
 
 
-def test_prepare_shopping_banned_recheck_then_409_until_task045(api, auth, db):
+def test_prepare_shopping_banned_recheck_then_starts(api, auth, db):
     job = shop_job(db)
     db.add_asset(job, "source_upload", rights=RIGHTS)
     db.add_asset(job, "source_upload", rights=RIGHTS)
@@ -358,10 +359,10 @@ def test_prepare_shopping_banned_recheck_then_409_until_task045(api, auth, db):
     r = api.post(f"{URL}/{job['id']}/prepare", headers=auth)
     assert r.status_code == 400 and r.json()["field"] == "banned_category"
     job["brief"] = {"product_name": "운동화"}
-    # 리뷰 반영 2: 쇼핑 렌더러(045) 전에는 preparing에 갇히지 않게 시작 자체를 막는다
+    # task-045: 쇼핑 렌더러가 생겨 409(field kind)를 풀었다 — 지원 워커가 claim한다(R4)
     r = api.post(f"{URL}/{job['id']}/prepare", headers=auth)
-    assert r.status_code == 409 and r.json()["field"] == "kind"
-    assert job["status"] == "draft"
+    assert r.status_code == 202, r.text
+    assert job["status"] == "preparing"
 
 
 def test_review3_prepare_race_with_source_delete_is_409(api, auth, db):
@@ -628,3 +629,39 @@ def test_review7_shopping_fields_not_allowed_while_rendering_or_general(api, aut
     assert r.status_code == 409
     gen = db.add_job(status="review")
     assert api.patch(f"{URL}/{gen['id']}", json={"affiliates": []}, headers=auth).status_code == 409
+
+
+def test_detail_assets_include_rights_and_parent(api, auth, db):
+    # task-045: PROD-03 권리 목록(A-09 상세 assets에 rights·parent_asset_id)
+    job = shop_job(db, status="review")
+    db.add_revision(job)
+    up = db.add_asset(job, "source_upload", rights=RIGHTS)
+    db.add_asset(job, "source", parent_asset_id=up["id"], duration_sec=10)
+    r = api.get(f"{URL}/{job['id']}", headers=auth)
+    assert r.status_code == 200, r.text
+    got = {a["kind"]: a for a in r.json()["assets"]}
+    assert got["source_upload"]["rights"] == RIGHTS
+    assert got["source_upload"]["parent_asset_id"] is None
+    assert got["source"]["parent_asset_id"] == up["id"] and got["source"]["rights"] is None
+    assert "storage_path" not in got["source"]
+
+
+def test_review4_delete_narration_in_sentence_list_is_409(api, auth, db):
+    # 리뷰 반영 4: spec_asset_refs가 문장별 녹음 4개(narration_asset_ids)도 참조로 본다
+    job, rev, _ = review_shop(db)
+    narr = [db.add_asset(job, "narration") for _ in range(4)]
+    rev["spec"]["voice"] = {"narration_asset_ids": [n["id"] for n in narr]}
+    r = api.delete(f"{URL}/{job['id']}/assets/{narr[2]['id']}", headers=auth)
+    assert r.status_code == 409 and r.json()["field"] == "asset_id"
+    assert narr[2] in db.assets
+    free = db.add_asset(job, "narration")
+    assert api.delete(f"{URL}/{job['id']}/assets/{free['id']}", headers=auth).status_code == 204
+
+
+def test_review4_spec_asset_refs_includes_sentence_narrations():
+    spec = {
+        "cuts": [{"source_asset_id": "c1"}],
+        "bgm_asset_id": "b1",
+        "voice": {"narration_asset_ids": ["n1", "n2", 3, "n4"]},
+    }
+    assert shopping.spec_asset_refs(spec) == {"c1", "b1", "n1", "n2", "n4"}

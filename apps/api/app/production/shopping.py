@@ -240,7 +240,7 @@ def assets_map(rows: list[dict]) -> dict[str, dict[str, Any]]:
 
 
 def spec_asset_refs(spec: Any) -> set[str]:
-    """편집안이 참조하는 자산 ID(컷 원본·BGM·내레이션)."""
+    """편집안이 참조하는 자산 ID(컷 원본·BGM·내레이션 — 단일·문장별 4개)."""
     refs: set[str] = set()
     if not isinstance(spec, Mapping):
         return refs
@@ -256,6 +256,9 @@ def spec_asset_refs(spec: Any) -> set[str]:
     voice = spec.get("voice")
     if isinstance(voice, Mapping) and isinstance(voice.get("narration_asset_id"), str):
         refs.add(voice["narration_asset_id"])
+    ids = voice.get("narration_asset_ids") if isinstance(voice, Mapping) else None
+    if isinstance(ids, list):  # task-045: 문장별 녹음 4개
+        refs.update(i for i in ids if isinstance(i, str))
     return refs
 
 

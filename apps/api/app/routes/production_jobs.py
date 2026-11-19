@@ -46,7 +46,8 @@ LIST_COLUMNS = (
     "id,title,kind,format,vertical,status,failed_stage,error_code,candidate_id,updated_at,"
     "completed_at,current_revision_id,current_ja_revision_id"
 )
-ASSET_COLUMNS = "id,kind,status,size_bytes,duration_sec"
+# task-045: rights·parent_asset_id는 쇼핑 PROD-03 권리 목록·원본 계보용(A-09 상세)
+ASSET_COLUMNS = "id,kind,status,size_bytes,duration_sec,rights,parent_asset_id"
 RUN_COLUMNS = "id,status,progress_pct,progress_stage,error_stage,error_code,attempt,claimed_by"
 REVISION_COLUMNS = "id,rev_no,spec,origin,validation,approved_at"
 IDEMPOTENCY_CONSTRAINT = "production_jobs_workspace_id_idempotency_key_key"
@@ -269,6 +270,8 @@ class AssetOut(BaseModel):
     status: str
     size_bytes: int | None
     duration_sec: float | None
+    rights: dict[str, Any] | None = None  # task-045: 사용자 입력 권리(쇼핑), 없으면 null
+    parent_asset_id: uuid.UUID | None = None  # task-044 P1 계보(파생 산출물의 원본)
 
 
 class RevisionSummary(BaseModel):
@@ -1154,9 +1157,6 @@ async def prepare_job(
         job["title"], job.get("brief"), job.get("comment_keyword")
     ):
         raise _banned()  # 원본 준비 시작도 금지 품목이면 막는다(PROD-01S)
-    if job.get("kind") == "shopping":
-        # 리뷰 반영 2: task-045(쇼핑 렌더러) 전까지 claim이 쇼핑을 내주지 않아 preparing에 갇힌다
-        raise ApiError(409, "CONFLICT", "쇼핑 렌더러 준비 중입니다.", "kind")
     if job["source_kind"] == "upload":
         uploads = await _uploads(request, ws, job_id)
         if not any(a["status"] == "ready" for a in uploads):

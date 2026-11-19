@@ -578,6 +578,8 @@ isOneToOne: false
                            },
 "claim_production_task":
 { Args: { "p_worker": string,"p_workspace": string }; Returns: Json
+                           } |
+{ Args: { "p_formats": (string)[],"p_worker": string,"p_workspace": string }; Returns: Json
                            },
 "create_ai_draft_revision":
 { Args: { "p_job": string,"p_key": string,"p_spec": Json,"p_user": string,"p_validation": Json,"p_workspace": string }; Returns: Json

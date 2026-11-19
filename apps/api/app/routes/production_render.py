@@ -15,6 +15,7 @@ from app.errors import ApiError, db_error, not_found
 from app.production import runs
 from app.routes.profiles import _json_list, _send
 from app.routes.verify_runs import _KEY_RE
+from app.routes.worker_production import shopping_ref_assets
 
 logger = logging.getLogger("nomadroom.production_render")
 
@@ -51,10 +52,10 @@ def _envelope(body: object) -> tuple[RenderRunEnvelope, bool]:
     )
 
 
-RENDER_FORMATS = ("category", "variety")  # task-036: 예능형 렌더러 연결
+RENDER_FORMATS = ("category", "variety", "shopping")  # task-036 예능형 · task-045 쇼핑
 
 
-async def _require_render_format(request: Request, user: CurrentUser, job_id: uuid.UUID) -> None:
+async def _require_render_format(request: Request, user: CurrentUser, job_id: uuid.UUID) -> str:
     """렌더러가 없는 형식(shopping 등)은 렌더 요청·재시도 409. 없는 작업은 404."""
     jobs = _json_list(
         await _send(
@@ -74,6 +75,76 @@ async def _require_render_format(request: Request, user: CurrentUser, job_id: uu
         raise not_found()
     if jobs[0]["format"] not in RENDER_FORMATS:
         raise ApiError(409, "CONFLICT", "이 형식의 렌더는 아직 준비 중입니다.", "format")
+    return jobs[0]["format"]
+
+
+async def _require_shopping_assets(
+    request: Request, user: CurrentUser, job_id: uuid.UUID, revision_id: uuid.UUID
+) -> None:
+    """task-045(044 이월): 쇼핑 렌더 요청 때 리비전이 참조하는 자산이 이 작업 소유·ready이고
+    컷 원본마다 파생 source가 있는지 다시 본다(fail-closed, 아니면 409 field assets).
+    리비전이 없거나 다른 작업이면 여기서는 통과시키고 RPC가 400으로 거부한다."""
+    revs = _json_list(
+        await _send(
+            request,
+            "GET",
+            "edit_revisions",
+            params={
+                "select": "spec",
+                "id": f"eq.{revision_id}",
+                "job_id": f"eq.{job_id}",
+                "workspace_id": f"eq.{user.workspace_id}",
+            },
+        ),
+        "GET",
+        "edit_revisions",
+    )
+    if not revs:
+        return
+    _, ok = await shopping_ref_assets(request, user.workspace_id, job_id, revs[0].get("spec"))
+    if not ok:
+        msg = "편집안이 쓰는 자산이 없거나 준비되지 않았습니다."
+        raise ApiError(409, "CONFLICT", msg, "assets")
+
+
+async def _key_used(request: Request, user: CurrentUser, key: str) -> bool:
+    rows = _json_list(
+        await _send(
+            request,
+            "GET",
+            "render_runs",
+            params={
+                "select": "id",
+                "workspace_id": f"eq.{user.workspace_id}",
+                "idempotency_key": f"eq.{key}",
+            },
+        ),
+        "GET",
+        "render_runs",
+    )
+    return bool(rows)
+
+
+async def _run_revision(
+    request: Request, user: CurrentUser, job_id: uuid.UUID, run_id: uuid.UUID
+) -> uuid.UUID | None:
+    """재시도 대상 run의 리비전(없으면 None → RPC가 404·409로 판정)."""
+    rows = _json_list(
+        await _send(
+            request,
+            "GET",
+            "render_runs",
+            params={
+                "select": "revision_id",
+                "id": f"eq.{run_id}",
+                "job_id": f"eq.{job_id}",
+                "workspace_id": f"eq.{user.workspace_id}",
+            },
+        ),
+        "GET",
+        "render_runs",
+    )
+    return uuid.UUID(str(rows[0]["revision_id"])) if rows else None
 
 
 @router.post("/{job_id}/render-runs", response_model=RenderRunEnvelope, status_code=202)
@@ -90,7 +161,10 @@ async def request_render(
     if body.lang == "ja":
         # E8: 일본어 렌더는 task-049 전까지 준비 중
         raise ApiError(400, "VALIDATION", "준비 중인 기능입니다.", "lang")
-    await _require_render_format(request, user, job_id)  # task-035 V2·task-036
+    fmt = await _require_render_format(request, user, job_id)  # task-035 V2·task-036
+    if fmt == "shopping" and not await _key_used(request, user, idempotency_key):
+        # 리뷰 반영 3: 같은 키 재전송은 RPC가 기존 run을 돌려주게 두고, 새 run 경로만 재확인
+        await _require_shopping_assets(request, user, job_id, body.revision_id)
     await runs.expire_offline(request, user.workspace_id)  # E3
     out, created = _envelope(
         await runs.rpc(
@@ -123,7 +197,11 @@ async def retry_render(
     request: Request,
     user: CurrentUser = Depends(get_current_user),
 ) -> RenderRunEnvelope:
-    await _require_render_format(request, user, job_id)  # task-035 V2·task-036
+    fmt = await _require_render_format(request, user, job_id)  # task-035 V2·task-036
+    if fmt == "shopping":  # 리뷰 반영 3: 재시도도 그 run 리비전의 참조 자산을 다시 본다
+        revision = await _run_revision(request, user, job_id, run_id)
+        if revision is not None:
+            await _require_shopping_assets(request, user, job_id, revision)
     await runs.expire_offline(request, user.workspace_id)  # E3
     out, _ = _envelope(
         await runs.rpc(

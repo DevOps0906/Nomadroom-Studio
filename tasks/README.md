@@ -46,7 +46,7 @@
 | task-042 | 스키마: 유형·분야·brief·제휴·권리·리비전 언어 | W8 | 038 | 높음 | builder + tester | 완료 |
 | task-043 | 쇼핑 편집안 검증 | W8 | 042 | 보통 | builder + tester | 완료 |
 | task-044 | 쇼핑 API | W8 | 043 | 높음 | builder + tester | 완료 |
-| task-045 | 쇼핑 렌더러 (로컬 워커) | W8 | 044, 030 | 높음 | builder + tester | 대기 |
+| task-045 | 쇼핑 렌더러 (로컬 워커) | W8 | 044, 030 | 높음 | builder + tester | 완료 |
 | task-046 | 화면: 유형 선택·PROD-01S·PROD-02S·게시 문구 | W8 | 044 | 보통 | builder | 완료 |
 | task-047 | 쇼핑 P0 인수 SHOP-01~06 | W8 | 045, 046 | 보통 | tester | 대기 |
 | task-048 | AI 대본 3안 + 게시 문구 초안 | W9 | 047, 029 | 높음 | builder + tester | 대기 |

@@ -33,6 +33,10 @@ class FakeServer:
         self.token = token
         self.calls: list[tuple[str, str]] = []
         self.inputs: dict[str, tuple[str, bytes]] = {}  # kind → (asset_id, 내용)
+        # task-045: 같은 kind 여러 건·parent_asset_id(쇼핑). {asset_id, kind, body, parent?}
+        self.input_items: list[dict] = []
+        self.drop_on_reissue: set[str] = set()  # 재발급(2번째 W-06부터) 응답에서 뺄 asset_id
+        self.claim_bodies: list[bytes] = []
         self.expire_first_inputs = False
         self.reject_first_upload = False
         self.progress_status = 200
@@ -59,6 +63,7 @@ class FakeServer:
         self.calls.append((request.method, path))
         parts = path.removeprefix("/worker/v1/production/").split("/")
         if parts == ["claim"]:
+            self.claim_bodies.append(request.content)
             return httpx.Response(204)
         _, _, action = parts
         if action == "inputs":
@@ -76,6 +81,17 @@ class FakeServer:
                             "expires_at": exp.isoformat(),
                         }
                         for k, (aid, _) in self.inputs.items()
+                    ]
+                    + [
+                        {
+                            "asset_id": it["asset_id"],
+                            "kind": it["kind"],
+                            "download_url": self._sign("in", it["asset_id"]),
+                            "expires_at": exp.isoformat(),
+                            "parent_asset_id": it.get("parent"),
+                        }
+                        for it in self.input_items
+                        if self._inputs_calls == 1 or it["asset_id"] not in self.drop_on_reissue
                     ]
                 },
             )
@@ -116,6 +132,9 @@ class FakeServer:
             for asset_id, body in self.inputs.values():
                 if asset_id == aid:
                     return httpx.Response(200, content=body)
+            for it in self.input_items:
+                if it["asset_id"] == aid:
+                    return httpx.Response(200, content=it["body"])
             return httpx.Response(404)
         if direction == "out" and request.method == "PUT":
             self._uploads += 1

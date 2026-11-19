@@ -28,6 +28,8 @@ REFRESH_STATUS = {400, 401, 403}  # Storage가 만료·서명 오류에 돌려�
 CHUNK = 1024 * 1024
 FINISH_BACKOFF = (1.0, 3.0)  # finish 재시도 간격(초) — 시도는 최대 3회
 PARSE_ERRORS = (ValidationError, ValueError, KeyError, TypeError)
+# task-045 R4: 이 워커가 처리할 수 있는 형식(W-05). 서버는 알린 워커에게만 쇼핑 task를 준다
+CAPABILITIES = ["shopping"]
 
 
 class Task(BaseModel):
@@ -56,6 +58,7 @@ class SignedUrl(BaseModel):
     kind: str
     url: str
     expires_at: datetime
+    parent_asset_id: uuid.UUID | None = None  # task-045 R5: 쇼핑 render 파생 source의 원본
 
     @field_validator("url")
     @classmethod
@@ -111,7 +114,7 @@ class WorkerApi:
         return resp
 
     def claim(self) -> Task | None:
-        resp = self._call("POST", "/claim", "W-05")
+        resp = self._call("POST", "/claim", "W-05", json={"capabilities": CAPABILITIES})
         if resp.status_code == 204:
             return None
         try:
@@ -119,20 +122,26 @@ class WorkerApi:
         except PARSE_ERRORS:
             raise ApiCallError("W-05: 응답 형식 오류") from None
 
-    def inputs(self, task: Task) -> dict[str, SignedUrl]:
+    def input_list(self, task: Task) -> list[SignedUrl]:
+        """W-06 입력 목록(R2: asset_id 기준, 같은 kind 여러 건)."""
         resp = self._call("GET", f"/{task.kind}/{task.id}/inputs", "W-06")
-        out: dict[str, SignedUrl] = {}
         try:
-            for item in resp.json()["inputs"]:
-                out[item["kind"]] = SignedUrl(
+            return [
+                SignedUrl(
                     asset_id=item["asset_id"],
                     kind=item["kind"],
                     url=item["download_url"],
                     expires_at=item["expires_at"],
+                    parent_asset_id=item.get("parent_asset_id"),
                 )
+                for item in resp.json()["inputs"]
+            ]
         except PARSE_ERRORS:  # ValidationError 원문은 URL을 담을 수 있어 버린다
             raise ApiCallError("W-06: 응답 형식 오류") from None
-        return out
+
+    def inputs(self, task: Task) -> dict[str, SignedUrl]:
+        """kind별 입력(일반·예능형: kind마다 1건). 같은 kind가 여럿이면 마지막 것."""
+        return {s.kind: s for s in self.input_list(task)}
 
     def outputs(self, task: Task, items: list[dict[str, Any]]) -> list[SignedUrl]:
         resp = self._call("POST", f"/{task.kind}/{task.id}/outputs", "W-07", json={"items": items})

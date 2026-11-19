@@ -94,11 +94,19 @@ class ClaimOut(BaseModel):
     task: TaskOut
 
 
+class ClaimIn(_In):
+    """task-045 R4: 워커가 처리할 수 있는 형식. shopping을 알린 워커에게만 쇼핑 task를 새로 준다."""
+
+    capabilities: Annotated[list[Literal["shopping"]], Field(max_length=5)] = []
+
+
 class InputOut(BaseModel):
     asset_id: uuid.UUID
     kind: str
     download_url: str
     expires_at: datetime
+    # task-045 R5: 쇼핑 render의 파생 source는 부모 source_upload(컷이 가리키는 id)를 함께 준다
+    parent_asset_id: uuid.UUID | None = None
 
 
 class InputsOut(BaseModel):
@@ -192,7 +200,7 @@ async def _task(
             request,
             "render_runs",
             {
-                "select": "id,job_id,status,claimed_by,lang",
+                "select": "id,job_id,status,claimed_by,lang,revision_id",
                 "id": f"eq.{task_id}",
                 "workspace_id": f"eq.{ws}",
             },
@@ -278,19 +286,130 @@ async def _assets_by_ids(request: Request, params: dict[str, str], ids: list) ->
     return rows
 
 
+def spec_refs(spec: Any) -> dict[str, list[str]]:
+    """쇼핑 편집안이 참조하는 자산 id(종류별, 순서 유지). 문자열이 아닌 값은 버린다."""
+    out: dict[str, list[str]] = {"cuts": [], "bgm": [], "narration": []}
+    if not isinstance(spec, dict):
+        return out
+    cuts = spec.get("cuts")
+    for c in cuts if isinstance(cuts, list) else []:
+        if isinstance(c, dict) and isinstance(c.get("source_asset_id"), str):
+            out["cuts"].append(c["source_asset_id"])
+    if isinstance(spec.get("bgm_asset_id"), str):
+        out["bgm"].append(spec["bgm_asset_id"])
+    voice = spec.get("voice")
+    ids = voice.get("narration_asset_ids") if isinstance(voice, dict) else None
+    out["narration"] = [i for i in (ids if isinstance(ids, list) else []) if isinstance(i, str)]
+    return out
+
+
+def _uuid_or_none(v: str) -> str | None:
+    try:
+        return str(uuid.UUID(v))
+    except ValueError:
+        return None
+
+
+async def shopping_ref_assets(
+    request: Request, ws: uuid.UUID, job_id: Any, spec: Any
+) -> tuple[list[dict], bool]:
+    """R3·R5: 편집안이 참조하는 이 작업 소유·ready·사용자 자산과 컷 원본(source_upload)의 파생
+    source. 반환 (서명할 행, 참조 전부 충족 여부).
+    source_upload 자체는 넣지 않는다(디코드 안 함)."""
+    refs = spec_refs(spec)
+    wanted = {
+        "cuts": ("source_upload", "source", "image"),
+        "bgm": ("bgm",),
+        "narration": ("narration",),
+    }
+    all_ids = {i for ids in refs.values() for i in ids}
+    ids = [u for u in (_uuid_or_none(i) for i in all_ids) if u]
+    base = {
+        "select": "id,kind,storage_path,parent_asset_id,created_at",
+        "job_id": f"eq.{job_id}",
+        "workspace_id": f"eq.{ws}",
+        "status": "eq.ready",
+        "render_run_id": "is.null",
+    }
+    rows = {str(r["id"]): r for r in await _assets_by_ids(request, base, ids)} if ids else {}
+    ok = len(ids) == len(all_ids)
+    for group, kinds in wanted.items():
+        ok = ok and all(rows.get(i, {}).get("kind") in kinds for i in refs[group])
+    uploads = [i for i in refs["cuts"] if rows.get(i, {}).get("kind") == "source_upload"]
+    children: dict[str, dict] = {}
+    if uploads:
+        derived = await _rows(
+            request,
+            "GET",
+            "production_assets",
+            params={
+                **base,
+                "kind": "eq.source",
+                "parent_asset_id": f"in.({','.join(sorted(set(uploads)))})",
+                "order": "created_at.desc,id.desc",
+            },
+        )
+        for r in derived:
+            children.setdefault(str(r["parent_asset_id"]), r)
+        ok = ok and all(u in children for u in uploads)
+    out = [r for r in rows.values() if r["kind"] != "source_upload"]
+    out += list(children.values())
+    out.sort(key=lambda r: str(r["id"]))
+    return out, ok
+
+
+async def _shopping_render_inputs(
+    request: Request, worker: CurrentWorker, job: dict, run: dict | None
+) -> list[InputOut]:
+    """R3: 이 run의 승인 리비전 spec이 참조하는 자산만 서명한다(없는 참조는 빼고 워커가 실패)."""
+    rev = await _one(
+        request,
+        "edit_revisions",
+        {
+            "select": "spec",
+            "id": f"eq.{run['revision_id']}" if run else "is.null",
+            "job_id": f"eq.{job['id']}",
+            "workspace_id": f"eq.{worker.workspace_id}",
+        },
+    )
+    rows, _ = await shopping_ref_assets(
+        request, worker.workspace_id, job["id"], rev.get("spec") if rev else None
+    )
+    settings = request.app.state.settings
+    inputs = []
+    for r in rows:
+        url, exp = await storage.sign_download(_http(request), settings, r["storage_path"])
+        inputs.append(
+            InputOut(
+                asset_id=r["id"],
+                kind=r["kind"],
+                download_url=url,
+                expires_at=exp,
+                parent_asset_id=r.get("parent_asset_id") if r["kind"] == "source" else None,
+            )
+        )
+    return inputs
+
+
 # --- W-05 수령 --------------------------------------------------------------------
 
 
 @router.post("/claim", response_model=ClaimOut, responses={204: {"description": "작업 없음"}})
 async def claim_task(
-    request: Request, worker: CurrentWorker = Depends(get_current_worker)
+    request: Request,
+    body: ClaimIn | None = None,
+    worker: CurrentWorker = Depends(get_current_worker),
 ) -> ClaimOut | Response:
     await _touch_heartbeat(request, worker, None)  # E4: current_job_id는 jobs FK라 null
     await runs.expire_offline(request, worker.workspace_id)  # E3
     task = await runs.rpc(
         request,
         "claim_production_task",
-        {"p_workspace": str(worker.workspace_id), "p_worker": str(worker.worker_id)},
+        {
+            "p_workspace": str(worker.workspace_id),
+            "p_worker": str(worker.worker_id),
+            "p_formats": sorted(set(body.capabilities)) if body else [],
+        },
     )
     if task is None:
         return Response(status_code=204)
@@ -312,7 +431,7 @@ async def task_inputs(
     response: Response,
     worker: CurrentWorker = Depends(get_current_worker),
 ) -> InputsOut:
-    job, _ = await _task(request, worker, kind, task_id)
+    job, run = await _task(request, worker, kind, task_id)
     settings = request.app.state.settings
     if kind == "prepare" and _is_shopping(job):
         # 쇼핑: ready 원본 전부(원본별로 source·analysis·sheet를 W-07로 올린다)
@@ -322,6 +441,11 @@ async def task_inputs(
             inputs.append(
                 InputOut(asset_id=r["id"], kind=r["kind"], download_url=url, expires_at=exp)
             )
+        response.headers["Cache-Control"] = "no-store"
+        logger.info("제작 입력 서명 발급: kind=%s id=%s n=%d", kind, task_id, len(inputs))
+        return InputsOut(inputs=inputs)
+    if kind == "render" and _is_shopping(job):
+        inputs = await _shopping_render_inputs(request, worker, job, run)
         response.headers["Cache-Control"] = "no-store"
         logger.info("제작 입력 서명 발급: kind=%s id=%s n=%d", kind, task_id, len(inputs))
         return InputsOut(inputs=inputs)
