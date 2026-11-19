@@ -1,0 +1,32 @@
+[project]
+name = "nomadroom-worker"
+version = "0.1.0"
+description = "Nomadroom Studio 로컬 워커: FastAPI /worker/v1/*만 호출(DB·Supabase 키 없음). 제작 prepare·render"
+requires-python = ">=3.14"
+dependencies = [
+    "httpx>=0.28.1",
+    "pillow>=12.0.0",
+    "pydantic-settings>=2.16.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "ruff>=0.17.5",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "tests/production"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "S603"]
+"production/media.py" = ["S603"]
+"production/render.py" = ["S603"]  # 고정 인자 ffmpeg(사용자 문자열은 파일 내용뿐)
