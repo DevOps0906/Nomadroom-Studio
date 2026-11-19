@@ -4,6 +4,7 @@ import { DashboardForbidden } from "@/components/dashboard/dashboard-view";
 import { isUuid } from "@/components/monitoring/query";
 import { JobsError } from "@/components/production/job-list-view";
 import { EditForm, type EditRevision } from "@/components/production/edit/edit-form";
+import { ShoppingEditForm } from "@/components/production/shopping/edit-form";
 import { ApiError, SESSION_EXPIRED_PATH, classifyApiError } from "@/server/api/client";
 import { getProductionJob, getProductionRevision, type ProductionJobDetail } from "@/server/api/production";
 
@@ -52,20 +53,40 @@ export default async function ProductionEditPage({ params }: { params: Promise<{
         <h1 className="line-clamp-2 text-h1 font-bold">
           {job.title}
         </h1>
+        {job.kind === "shopping" && (
+          <p className="text-caption font-semibold text-primary">쇼핑{job.vertical ? "·" + (job.vertical === "travel" ? "여행" : "상품") : ""} 형식</p>
+        )}
         <p className="text-caption text-text-muted">{revision ? `리비전 ${revision.rev_no}${revision.approved_at ? " · 승인됨" : ""}` : "리비전 없음"}</p>
       </header>
-      <EditForm
-        key={`${job.id}-${revision?.rev_no ?? 0}`}
-        job={{ id: job.id, title: job.title, status: job.status, failed_stage: job.failed_stage, format: job.format }}
-        revision={revision}
-        sheet={{
-          jobId: job.id,
-          sheetIds: assets.filter((a) => a.kind === "sheet" && a.status === "ready").map((a) => a.id),
-          sourceStart: job.source_start_sec,
-          segmentLen: job.segment_len_sec,
-          sourceDuration: source?.duration_sec ?? null,
-        }}
-      />
+      {job.kind === "shopping" ? (
+        <ShoppingEditForm
+          key={`${job.id}-${revision?.rev_no ?? 0}`}
+          job={{ id: job.id, title: job.title, status: job.status, failed_stage: job.failed_stage, vertical: job.vertical ?? null }}
+          revision={revision}
+          brief={job.brief ?? null}
+          assets={assets.map((a) => ({ id: a.id, kind: a.kind, status: a.status, duration_sec: a.duration_sec }))}
+          sheet={{
+            jobId: job.id,
+            sheetIds: assets.filter((a) => a.kind === "sheet" && a.status === "ready").map((a) => a.id),
+            sourceStart: job.source_start_sec,
+            segmentLen: job.segment_len_sec,
+            sourceDuration: source?.duration_sec ?? null,
+          }}
+        />
+      ) : (
+        <EditForm
+          key={`${job.id}-${revision?.rev_no ?? 0}`}
+          job={{ id: job.id, title: job.title, status: job.status, failed_stage: job.failed_stage, format: job.format === "variety" ? "variety" : "category" }}
+          revision={revision}
+          sheet={{
+            jobId: job.id,
+            sheetIds: assets.filter((a) => a.kind === "sheet" && a.status === "ready").map((a) => a.id),
+            sourceStart: job.source_start_sec,
+            segmentLen: job.segment_len_sec,
+            sourceDuration: source?.duration_sec ?? null,
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { DashboardForbidden } from "@/components/dashboard/dashboard-view";
 import { isUuid } from "@/components/monitoring/query";
 import { formatBytes } from "@/components/production/format";
 import { SourceForm } from "@/components/production/source-form";
+import { ShoppingSourceForm } from "@/components/production/shopping/source-form";
 import { SourceHeader } from "@/components/production/source-view";
 import { JobsError } from "@/components/production/job-list-view";
 import { ApiError, SESSION_EXPIRED_PATH, classifyApiError } from "@/server/api/client";
@@ -31,6 +32,28 @@ export default async function ProductionSourcePage({ params }: { params: Promise
   }
 
   const { job, assets } = detail;
+  if (job.kind === "shopping") {
+    return (
+      <div className="mx-auto flex max-w-3xl flex-col gap-4 tablet:gap-5 desktop:max-w-5xl">
+        <SourceHeader title={job.title} />
+        <ShoppingSourceForm
+          key={`${job.id}-${job.status}`}
+          job={{
+            id: job.id,
+            title: job.title,
+            status: job.status,
+            failed_stage: job.failed_stage,
+            error_code: job.error_code,
+            vertical: job.vertical ?? null,
+            brief: job.brief ?? null,
+            affiliates: job.affiliates ?? [],
+            comment_keyword: job.comment_keyword ?? null,
+          }}
+          assets={assets.map((a) => ({ id: a.id, kind: a.kind, status: a.status, size_bytes: a.size_bytes }))}
+        />
+      </div>
+    );
+  }
   const source = assets.find((a) => a.kind === "source_upload" && a.status === "ready");
   const info = source ? [source.size_bytes ? formatBytes(source.size_bytes) : null, source.duration_sec ? `${Math.round(source.duration_sec)}초` : null].filter(Boolean).join(" · ") : undefined;
 
@@ -52,7 +75,7 @@ export default async function ProductionSourcePage({ params }: { params: Promise
           segment_len_sec: job.segment_len_sec,
           source_kind: job.source_kind,
           source_url: job.source_url,
-          format: job.format,
+          format: job.format === "variety" ? "variety" : "category",
         }}
         candidate={null}
         hasReadySource={!!source}

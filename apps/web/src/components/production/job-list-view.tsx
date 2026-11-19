@@ -12,7 +12,26 @@ const LINK_BTN = cn("inline-flex min-h-11 items-center justify-center rounded-co
 const PRIMARY = cn(LINK_BTN, "bg-primary text-primary-fg hover:bg-primary-hover");
 const CHIP = cn("inline-flex min-h-11 items-center rounded-chip border px-3 text-body font-medium", FOCUS);
 
-const FORMAT_LABEL = { category: "카테고리형", variety: "예능형" } as const;
+const FORMAT_LABEL = { category: "카테고리형", variety: "예능형", shopping: "쇼핑" } as const;
+const VERTICAL_TEXT = { product: "상품", travel: "여행" } as const;
+
+/** 형식 칸 문구: 쇼핑은 분야까지(쇼핑·상품), 그 밖은 형식. */
+export function formatText(j: Pick<ProductionJobListItem, "format" | "kind" | "vertical">): string {
+  return j.kind === "shopping" && j.vertical ? FORMAT_LABEL.shopping + "·" + VERTICAL_TEXT[j.vertical] : FORMAT_LABEL[j.format];
+}
+
+function LangBadges({ langs }: { langs?: ("ko" | "ja")[] }) {
+  if (!langs || langs.length === 0) return null;
+  return (
+    <span className="inline-flex gap-1" aria-label="언어">
+      {langs.map((l) => (
+        <span key={l} className="rounded-chip bg-neutral-soft px-2 py-0.5 text-caption font-semibold text-neutral-soft-fg">
+          {l}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 function listHref(status: ProductionStatus | null, page = 1) {
   const q = new URLSearchParams();
@@ -37,7 +56,7 @@ export function ProductionHeader() {
         <p className="mt-1 text-body text-text-muted">소재수집 후보나 업로드한 원본으로 편집안을 만들고 MP4를 검수합니다.</p>
       </div>
       <Link href="/production/new" className={PRIMARY}>
-        새 작업
+        내부 제작
       </Link>
     </div>
   );
@@ -88,7 +107,8 @@ export function JobTable({ items, status, page }: { items: ProductionJobListItem
             </Link>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-caption text-text-muted">
               <StatusTag job={j} />
-              <span>{FORMAT_LABEL[j.format]}</span>
+              <span>{j.kind === "shopping" ? "쇼핑" : "일반"} · {formatText(j)}</span>
+              <LangBadges langs={j.langs} />
               <time dateTime={j.updated_at}>{formatDateTime(j.updated_at)}</time>
             </div>
           </li>
@@ -100,7 +120,9 @@ export function JobTable({ items, status, page }: { items: ProductionJobListItem
           <thead className="bg-surface-alt text-caption text-text-muted">
             <tr>
               <th scope="col" className="px-4 py-3 font-semibold">제목</th>
-              <th scope="col" className="px-4 py-3 font-semibold">형식</th>
+              <th scope="col" className="px-4 py-3 font-semibold">유형</th>
+              <th scope="col" className="px-4 py-3 font-semibold">형식(분야)</th>
+              <th scope="col" className="px-4 py-3 font-semibold">언어</th>
               <th scope="col" className="px-4 py-3 font-semibold">상태</th>
               <th scope="col" className="px-4 py-3 font-semibold">수정 시각</th>
             </tr>
@@ -113,7 +135,11 @@ export function JobTable({ items, status, page }: { items: ProductionJobListItem
                     {j.title}
                   </Link>
                 </td>
-                <td className="px-4 py-3">{FORMAT_LABEL[j.format]}</td>
+                <td className="px-4 py-3">{j.kind === "shopping" ? "쇼핑" : "일반"}</td>
+                <td className="px-4 py-3">{formatText(j)}</td>
+                <td className="px-4 py-3">
+                  <LangBadges langs={j.langs} />
+                </td>
                 <td className="px-4 py-3">
                   <StatusTag job={j} />
                 </td>

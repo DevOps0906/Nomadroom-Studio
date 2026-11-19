@@ -9,6 +9,8 @@ import { createIntentKey } from "@/components/monitoring/intent-key";
 import type { ProductionJobDetail } from "@/server/api/production";
 import { STAGE_LABEL, STATUS_LABEL, STATUS_TONE } from "../format";
 import { approveReview, assetUrl, requestRender, retryRender, type RunResult } from "./api";
+import { PublishTextCard, RightsList } from "./shopping-extras";
+import { VERTICAL_LABEL } from "../shopping/model";
 import { HOOK_NEED_TEXT, REASON_TEXT, STEPS, latestAsset, stageLabel, stepStates, viewOf, type StepState } from "./model";
 
 // PROD-03 작업·검수. 서버(A-09 GET)가 정본이고 렌더 요청·재시도·검수 승인은 Route Handler로 보낸다.
@@ -104,6 +106,7 @@ export function RunView({ detail }: { detail: ProductionJobDetail }) {
   const mp4 = latestAsset(detail.assets, "output_mp4");
   const report = latestAsset(detail.assets, "report");
   const locked = busy !== null || pending;
+  const shopping = job.kind === "shopping";
   const polling = job.status === "rendering" || run?.status === "queued" || run?.status === "running";
 
   useEffect(() => {
@@ -180,6 +183,11 @@ export function RunView({ detail }: { detail: ProductionJobDetail }) {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <span className={cn("rounded-chip px-2 py-0.5 text-caption font-semibold", STATUS_TONE[job.status])}>{STATUS_LABEL[job.status]}</span>
+        {shopping && (
+          <span className="rounded-chip bg-primary-soft px-2 py-0.5 text-caption font-semibold text-primary-soft-fg">
+            쇼핑{job.vertical ? `·${VERTICAL_LABEL[job.vertical]}` : ""}
+          </span>
+        )}
         <span className="text-caption text-text-muted">ko{run ? ` · 시도 ${run.attempt}` : ""}</span>
       </div>
 
@@ -277,6 +285,8 @@ export function RunView({ detail }: { detail: ProductionJobDetail }) {
               <p className="text-text-muted">리포트가 아직 없습니다.</p>
             )}
           </section>
+          {shopping && <RightsList assets={detail.assets} />}
+          {shopping && <PublishTextCard jobId={job.id} />}
           <div className="flex flex-wrap gap-2">
             {v.inspect && (
               <button type="button" disabled={locked || !mp4} onClick={() => void onApprove()} className={PRIMARY}>

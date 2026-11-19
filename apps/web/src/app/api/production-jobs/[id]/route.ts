@@ -3,6 +3,7 @@ import { assertSameOrigin } from "@/server/auth/same-origin";
 import { isUuid } from "@/components/monitoring/query";
 import { URL_ONLY, isYoutubeUrl } from "@/components/production/api";
 import { INVALID, fromApiError, isCredit, isLicense, json, readBody, segmentError } from "../_shared";
+import { parseShoppingFields } from "../_shopping";
 
 // PROD-01 저장 중계(A-09 PATCH). 보낸 필드만 전달한다.
 
@@ -42,6 +43,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!isCredit(b.credit)) return json(400, INVALID);
     patch.credit = (b.credit as string | null) || null;
   }
+  // 쇼핑 항목(task-044 P10): brief·affiliates·vertical·comment_keyword. 일반 작업이면 API가 400.
+  const shopping = parseShoppingFields(b);
+  if (!shopping.ok) return json(400, { code: "VALIDATION", message: shopping.message, field: shopping.field });
+  Object.assign(patch, shopping.value);
   if (Object.keys(patch).length === 0) return json(400, INVALID);
 
   try {

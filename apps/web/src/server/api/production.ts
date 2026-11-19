@@ -7,10 +7,31 @@ import { apiFetch } from "./client";
 
 export type ProductionStatus = "draft" | "preparing" | "review" | "rendering" | "inspect" | "done" | "failed";
 
+export type ShoppingVertical = "product" | "travel";
+export type ShoppingBrief = {
+  product_name?: string;
+  pain?: string;
+  destination?: string;
+  product_type?: "stay" | "tour" | "package";
+  appeal?: string;
+  scenes?: string[];
+  avoid?: string;
+  facts?: string[];
+  target?: { gender?: "female" | "male" | "all"; age?: string };
+};
+export type Affiliate = { lang: "ko" | "ja"; partner: string; url: string };
+export type JobFormat = "category" | "variety" | "shopping";
+
 export type ProductionJob = {
   id: string;
   title: string;
-  format: "category" | "variety";
+  format: JobFormat;
+  // 쇼핑 확장(A-09, task-044). 일반 작업은 kind=general·나머지 비어 있음.
+  kind?: "general" | "shopping";
+  vertical?: ShoppingVertical | null;
+  brief?: ShoppingBrief | null;
+  affiliates?: Affiliate[];
+  comment_keyword?: string | null;
   status: ProductionStatus;
   failed_stage: "prepare" | "audio" | "render" | null;
   error_code: string | null;
@@ -36,7 +57,17 @@ export type ProductionJob = {
 export type ProductionJobListItem = Pick<
   ProductionJob,
   "id" | "title" | "format" | "status" | "failed_stage" | "error_code" | "candidate_id" | "updated_at" | "completed_at"
->;
+> & { kind?: "general" | "shopping"; vertical?: ShoppingVertical | null; langs?: ("ko" | "ja")[] };
+
+export type RightsBasis = "own" | "licensed" | "permission" | "quote" | "platform_audio";
+export type AssetRights = {
+  basis: RightsBasis;
+  source_url?: string;
+  author?: string;
+  has_person?: boolean;
+  portrait_consent?: boolean;
+  note?: string;
+};
 
 export type ProductionAsset = {
   id: string;
@@ -44,6 +75,8 @@ export type ProductionAsset = {
   status: "pending" | "ready";
   size_bytes: number | null;
   duration_sec: number | null;
+  // A-09 GET은 아직 권리를 돌려주지 않는다(ASSET_COLUMNS). 주면 PROD-03 권리 목록이 채운다.
+  rights?: AssetRights | null;
 };
 
 export type SpecIssue = { code: string; path: string; message: string };
@@ -76,7 +109,13 @@ export type ProductionJobDetail = {
 
 export type CreateProductionJob = {
   title: string;
-  format?: "category" | "variety";
+  kind?: "general" | "shopping";
+  format?: JobFormat;
+  vertical?: ShoppingVertical;
+  brief?: ShoppingBrief;
+  affiliates?: Affiliate[];
+  comment_keyword?: string | null;
+  not_banned_confirmed?: boolean;
   candidate_id?: string;
   source_kind: "upload" | "url";
   source_url?: string | null;
@@ -88,10 +127,13 @@ export type CreateProductionJob = {
 };
 
 export type PatchProductionJob = Partial<
-  Pick<CreateProductionJob, "source_kind" | "source_url" | "rights_confirmed" | "license_cc" | "credit" | "source_start_sec" | "segment_len_sec">
+  Pick<
+    CreateProductionJob,
+    "source_kind" | "source_url" | "rights_confirmed" | "license_cc" | "credit" | "source_start_sec" | "segment_len_sec" | "vertical" | "brief" | "affiliates" | "comment_keyword"
+  >
 >;
 
-export type UploadKind = "source_upload" | "hook_audio";
+export type UploadKind = "source_upload" | "hook_audio" | "image" | "bgm" | "narration";
 export type UploadTicket = {
   asset: { id: string; kind: UploadKind; status: "pending" };
   upload_url: string;
@@ -126,7 +168,7 @@ export async function patchProductionJob(id: string, body: PatchProductionJob): 
 }
 
 /** A-10 업로드 서명 발급. upload_url은 브라우저가 PUT 한 번에만 쓰고 저장·로그하지 않는다. */
-export function requestProductionUpload(id: string, body: { kind: UploadKind; size_bytes: number; mime: string }) {
+export function requestProductionUpload(id: string, body: { kind: UploadKind; size_bytes: number; mime: string; rights?: AssetRights }) {
   return apiFetch<UploadTicket>(`${jobPath(id)}/uploads`, { method: "POST", body });
 }
 
@@ -202,4 +244,17 @@ export const AI_DRAFT_TIMEOUT_MS = 200_000;
 /** A-14 AI 초안(새 리비전, origin=ai_draft, 기존 편집 보존). 같은 키 재요청은 기존 결과. 자동 승인 없음. */
 export async function requestProductionAiDraft(id: string, idempotencyKey: string): Promise<AiDraftResult> {
   return apiFetch<AiDraftResult>(`${jobPath(id)}/ai-draft`, { method: "POST", idempotencyKey, timeoutMs: AI_DRAFT_TIMEOUT_MS });
+}
+
+/** A-10 자산 삭제(task-044 P9). 204. 현재 리비전이 참조하는 사진·BGM·녹음과 준비 시작 뒤 원본은 409. */
+export async function deleteProductionAsset(id: string, assetId: string): Promise<void> {
+  await apiFetch<undefined>(`${jobPath(id)}/assets/${encodeURIComponent(assetId)}`, { method: "DELETE" });
+}
+
+export type PublishText = { caption: string; pinned_comment: string; recommended_time: string };
+export type PublishTextResult = { text: PublishText; render_run_id: string; lang: "ko" | "ja" };
+
+/** A-21 게시 문구(쇼핑만). 제휴 링크가 들어 있으므로 저장·로그하지 않는다(task-044 P8). */
+export function getProductionPublishText(id: string, lang: "ko" | "ja", renderRunId?: string): Promise<PublishTextResult> {
+  return apiFetch<PublishTextResult>(`${jobPath(id)}/publish-text`, { query: { lang, render_run_id: renderRunId } });
 }
