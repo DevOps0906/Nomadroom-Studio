@@ -140,6 +140,21 @@ def analysis_text(raw: bytes | None) -> str:
     return text
 
 
+def image_blocks(sheets: list[bytes]) -> list[dict[str, Any]]:
+    """JPEG 시트 이미지 블록(base64). 다른 형식은 호출 전에 걸러진다."""
+    return [
+        {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": SHEET_MIME,
+                "data": base64.b64encode(data).decode("ascii"),
+            },
+        }
+        for data in sheets
+    ]
+
+
 def build_content(
     sheets: list[bytes], analysis: str, candidate_title: str | None, max_duration: float
 ) -> list[dict[str, Any]]:
@@ -147,16 +162,7 @@ def build_content(
     content: list[dict[str, Any]] = []
     for i, data in enumerate(sheets, start=1):
         content.append({"type": "text", "text": f"시트 {i}"})
-        content.append(
-            {
-                "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": SHEET_MIME,
-                    "data": base64.b64encode(data).decode("ascii"),
-                },
-            }
-        )
+        content.extend(image_blocks([data]))
     # 꺾쇠를 \u 이스케이프해 데이터가 </untrusted_data> 경계를 닫지 못하게 한다(JSON 의미는 같음)
     data = (
         json.dumps({"candidate_title": candidate_title, "analysis": analysis}, ensure_ascii=False)
@@ -183,8 +189,15 @@ class DraftFailed(Exception):
     """Claude 오류·응답 형식 불일치(사유 코드만 담는다)."""
 
 
-async def call_claude(settings: Settings, content: list[dict[str, Any]]) -> dict[str, Any]:
-    """한 번 호출해 도구 입력(dict)을 돌려준다. 실패는 DraftFailed(사유는 예외 이름·코드만)."""
+async def call_claude(
+    settings: Settings,
+    content: list[dict[str, Any]],
+    system: str = SYSTEM_PROMPT,
+    tool: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """한 번 호출해 도구 입력(dict)을 돌려준다. 실패는 DraftFailed(사유는 예외 이름·코드만).
+    system·tool을 주지 않으면 카테고리형 프롬프트·도구(예능형은 ai_draft_variety 값을 넘긴다)."""
+    tool = tool or _tool_schema(settings)
     key = settings.anthropic_api_key
     if key is None:
         raise DraftFailed("no_key")
@@ -197,9 +210,9 @@ async def call_claude(settings: Settings, content: list[dict[str, Any]]) -> dict
             resp = await client.messages.create(
                 model=settings.ai_draft_model,
                 max_tokens=settings.ai_draft_max_tokens,
-                system=SYSTEM_PROMPT,
-                tools=[_tool_schema(settings)],
-                tool_choice={"type": "tool", "name": TOOL_NAME},
+                system=system,
+                tools=[tool],
+                tool_choice={"type": "tool", "name": tool["name"]},
                 messages=[{"role": "user", "content": content}],
             )
     except anthropic.AnthropicError as exc:
@@ -207,7 +220,10 @@ async def call_claude(settings: Settings, content: list[dict[str, Any]]) -> dict
     if getattr(resp, "stop_reason", None) == "max_tokens":
         raise DraftFailed("max_tokens")
     for block in getattr(resp, "content", None) or []:
-        if getattr(block, "type", None) == "tool_use" and getattr(block, "name", None) == TOOL_NAME:
+        if (
+            getattr(block, "type", None) == "tool_use"
+            and getattr(block, "name", None) == tool["name"]
+        ):
             out = getattr(block, "input", None)
             if isinstance(out, dict):
                 return out

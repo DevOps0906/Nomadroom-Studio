@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { EVIDENCE_SESSION_EXPIRED_PATH as SESSION_EXPIRED_PATH } from "@/components/evidence/evidence";
 import type { SpecIssue, Validation } from "@/server/api/production";
+import { AiDraftButton } from "./AiDraftButton";
 import { approveRevision, saveRevision, type EditResult } from "./api";
 import { approveBlockers, isEditableStatus, issuesAt } from "./model";
 import { SheetPanel, type SheetInfo } from "./sheet-panel";
@@ -146,6 +147,9 @@ export function VarietyTimeline({ draft }: { draft: VarietyDraft }) {
   );
 }
 
+// task-040 A6: 대사 전송 고지(PRD#8 팀장 결정 문구)
+export const AI_DRAFT_SEND_NOTICE = "AI 초안을 만들면 입력한 대사·분석 시트·후보 제목이 Anthropic(Claude)으로 전송됩니다.";
+
 export function VarietyEditForm({ job, revision, sheet }: { job: EditJob; revision: EditRevision | null; sheet: SheetInfo | null }) {
   const router = useRouter();
   const editable = isEditableStatus(job.status, job.failed_stage);
@@ -159,7 +163,7 @@ export function VarietyEditForm({ job, revision, sheet }: { job: EditJob; revisi
   const [localErr, setLocalErr] = useState<{ path: string; message: string } | null>(null);
   const [rejected, setRejected] = useState(false);
   const [conflict, setConflict] = useState(false);
-  const [phase, setPhase] = useState<"idle" | "saving" | "approving">("idle");
+  const [phase, setPhase] = useState<"idle" | "saving" | "approving" | "drafting">("idle");
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [section, setSection] = useState<Section>("cuts");
   const busy = phase !== "idle";
@@ -223,6 +227,18 @@ export function VarietyEditForm({ job, revision, sheet }: { job: EditJob; revisi
     setSnapshot(JSON.stringify(draft));
     setMessage({ tone: "ok", text: rev.validation.errors.length > 0 ? `저장했습니다. 검증 오류 ${rev.validation.errors.length}건이 있습니다.` : "저장했습니다." });
     return true;
+  }
+
+  // A-14 AI 초안(새 리비전)을 양식에 반영한다. 이전 편집안은 서버에 보관된다.
+  function applyDraft(rev: EditRevision) {
+    const d = toVarietyDraft(rev.spec);
+    setDraft(d);
+    setSnapshot(JSON.stringify(d));
+    setRevNo(rev.rev_no);
+    setValidation(rev.validation);
+    setApprovedAt(rev.approved_at);
+    setRejected(false);
+    setLocalErr(null);
   }
 
   const blockers = approveBlockers({ status: job.status, hasRevision: revNo !== null, dirty, approved: approvedAt !== null, errorCount: rejected ? Math.max(errors.length, 1) : errors.length, busy });
@@ -580,9 +596,11 @@ export function VarietyEditForm({ job, revision, sheet }: { job: EditJob; revisi
         <button type="button" disabled={blockers.length > 0 || conflict} aria-describedby={blockers.length > 0 ? "approve-why" : undefined} onClick={() => void approve()} className={SECONDARY}>
           {phase === "approving" ? "승인하는 중…" : "승인"}
         </button>
+        <AiDraftButton jobId={job.id} disabled={busy || conflict || job.status !== "review"} dirty={dirty} onBusy={(b) => setPhase(b ? "drafting" : "idle")} onApplied={applyDraft} onFail={handleFail} />
         <button type="button" disabled={busy} onClick={cancel} className={SECONDARY}>
           취소
         </button>
+        <p className="text-caption text-text-muted tablet:basis-full">{AI_DRAFT_SEND_NOTICE}</p>
       </div>
     </form>
   );

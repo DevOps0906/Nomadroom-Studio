@@ -2,7 +2,7 @@
 -- 근거: tasks/task-029.md#착수-결정 H1·H2·H3
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(34);
+select plan(37);
 
 insert into auth.users (id, email, aud, role) values
   ('66666666-6666-4666-8666-666666666666', 'prod-ai@test.local', 'authenticated', 'authenticated');
@@ -10,7 +10,7 @@ insert into public.workspaces (id, name) values
   ('eeeeeeee-0000-4000-8000-000000000001', 'prod-ai-a'),
   ('eeeeeeee-0000-4000-8000-000000000002', 'prod-ai-b');
 
--- 작업: 11 review(미승인 rev1) · 12 inspect · 13 review(variety) · 14 review(상한 도달) · 15 review(다른 키 작업)
+-- 작업: 11 review(미승인 rev1) · 12 inspect · 13 review(variety, task-040부터 허용) · 14 review(상한 도달) · 15 review(다른 키 작업)
 insert into public.production_jobs
   (id, workspace_id, title, format, segment_len_sec, preset_version, idempotency_key, status, ai_draft_count) values
   ('eeeeeeee-0000-4000-8000-000000000011', 'eeeeeeee-0000-4000-8000-000000000001', 'j11', 'category', 60, 'category-1080-v1', 'k11', 'review', 0),
@@ -20,6 +20,14 @@ insert into public.production_jobs
   ('eeeeeeee-0000-4000-8000-000000000015', 'eeeeeeee-0000-4000-8000-000000000001', 'j15', 'category', 60, 'category-1080-v1', 'k15', 'review', 0),
   ('eeeeeeee-0000-4000-8000-000000000016', 'eeeeeeee-0000-4000-8000-000000000001', 'j16', 'category', 60, 'category-1080-v1', 'k16', 'review', 0),
   ('eeeeeeee-0000-4000-8000-000000000017', 'eeeeeeee-0000-4000-8000-000000000001', 'j17', 'category', 60, 'category-1080-v1', 'k17', 'review', 0);
+-- task-040 A1: 18 review(shopping) · 19 review(variety·lang ja — 작업 lang check를 이 트랜잭션에서만 풀어 방어 분기 확인)
+insert into public.production_jobs
+  (id, workspace_id, title, kind, vertical, format, segment_len_sec, preset_version, idempotency_key, status, ai_draft_count) values
+  ('eeeeeeee-0000-4000-8000-000000000018', 'eeeeeeee-0000-4000-8000-000000000001', 'j18', 'shopping', 'product', 'shopping', 60, 'shopping-1080-v1', 'k18', 'review', 0);
+alter table public.production_jobs drop constraint production_jobs_lang_check;
+insert into public.production_jobs
+  (id, workspace_id, title, format, lang, segment_len_sec, preset_version, idempotency_key, status, ai_draft_count) values
+  ('eeeeeeee-0000-4000-8000-000000000019', 'eeeeeeee-0000-4000-8000-000000000001', 'j19', 'variety', 'ja', 60, 'variety-1080-v1', 'k19', 'review', 0);
 insert into public.edit_revisions (id, workspace_id, job_id, rev_no, spec, approved_at) values
   ('eeeeeeee-0000-4000-8000-000000000031', 'eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000011', 1, '{"user": "edit"}', null),
   ('eeeeeeee-0000-4000-8000-000000000037', 'eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000017', 1, '{"user": "edit"}', null);
@@ -90,10 +98,17 @@ select throws_ok(
   $$select public.reserve_ai_draft('eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000012',
     '66666666-6666-4666-8666-666666666666', 'ai-3', 3)$$,
   'NR010', '현재 상태(inspect)에서는 할 수 없습니다.', 'review 아님 → NR010');
+select is(
+  (public.reserve_ai_draft('eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000013',
+    '66666666-6666-4666-8666-666666666666', 'ai-4', 3) ->> 'ai_draft_count')::int, 1, 'variety(ko) 예약 가능(task-040 A1)');
 select throws_ok(
-  $$select public.reserve_ai_draft('eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000013',
-    '66666666-6666-4666-8666-666666666666', 'ai-4', 3)$$,
-  'NR010', null, 'variety → NR010');
+  $$select public.reserve_ai_draft('eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000018',
+    '66666666-6666-4666-8666-666666666666', 'ai-4s', 3)$$,
+  'NR010', '이 형식(shopping)은 AI 초안을 지원하지 않습니다.', 'shopping → NR010');
+select throws_ok(
+  $$select public.reserve_ai_draft('eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000019',
+    '66666666-6666-4666-8666-666666666666', 'ai-4j', 3)$$,
+  'NR010', null, 'variety lang ja → NR010');
 select throws_ok(
   $$select public.reserve_ai_draft('eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000014',
     '66666666-6666-4666-8666-666666666666', 'ai-5', 3)$$,
@@ -103,8 +118,12 @@ select throws_ok(
     '66666666-6666-4666-8666-666666666666', 'ai-6', 3)$$,
   'NR009', null, '타 워크스페이스 → NR009');
 select is((select sum(jsonb_array_length(ai_draft_requests))::int from public.production_jobs
-  where id in ('eeeeeeee-0000-4000-8000-000000000012', 'eeeeeeee-0000-4000-8000-000000000013',
-               'eeeeeeee-0000-4000-8000-000000000014')), 0, '거부된 요청은 기록 없음');
+  where id in ('eeeeeeee-0000-4000-8000-000000000012', 'eeeeeeee-0000-4000-8000-000000000014',
+               'eeeeeeee-0000-4000-8000-000000000018', 'eeeeeeee-0000-4000-8000-000000000019')), 0,
+  '거부된 요청은 기록 없음(shopping·ja 포함, 계수 없음)');
+select is((select sum(ai_draft_count)::int from public.production_jobs
+  where id in ('eeeeeeee-0000-4000-8000-000000000018', 'eeeeeeee-0000-4000-8000-000000000019')), 0,
+  'shopping·ja 거부는 횟수 증가 없음');
 
 -- 6. 실패 기록: 횟수 유지, 같은 키 재요청은 failed 결과
 select lives_ok(

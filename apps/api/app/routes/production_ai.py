@@ -1,5 +1,6 @@
 """AI 초안 A-14 `POST /v1/production-jobs/{id}/ai-draft`. 근거: docs/04_API.md#A-14,
-tasks/task-029.md#착수-결정 H1~H8, supabase/migrations/20261119000018_production_ai_draft.sql.
+tasks/task-029.md#착수-결정 H1~H8, supabase/migrations/20261119000018_production_ai_draft.sql,
+예능형 분기 tasks/task-040.md#착수-결정 A1~A5(000022: variety·ko만 예약).
 
 순서: 키 확인(없으면 503, 계수 없음) → reserve_ai_draft(잠금·상태·형식·상한·60초·멱등, 횟수+1, 커밋)
 → 잠금 없이 입력 수집·Claude 호출(형식 불일치·오류는 1회 재시도) → create_ai_draft_revision
@@ -16,13 +17,15 @@ from pydantic import BaseModel
 
 from app.auth.user import CurrentUser, get_current_user
 from app.errors import ApiError, db_error
-from app.production import ai_draft, runs
+from app.production import ai_draft, ai_draft_variety, runs
+from app.production.validation_variety import MAX_TEXT_CHARS
 from app.routes.production_jobs import (
     RevisionOut,
     _get_job,
     _rejected,
     _rows,
     _source_duration,
+    _source_size,
     _validate,
 )
 from app.routes.profiles import _send
@@ -34,6 +37,7 @@ router = APIRouter(prefix="/v1/production-jobs", tags=["production-jobs"])
 
 MAX_ANALYSIS_BYTES = 50 * 1024 * 1024  # W-07 analysis 상한과 같은 값
 ATTEMPTS = 2  # 첫 호출 + 재시도 1회(H4)
+MAX_TITLE_CHARS = MAX_TEXT_CHARS  # 후보 제목 프롬프트 상한(자막 문구 상한과 같은 값)
 
 
 class AiDraftOut(BaseModel):
@@ -90,38 +94,49 @@ def _out(result: Any) -> AiDraftOut:
     )
 
 
-async def _inputs(request: Request, ws: uuid.UUID, job: dict) -> tuple[list[bytes], bytes | None]:
-    """ready 시트(JPEG, 상한 장수)와 최신 ready analysis. 자산은 작업·워크스페이스 조건으로만."""
+def _asset_filter(ws: uuid.UUID, job: dict) -> dict[str, str]:
+    return {"job_id": f"eq.{job['id']}", "workspace_id": f"eq.{ws}", "status": "eq.ready"}
+
+
+async def _sheets(request: Request, ws: uuid.UUID, job: dict) -> list[tuple[int, bytes]]:
+    """ready 시트(JPEG, 상한 장수) — (순번 0부터, 바이트). 경로에 페이지가 없으므로
+    created_at·id 순번을 페이지로 본다(워커가 W-07을 시트마다 순서대로 호출하는 전제)."""
     state = request.app.state
     settings = state.settings
-    base = {"job_id": f"eq.{job['id']}", "workspace_id": f"eq.{ws}", "status": "eq.ready"}
     sheet_rows = await _rows(
         request,
         "GET",
         "production_assets",
         params={
-            **base,
+            **_asset_filter(ws, job),
             "select": "storage_path,mime",
             "kind": "eq.sheet",
-            "order": "created_at.asc",
+            "order": "created_at.asc,id.asc",
             "limit": str(settings.ai_draft_max_sheets),
         },
     )
-    sheets: list[bytes] = []
-    for row in sheet_rows:
+    sheets: list[tuple[int, bytes]] = []
+    for idx, row in enumerate(sheet_rows):
         if row.get("mime") != ai_draft.SHEET_MIME:
             continue
         data = await ai_draft.download(
             state.http, settings, row["storage_path"], ai_draft.MAX_SHEET_BYTES
         )
         if ai_draft.is_jpeg(data):
-            sheets.append(data)
+            sheets.append((idx, data))
+    return sheets
+
+
+async def _inputs(request: Request, ws: uuid.UUID, job: dict) -> tuple[list[bytes], bytes | None]:
+    """ready 시트(JPEG, 상한 장수)와 최신 ready analysis. 자산은 작업·워크스페이스 조건으로만."""
+    state = request.app.state
+    sheets = [data for _, data in await _sheets(request, ws, job)]
     analysis_rows = await _rows(
         request,
         "GET",
         "production_assets",
         params={
-            **base,
+            **_asset_filter(ws, job),
             "select": "storage_path",
             "kind": "eq.analysis",
             "order": "created_at.desc",
@@ -131,7 +146,7 @@ async def _inputs(request: Request, ws: uuid.UUID, job: dict) -> tuple[list[byte
     analysis = None
     if analysis_rows:
         analysis = await ai_draft.download(
-            state.http, settings, analysis_rows[0]["storage_path"], MAX_ANALYSIS_BYTES
+            state.http, state.settings, analysis_rows[0]["storage_path"], MAX_ANALYSIS_BYTES
         )
     return sheets, analysis
 
@@ -150,7 +165,8 @@ async def _candidate_title(request: Request, ws: uuid.UUID, job: dict) -> str | 
         },
     )
     title = rows[0].get("title") if rows else None
-    return title if isinstance(title, str) else None
+    # 리뷰 반영 3: 비신뢰 텍스트 길이 상한(카테고리형·예능형 공통)
+    return title[:MAX_TITLE_CHARS] if isinstance(title, str) else None
 
 
 async def _base_spec(request: Request, ws: uuid.UUID, job: dict) -> dict | None:
@@ -203,6 +219,43 @@ async def _draft(request: Request, ws: uuid.UUID, job: dict) -> tuple[dict, dict
     raise ai_draft.DraftFailed(reason)
 
 
+async def _draft_variety(request: Request, ws: uuid.UUID, job: dict) -> tuple[dict, dict]:
+    """예능형(task-040): 사용자 대사·시트·후보 제목 → Claude(최대 2회) → (spec, validation).
+    analysis·원본·음성은 읽지 않는다. 실패는 DraftFailed."""
+    settings = request.app.state.settings
+    sheets = await _sheets(request, ws, job)
+    source_duration = await _source_duration(request, ws, job["id"])
+    segment_len = float(job["segment_len_sec"]) if job.get("segment_len_sec") is not None else None
+    if segment_len is not None and source_duration is not None:
+        segment_len = min(segment_len, source_duration)
+    lines = ai_draft_variety.dialogue(await _base_spec(request, ws, job))
+    content = ai_draft_variety.build_content(
+        sheets, lines, await _candidate_title(request, ws, job), segment_len, _source_size(job)
+    )
+    tool = ai_draft_variety.tool_schema(with_subtitles=bool(lines))
+    reason = "schema"
+    for _ in range(ATTEMPTS):
+        try:
+            out = await ai_draft.call_claude(
+                settings, content, system=ai_draft_variety.SYSTEM_PROMPT, tool=tool
+            )
+        except ai_draft.DraftFailed as exc:
+            reason = str(exc)
+            continue
+        assembled = ai_draft_variety.assemble_spec(out, job, lines)
+        if assembled is None:
+            reason = "limit"
+            continue
+        spec, notes = assembled
+        validation = _validate(spec, job, source_duration)
+        if _rejected(validation):
+            reason = "schema"
+            continue
+        validation["warnings"].extend(notes)  # 사용자 자막 폴백 메모(리뷰 반영 2)
+        return spec, validation
+    raise ai_draft.DraftFailed(reason)
+
+
 @router.post("/{job_id}/ai-draft", response_model=AiDraftOut, status_code=201)
 async def create_ai_draft(
     job_id: uuid.UUID,
@@ -242,7 +295,8 @@ async def create_ai_draft(
         return _out(reserved)
 
     try:
-        spec, validation = await _draft(request, ws, job)
+        draft = _draft_variety if job["format"] == "variety" else _draft
+        spec, validation = await draft(request, ws, job)
     except ai_draft.DraftFailed as exc:
         await _fail(request, ids)
         logger.warning("AI 초안 실패: job=%s reason=%s", job_id, exc)

@@ -2,7 +2,7 @@
 
 - SDK `AsyncMessages.create`를 가로채 전송 인자를 검사한다(이미지 image/jpeg 시트만, 영상·음성 0건).
 - 가짜 PostgREST·Storage는 test_jobs_api의 FakeDB를 잇고, RPC(reserve_ai_draft·
-  create_ai_draft_revision·fail_ai_draft)는 supabase/migrations/20261119000018을 본뜬다
+  create_ai_draft_revision·fail_ai_draft)는 supabase/migrations/20261119000018·000022를 본뜬다
   (실제 SQL은 supabase/tests/production_ai_draft_test.sql이 검사).
 - SDK는 httpx2를 써서 respx가 못 막으므로 이 파일 전체에서 socket DNS 조회를 막는다(실제 호출 0건).
 """
@@ -131,7 +131,9 @@ class AiDB(FakeDB):
             for o in self.jobs
         ):
             return _rpc_error("NR011")
-        if j["status"] != "review" or j["format"] != "category":
+        if j["status"] != "review" or j["format"] not in ("category", "variety"):
+            return _rpc_error("NR010")
+        if j["format"] == "variety" and j["lang"] != "ko":  # 000022(task-040 A1)
             return _rpc_error("NR010")
         if j["ai_draft_count"] >= body["p_limit"]:
             return _rpc_error("NR016")
@@ -330,6 +332,15 @@ def test_payload_only_jpeg_sheets_no_video_audio(api, auth, db, claude):
     assert "후보 제목" in dumped
 
 
+def test_candidate_title_truncated(api, auth, db, claude):
+    db.candidates[0]["title"] = "제" * 300  # 리뷰 반영 3(task-040): 카테고리형도 200자 상한
+    job, _ = ready_job(db)
+    assert post(api, auth, job).status_code == 201
+    text = claude.calls[0]["messages"][0]["content"][-1]["text"]
+    data = json.loads(text.split("<untrusted_data>\n", 1)[1].split("\n</untrusted_data>", 1)[0])
+    assert data["candidate_title"] == "제" * 200
+
+
 def test_sheet_count_capped_by_setting(mock_supabase, jwks_payload, db, claude, key, auth):
     job, _ = ready_job(db)
     with _client(
@@ -441,8 +452,8 @@ def test_missing_idempotency_key_400(api, auth, db, claude):
 # --- 형식·상태·권한(H3) ----------------------------------------------------------
 
 
-def test_variety_format_409_without_call(api, auth, db, claude):
-    job, _ = ready_job(db, format="variety")
+def test_shopping_format_409_without_call(api, auth, db, claude):
+    job, _ = ready_job(db, format="shopping")
     r = post(api, auth, job)
     assert r.status_code == 409 and r.json()["code"] == "CONFLICT"
     assert claude.calls == [] and job["ai_draft_count"] == 0

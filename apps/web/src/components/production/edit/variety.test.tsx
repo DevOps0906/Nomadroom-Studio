@@ -108,6 +108,18 @@ describe("예능형 모델", () => {
   });
 });
 
+describe("예능형 AI 초안(task-040 A6)", () => {
+  it("review면 AI 초안 버튼과 대사 전송 고지를 보인다", () => {
+    const html = render(rev());
+    expect(html).toMatch(/<button type="button"(?![^>]*disabled="")[^>]*>AI 초안 채우기<\/button>/);
+    expect(html).toContain("AI 초안을 만들면 입력한 대사·분석 시트·후보 제목이 Anthropic(Claude)으로 전송됩니다.");
+  });
+  it("review가 아니면 AI 초안 버튼이 비활성이다", () => {
+    const html = render(rev(), { ...JOB, status: "inspect" as never });
+    expect(html).toMatch(/<button type="button" disabled=""[^>]*>AI 초안 채우기<\/button>/);
+  });
+});
+
 describe("PROD-01 형식 선택", () => {
   const src = (props: Record<string, unknown>) => renderToStaticMarkup(<SourceForm job={null} candidate={null} hasReadySource={false} {...props} />);
   it("새 작업은 형식을 고를 수 있고 initialFormat이 미리 선택된다", () => {
