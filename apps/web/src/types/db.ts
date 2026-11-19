@@ -269,14 +269,14 @@ isOneToOne: false
                   ]
                 },"production_assets": {
                   Row: {
-                    "created_at": string,"created_by": string | null,"duration_sec": number | null,"id": string,"job_id": string,"kind": string,"mime": string,"render_run_id": string | null,"rights": Json | null,"size_bytes": number | null,"status": string,"storage_path": string,"workspace_id": string
+                    "created_at": string,"created_by": string | null,"duration_sec": number | null,"id": string,"job_id": string,"kind": string,"mime": string,"parent_asset_id": string | null,"render_run_id": string | null,"rights": Json | null,"size_bytes": number | null,"status": string,"storage_path": string,"workspace_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"created_by"?: string | null,"duration_sec"?: number | null,"id"?: string,"job_id": string,"kind": string,"mime": string,"render_run_id"?: string | null,"rights"?: Json | null,"size_bytes"?: number | null,"status"?: string,"storage_path": string,"workspace_id": string
+                    "created_at"?: string,"created_by"?: string | null,"duration_sec"?: number | null,"id"?: string,"job_id": string,"kind": string,"mime": string,"parent_asset_id"?: string | null,"render_run_id"?: string | null,"rights"?: Json | null,"size_bytes"?: number | null,"status"?: string,"storage_path": string,"workspace_id": string
                   }
                   Update: {
-                    "created_at"?: string,"created_by"?: string | null,"duration_sec"?: number | null,"id"?: string,"job_id"?: string,"kind"?: string,"mime"?: string,"render_run_id"?: string | null,"rights"?: Json | null,"size_bytes"?: number | null,"status"?: string,"storage_path"?: string,"workspace_id"?: string
+                    "created_at"?: string,"created_by"?: string | null,"duration_sec"?: number | null,"id"?: string,"job_id"?: string,"kind"?: string,"mime"?: string,"parent_asset_id"?: string | null,"render_run_id"?: string | null,"rights"?: Json | null,"size_bytes"?: number | null,"status"?: string,"storage_path"?: string,"workspace_id"?: string
                   }
                   Relationships: [
                     {
@@ -285,6 +285,12 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "production_jobs"
       referencedColumns: ["id","workspace_id"]
+    },{
+      foreignKeyName: "production_assets_parent_fk"
+      columns: ["parent_asset_id","job_id"]
+isOneToOne: false
+      referencedRelation: "production_assets"
+      referencedColumns: ["id","job_id"]
     },{
       foreignKeyName: "production_assets_render_run_fk"
       columns: ["render_run_id","job_id"]

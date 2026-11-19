@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.auth.worker import CurrentWorker, get_current_worker
 from app.errors import ApiError, db_error, not_found
-from app.production import runs, storage
+from app.production import runs, shopping, storage
 from app.production.validation_variety import validate_for_format
 from app.routes.production_jobs import UPLOAD_MIME
 from app.routes.profiles import _json_list, _send
@@ -29,6 +29,10 @@ router = APIRouter(prefix="/worker/v1/production", tags=["worker-production"])
 TaskKind = Literal["prepare", "render"]
 MAX_SHEETS = 200  # W-07 sheet ≤200(가정)
 MAX_PENDING = MAX_SHEETS + 10  # E7: task당 pending 상한(sheet 수+10)
+# P5: 쇼핑 prepare는 원본마다 source·analysis·sheet(≤200) — task당 pending ≤ 원본 수×(200+2)
+PER_SOURCE = MAX_SHEETS + 2
+MAX_FINISH_IDS = shopping.MAX_SOURCES * PER_SOURCE
+_ID_CHUNK = 100  # 자산 id in.(...) 조회 한 번에 넣는 수(URL 길이)
 
 # E7: kind → mime → 확장자(버킷 allowed_mime_types 안, 000015)
 OUTPUT_MIME: dict[str, dict[str, str]] = {
@@ -75,7 +79,7 @@ class TaskOut(BaseModel):
     kind: TaskKind
     id: uuid.UUID
     job_id: uuid.UUID
-    job_kind: Literal["general"]
+    job_kind: Literal["general", "shopping"]
     format: str
     preset_version: str
     lang: str | None = None
@@ -106,6 +110,8 @@ class OutputItemIn(_In):
     size_bytes: Annotated[int, Field(strict=True, ge=1, le=storage.MAX_UPLOAD_BYTES)]
     mime: Annotated[str, StringConstraints(max_length=100)]
     duration_sec: Annotated[float, Field(ge=0, le=86_400, allow_inf_nan=False)] | None = None
+    # P1 계보: prepare 산출물의 원본(source_upload). 쇼핑 필수, 일반 업로드 작업은 생략 시 그 원본
+    parent_asset_id: uuid.UUID | None = None
 
 
 class OutputsIn(_In):
@@ -141,7 +147,7 @@ class PrepareMeta(_In):
 
 class FinishIn(_In):
     status: Literal["done", "failed"]
-    asset_ids: Annotated[list[uuid.UUID], Field(max_length=MAX_PENDING)] = []
+    asset_ids: Annotated[list[uuid.UUID], Field(max_length=MAX_FINISH_IDS)] = []
     meta: PrepareMeta | None = None
     error_stage: Literal["prepare", "audio", "render"] | None = None
     error_code: Annotated[str, StringConstraints(max_length=40)] | None = None
@@ -201,7 +207,7 @@ async def _task(
         request,
         "production_jobs",
         {
-            "select": "id,status,format,lang,claimed_by",
+            "select": "id,status,format,lang,claimed_by,kind,source_kind",
             "id": f"eq.{job_id}",
             "workspace_id": f"eq.{ws}",
         },
@@ -235,6 +241,41 @@ def _allowed_kinds(kind: TaskKind, job: dict) -> tuple[str, ...]:
 
 def _http(request: Request) -> Any:
     return request.app.state.http
+
+
+def _is_shopping(job: dict) -> bool:
+    return job.get("kind") == "shopping"
+
+
+async def _ready_uploads(request: Request, job: dict, ws: uuid.UUID) -> list[dict]:
+    """prepare 입력·계보 부모: 이 작업의 ready source_upload(오래된 순)."""
+    return await _rows(
+        request,
+        "GET",
+        "production_assets",
+        params={
+            "select": "id,kind,storage_path",
+            "job_id": f"eq.{job['id']}",
+            "workspace_id": f"eq.{ws}",
+            "kind": "eq.source_upload",
+            "status": "eq.ready",
+            "order": "created_at.asc,id.asc",
+        },
+    )
+
+
+async def _assets_by_ids(request: Request, params: dict[str, str], ids: list) -> list[dict]:
+    """id 목록을 나눠 조회한다(쇼핑 finish는 수천 건일 수 있다)."""
+    rows: list[dict] = []
+    for i in range(0, len(ids), _ID_CHUNK):
+        chunk = ids[i : i + _ID_CHUNK]
+        rows += await _rows(
+            request,
+            "GET",
+            "production_assets",
+            params={**params, "id": f"in.({','.join(str(x) for x in chunk)})"},
+        )
+    return rows
 
 
 # --- W-05 수령 --------------------------------------------------------------------
@@ -272,6 +313,18 @@ async def task_inputs(
     worker: CurrentWorker = Depends(get_current_worker),
 ) -> InputsOut:
     job, _ = await _task(request, worker, kind, task_id)
+    settings = request.app.state.settings
+    if kind == "prepare" and _is_shopping(job):
+        # 쇼핑: ready 원본 전부(원본별로 source·analysis·sheet를 W-07로 올린다)
+        inputs = []
+        for r in await _ready_uploads(request, job, worker.workspace_id):
+            url, exp = await storage.sign_download(_http(request), settings, r["storage_path"])
+            inputs.append(
+                InputOut(asset_id=r["id"], kind=r["kind"], download_url=url, expires_at=exp)
+            )
+        response.headers["Cache-Control"] = "no-store"
+        logger.info("제작 입력 서명 발급: kind=%s id=%s n=%d", kind, task_id, len(inputs))
+        return InputsOut(inputs=inputs)
     if kind == "prepare":
         wanted: tuple[str, ...] = ("source_upload",)
     else:
@@ -301,7 +354,6 @@ async def task_inputs(
     latest: dict[str, dict] = {}
     for r in rows:
         latest.setdefault(r["kind"], r)
-    settings = request.app.state.settings
     inputs = []
     for k in wanted:
         if k in latest:
@@ -317,6 +369,28 @@ async def task_inputs(
 
 
 # --- W-07 산출물 업로드 -----------------------------------------------------------
+
+
+async def _parents(
+    request: Request, worker: CurrentWorker, kind: TaskKind, job: dict, body: OutputsIn
+) -> list[str | None]:
+    """P1: 항목별 부모 source_upload id. render는 없음, 쇼핑 prepare는 필수,
+    일반 업로드 prepare는 생략 시 그 작업의 ready 원본, URL 작업은 없음."""
+    sent = [str(it.parent_asset_id) if it.parent_asset_id else None for it in body.items]
+    if kind == "render" or job.get("source_kind") == "url":
+        for i, p in enumerate(sent):
+            if p is not None:
+                raise _bad("이 산출물에는 원본을 지정하지 않습니다.", f"items.{i}.parent_asset_id")
+        return sent
+    ready = [str(r["id"]) for r in await _ready_uploads(request, job, worker.workspace_id)]
+    out: list[str | None] = []
+    for i, p in enumerate(sent):
+        if p is None and not _is_shopping(job) and len(ready) == 1:
+            p = ready[0]
+        if p is None or p not in ready:
+            raise _bad("이 작업의 준비된 원본이 아닙니다.", f"items.{i}.parent_asset_id")
+        out.append(p)
+    return out
 
 
 @router.post("/{kind}/{task_id}/outputs", response_model=OutputsOut)
@@ -342,22 +416,41 @@ async def task_outputs(
         exts.append(ext)
 
     ws = worker.workspace_id
+    parents = await _parents(request, worker, kind, job, body)
     pending = await _rows(
         request,
         "GET",
         "production_assets",
-        params={"select": "id,kind", **_scope(job, run, ws), "status": "eq.pending"},
+        params={
+            "select": "id,kind,parent_asset_id",
+            **_scope(job, run, ws),
+            "status": "eq.pending",
+        },
     )
-    if len(pending) + len(body.items) > MAX_PENDING:
-        raise _bad("올릴 산출물이 너무 많습니다.", "items")
-    sheets = sum(1 for a in pending if a["kind"] == "sheet") + sum(
-        1 for it in body.items if it.kind == "sheet"
-    )
-    if sheets > MAX_SHEETS:
-        raise _bad("시트 이미지가 너무 많습니다.", "items")
+    if kind == "prepare" and _is_shopping(job):
+        # P5: 상한은 원본 수×(sheet 200+2), sheet는 원본마다 200
+        n_sources = len({p for p in parents if p} | {str(a["parent_asset_id"]) for a in pending})
+        if len(pending) + len(body.items) > max(n_sources, 1) * PER_SOURCE:
+            raise _bad("올릴 산출물이 너무 많습니다.", "items")
+        sheets: dict[str, int] = {}
+        pairs = [(a["kind"], a.get("parent_asset_id")) for a in pending]
+        pairs += [(it.kind, par) for it, par in zip(body.items, parents, strict=True)]
+        for k, par in pairs:
+            if k == "sheet":
+                sheets[str(par)] = sheets.get(str(par), 0) + 1
+        if any(n > MAX_SHEETS for n in sheets.values()):
+            raise _bad("시트 이미지가 너무 많습니다.", "items")
+    else:
+        if len(pending) + len(body.items) > MAX_PENDING:
+            raise _bad("올릴 산출물이 너무 많습니다.", "items")
+        n_sheets = sum(1 for a in pending if a["kind"] == "sheet") + sum(
+            1 for it in body.items if it.kind == "sheet"
+        )
+        if n_sheets > MAX_SHEETS:
+            raise _bad("시트 이미지가 너무 많습니다.", "items")
 
     new_rows = []
-    for item, ext in zip(body.items, exts, strict=True):
+    for item, ext, parent in zip(body.items, exts, parents, strict=True):
         asset_id = uuid.uuid4()
         new_rows.append(
             {
@@ -371,6 +464,7 @@ async def task_outputs(
                 "duration_sec": item.duration_sec,
                 "status": "pending",
                 "render_run_id": str(run["id"]) if run else None,
+                "parent_asset_id": parent,
                 "created_by": str(worker.worker_id),
             }
         )
@@ -470,15 +564,14 @@ async def _verify_outputs(
     request: Request, worker: CurrentWorker, kind: TaskKind, job: dict, run: dict | None, ids: list
 ) -> None:
     """E6 목록 자산 확인 + Storage 실제 크기 = 선언 크기(없거나 다르면 400)."""
-    rows = await _rows(
+    rows = await _assets_by_ids(
         request,
-        "GET",
-        "production_assets",
-        params={
-            "select": "id,kind,status,storage_path,size_bytes,created_by,render_run_id",
-            "id": f"in.({','.join(str(i) for i in ids)})",
+        {
+            "select": "id,kind,status,storage_path,size_bytes,created_by,render_run_id,"
+            "parent_asset_id",
             **_scope(job, run, worker.workspace_id),
         },
+        ids,
     )
     allowed = _allowed_kinds(kind, job)
     if len(rows) != len(ids) or any(
@@ -489,7 +582,20 @@ async def _verify_outputs(
     ):
         raise _bad("산출물 목록이 올바르지 않습니다.", "asset_ids")
     kinds = [r["kind"] for r in rows]
-    if kind == "prepare":
+    if kind == "prepare" and _is_shopping(job):
+        # P3: ready 원본마다 source·analysis 정확히 1건·sheet 1건 이상, 모든 산출물은 그 원본의 것
+        ready = {str(r["id"]) for r in await _ready_uploads(request, job, worker.workspace_id)}
+        groups: dict[str, list[str]] = {u: [] for u in ready}
+        for r in rows:
+            parent = str(r.get("parent_asset_id"))
+            if parent not in groups:
+                raise _bad("필수 산출물이 없습니다.", "asset_ids")
+            groups[parent].append(r["kind"])
+        missing = not groups or any(
+            g.count("source") != 1 or g.count("analysis") != 1 or "sheet" not in g
+            for g in groups.values()
+        )
+    elif kind == "prepare":
         # 리뷰 반영 1: source·analysis 정확히 1건, sheet 1건 이상
         missing = kinds.count("source") != 1 or kinds.count("analysis") != 1 or "sheet" not in kinds
     else:
@@ -529,6 +635,7 @@ async def task_finish(
                 source_duration=body.meta.duration_sec if body.meta else None,
                 source_size=(body.meta.width, body.meta.height) if body.meta else None,
                 job_lang=job.get("lang"),
+                assets={},  # 빈 편집안이라 스키마 오류에서 멈춘다(쇼핑 assets.required 회피)
             )
     result = await runs.rpc(
         request,

@@ -297,12 +297,16 @@ select is(
      and roles && array['authenticated', 'anon', 'public']::name[]),
   0, 'storage.objects authenticated·anon·public 정책 0건(서명 URL만)');
 
--- 11. claim: job_kind = 칼럼 값
+-- 11. claim: task-044 P4 — task-045 전까지 쇼핑 prepare는 수령하지 않는다(000023)
+-- 000023 준비 시작 트리거가 ready 원본을 요구하므로 원본 1건을 먼저 둔다
+insert into public.production_assets (id, workspace_id, job_id, kind, storage_path, mime, status)
+  values ('f4200000-0000-4000-8000-000000000049', 'f4200000-0000-4000-8000-000000000001', 'f4200000-0000-4000-8000-000000000012',
+          'source_upload', 'f4200000-0000-4000-8000-000000000001/f4200000-0000-4000-8000-000000000012/f4200000-0000-4000-8000-000000000049.mp4',
+          'video/mp4', 'ready');
 update public.production_jobs set status = 'preparing' where id = 'f4200000-0000-4000-8000-000000000012';
 select is(
-  public.claim_production_task('f4200000-0000-4000-8000-000000000001', 'f4200000-0000-4000-8000-0000000000c1')
-    ->> 'job_kind',
-  'shopping', 'claim: 쇼핑 작업 prepare의 job_kind = shopping');
+  public.claim_production_task('f4200000-0000-4000-8000-000000000001', 'f4200000-0000-4000-8000-0000000000c1'),
+  null, 'claim: 쇼핑 작업 prepare는 미배정(task-045 전)');
 
 -- 12. 권한: 새 함수는 브라우저 역할 실행 불가, 새 칼럼은 구성원만 조회(기존 RLS)
 select ok(

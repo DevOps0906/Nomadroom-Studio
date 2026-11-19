@@ -1,8 +1,9 @@
-"""제작 작업 API A-09~A-13·A-17·A-18. 근거: docs/04_API.md#제작-api, tasks/task-022.md(D1~D9).
+"""제작 작업 API A-09~A-13·A-17·A-18·A-21. 근거: docs/04_API.md#제작-api, tasks/task-022.md(D1~D9),
+쇼핑(kind=shopping)은 tasks/task-044.md#착수-결정(P1~P10).
 
 - 웹·API는 작업 ID·자산 ID만 주고받는다. 경로는 서버가 만든다(production/storage.py).
 - 모든 조회에 workspace_id 조건, 자산은 id·job_id·workspace_id 세 조건(D9). 타 워크스페이스 404.
-- 서명 URL·토큰은 로그에 쓰지 않는다(응답에만).
+- 서명 URL·토큰·제휴 링크는 로그에 쓰지 않는다(응답에만).
 """
 
 import asyncio
@@ -19,10 +20,11 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstr
 from app.auth.user import CurrentUser, get_current_user
 from app.errors import ApiError, db_error, not_found
 from app.jobs.state import OFFLINE_AFTER
-from app.production import storage
-from app.production.runs import expire_offline
+from app.production import shopping, storage
+from app.production.runs import delete_objects, expire_offline
 from app.production.spec import TOL
 from app.production.url_guard import check_source_url
+from app.production.validation_shopping import validate_shopping_spec
 from app.production.validation_variety import validate_for_format
 from app.routes.collect_jobs import _worker_last_seen
 from app.routes.profiles import _json_list, _send
@@ -37,17 +39,26 @@ JOB_COLUMNS = (
     "transcribe_error,transcribe_updated_at,candidate_id,source_kind,source_url,"
     "rights_confirmed,rights_confirmed_by,rights_confirmed_at,license_cc,credit,"
     "source_start_sec,segment_len_sec,lang,preset_version,source_meta,current_revision_id,"
-    "ai_draft_count,retry_count,updated_at,requested_by,created_at,completed_at"
+    "ai_draft_count,retry_count,updated_at,requested_by,created_at,completed_at,"
+    "kind,vertical,brief,affiliates,comment_keyword,current_ja_revision_id"
 )
-LIST_COLUMNS = "id,title,format,status,failed_stage,error_code,candidate_id,updated_at,completed_at"
+LIST_COLUMNS = (
+    "id,title,kind,format,vertical,status,failed_stage,error_code,candidate_id,updated_at,"
+    "completed_at,current_revision_id,current_ja_revision_id"
+)
 ASSET_COLUMNS = "id,kind,status,size_bytes,duration_sec"
 RUN_COLUMNS = "id,status,progress_pct,progress_stage,error_stage,error_code,attempt,claimed_by"
 REVISION_COLUMNS = "id,rev_no,spec,origin,validation,approved_at"
 IDEMPOTENCY_CONSTRAINT = "production_jobs_workspace_id_idempotency_key_key"
-READY_SOURCE_INDEX = "production_assets_one_ready_source_uidx"
+# 원본 개수 트리거(000023): 23505 = 일반 ready 2건째·쇼핑 11건째, NR010 = 상태 불가
+_SOURCE_LIMIT = "23505"
 
-# 형식별 출력 프리셋(서버가 정함). shopping은 task-042에서 연다.
-PRESET_VERSION = {"category": "category-1080-v1", "variety": "variety-1080-v1"}
+# 형식별 출력 프리셋(서버가 정함). shopping 값은 가정(렌더러 task-045가 같은 값을 쓴다)
+PRESET_VERSION = {
+    "category": "category-1080-v1",
+    "variety": "variety-1080-v1",
+    "shopping": "shopping-1080-v1",
+}
 MAX_PREPARE_RETRY = 3  # 02_ARCHITECTURE.md#3-3과 같은 값(가정)
 MAX_SOURCE_START_SEC = 86_400  # 원본 시작점 상한 24시간(가정)
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
@@ -68,6 +79,13 @@ UPLOAD_MIME = {
         "audio/x-m4a": "m4a",
     },
 }
+# 쇼핑 업로드(A-10): 사진·BGM·첨부 녹음. 음성은 hook_audio와 같은 목록(버킷 allowed_mime_types 안)
+UPLOAD_MIME["image"] = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+UPLOAD_MIME["bgm"] = UPLOAD_MIME["hook_audio"]
+UPLOAD_MIME["narration"] = UPLOAD_MIME["hook_audio"]
+SHOPPING_UPLOADS = ("source_upload", "image", "bgm", "narration")
+# P9: 사용자가 지울 수 있는 자산
+_DELETABLE = ("source_upload", "image", "bgm", "narration")
 
 # save/approve RPC SQLSTATE(20261119000016_production_api.sql)
 _RPC_NOT_FOUND = "NR009"
@@ -86,10 +104,6 @@ def _stale(field: str) -> ApiError:
     return ApiError(
         409, "CONFLICT", "다른 곳에서 먼저 수정되었습니다. 다시 불러온 뒤 시도하세요.", field
     )
-
-
-def _not_ready_yet(field: str) -> ApiError:
-    return ApiError(400, "VALIDATION", "준비 중인 기능입니다.", field)
 
 
 def _validation_response(message: str, validation: dict) -> JSONResponse:
@@ -127,12 +141,27 @@ StartSec = Annotated[float, Field(ge=0, le=MAX_SOURCE_START_SEC, allow_inf_nan=F
 SegmentSec = Annotated[float, Field(gt=0, le=180, allow_inf_nan=False)]
 
 
+Keyword = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, max_length=50),
+    BeforeValidator(shopping.no_control),
+]
+
+
 class JobCreateIn(BaseModel):
     # rights_confirmed_by·at 등 서버 칸은 extra=forbid로 거부(D7)
     model_config = ConfigDict(extra="forbid")
 
     title: Title
-    format: Literal["category", "variety", "shopping"] = "category"
+    kind: Literal["general", "shopping"] = "general"
+    # 기본값: kind=shopping이면 shopping, 아니면 category(kind와 짝이 맞아야 함)
+    format: Literal["category", "variety", "shopping"] | None = None
+    vertical: Literal["product", "travel"] | None = None
+    brief: shopping.BriefIn | None = None
+    affiliates: shopping.Affiliates = []
+    comment_keyword: Keyword | None = None
+    # 금지 품목(의약품·건강기능식품) 아님 확인 체크(쇼핑 필수, 저장하지 않음)
+    not_banned_confirmed: bool = False
     candidate_id: uuid.UUID | None = None
     source_kind: Literal["upload", "url"]
     source_url: str | None = None
@@ -153,9 +182,23 @@ class JobPatchIn(BaseModel):
     credit: Credit | None = None
     source_start_sec: StartSec | None = None
     segment_len_sec: SegmentSec | None = None
+    # P10: 쇼핑만(kind 불변)
+    vertical: Literal["product", "travel"] | None = None
+    brief: shopping.BriefIn | None = None
+    affiliates: shopping.Affiliates | None = None
+    comment_keyword: Keyword | None = None
 
 
-_PATCH_NOT_NULL = ("source_kind", "rights_confirmed", "source_start_sec", "segment_len_sec")
+_PATCH_NOT_NULL = (
+    "source_kind",
+    "rights_confirmed",
+    "source_start_sec",
+    "segment_len_sec",
+    "vertical",
+    "affiliates",
+)
+_SHOPPING_FIELDS = ("vertical", "brief", "affiliates", "comment_keyword")
+_SHOPPING_EDIT_STATES = ("review", "inspect")
 
 
 class JobOut(BaseModel):
@@ -189,6 +232,12 @@ class JobOut(BaseModel):
     requested_by: uuid.UUID | None
     created_at: datetime
     completed_at: datetime | None
+    kind: str
+    vertical: str | None
+    brief: dict[str, Any] | None
+    affiliates: list[dict[str, Any]]
+    comment_keyword: str | None
+    current_ja_revision_id: uuid.UUID | None
 
 
 class JobEnvelope(BaseModel):
@@ -198,7 +247,10 @@ class JobEnvelope(BaseModel):
 class JobListItem(BaseModel):
     id: uuid.UUID
     title: str
+    kind: str
     format: str
+    vertical: str | None
+    langs: list[str]  # 리비전 보유 언어(←current_revision_id·current_ja_revision_id)
     status: str
     failed_stage: str | None
     error_code: str | None
@@ -252,9 +304,10 @@ class JobDetailOut(BaseModel):
 class UploadIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    kind: Literal["source_upload", "hook_audio"]
+    kind: Literal["source_upload", "hook_audio", "image", "bgm", "narration"]
     size_bytes: Annotated[int, Field(strict=True, ge=1, le=storage.MAX_UPLOAD_BYTES)]
     mime: Annotated[str, StringConstraints(max_length=100)]
+    rights: shopping.RightsIn | None = None  # 쇼핑 필수, 일반 선택(P6)
 
 
 class UploadAssetOut(BaseModel):
@@ -314,6 +367,18 @@ class DownloadOut(BaseModel):
     url: str
     expires_at: datetime
     kind: str
+
+
+class PublishText(BaseModel):
+    caption: str
+    pinned_comment: str
+    recommended_time: str
+
+
+class PublishTextOut(BaseModel):
+    text: PublishText
+    render_run_id: uuid.UUID
+    lang: str
 
 
 # --- 저장소 헬퍼 ---------------------------------------------------------------
@@ -434,24 +499,51 @@ def _source_size(job: dict) -> tuple[float, float] | None:
     return None
 
 
-def _validate(spec: dict, job: dict, source_duration: float | None) -> dict:
+async def _shopping_assets(request: Request, ws: uuid.UUID, job_id: uuid.UUID) -> dict:
+    """쇼핑 검증용 자산 맵(이 작업 소유·렌더 산출물 제외, task-043 fail-closed)."""
+    rows = await _rows(
+        request,
+        "GET",
+        "production_assets",
+        params={
+            "select": "id,kind,status,duration_sec,rights,parent_asset_id",
+            "job_id": f"eq.{job_id}",
+            "workspace_id": f"eq.{ws}",
+            "render_run_id": "is.null",
+        },
+    )
+    return shopping.assets_map(rows)
+
+
+def _validate(
+    spec: dict, job: dict, source_duration: float | None, assets: dict | None = None
+) -> dict:
     """작업 format별 검증(validate_for_format) + 작업 값 비교(source_start_sec·preset_version).
 
     스키마 오류가 있으면 의미 검사(작업 값 비교 포함)를 하지 않는다(task-021 리뷰 🟡2).
     variety: 구간 길이 = min(segment_len_sec, 원본 길이), 원본 크기 = source_meta(task-035 V4).
+    shopping: 이 작업 자산 맵(assets)이 없으면 assets.required 오류(fail-closed).
     """
     size = _source_size(job)
     segment_len = float(job["segment_len_sec"]) if job.get("segment_len_sec") is not None else None
     if segment_len is not None and source_duration is not None:
         segment_len = min(segment_len, source_duration)
-    result = validate_for_format(
-        job["format"],
-        spec,
-        source_duration=source_duration,
-        segment_len=segment_len,
-        source_size=size,
-        job_lang=job.get("lang"),
-    )
+    if job["format"] == "shopping" and assets is not None:
+        result = validate_shopping_spec(
+            spec,
+            assets=assets,
+            job_lang=job.get("lang"),
+            product_name=shopping.product_name(job),
+        )
+    else:
+        result = validate_for_format(
+            job["format"],
+            spec,
+            source_duration=source_duration,
+            segment_len=segment_len,
+            source_size=size,
+            job_lang=job.get("lang"),
+        )
     if any(e["code"].startswith("schema.") for e in result["errors"]):
         return result
     if job["format"] == "variety" and size is None:
@@ -527,6 +619,41 @@ def _http(request: Request) -> Any:
     return request.app.state.http
 
 
+def _banned() -> ApiError:
+    """금지 품목(의약품·건강기능식품). 입력 값·찾은 키워드는 응답에 넣지 않는다."""
+    return ApiError(
+        400,
+        "VALIDATION",
+        "의약품·건강기능식품은 쇼핑 작업으로 만들 수 없습니다.",
+        "banned_category",
+    )
+
+
+def _check_brief(brief: dict | None, vertical: str | None) -> None:
+    bad = shopping.brief_vertical_field(brief, vertical)
+    if bad is not None:
+        raise ApiError(400, "VALIDATION", "분야에 맞지 않는 브리프 항목입니다.", bad)
+
+
+def _write_conflict(
+    resp: Any, limit_message: str = "원본을 더 올릴 수 없습니다."
+) -> ApiError | None:
+    """자산 쓰기의 원본 개수·상태 트리거(000023) 오류 → 409. 그 밖은 None."""
+    if not 400 <= resp.status_code < 500:
+        return None
+    try:
+        code = resp.json().get("code")
+    except ValueError, AttributeError:
+        return None
+    if code == _SOURCE_LIMIT:
+        return ApiError(409, "CONFLICT", limit_message, "kind")
+    if code == _RPC_STATE:
+        return ApiError(409, "CONFLICT", "현재 상태에서는 할 수 없습니다.")
+    if code == "23503":
+        return ApiError(409, "CONFLICT", "이 자산을 쓰는 파일이 있어 지울 수 없습니다.")
+    return None
+
+
 # --- A-09 ----------------------------------------------------------------------
 
 
@@ -548,8 +675,24 @@ async def create_job(
         response.status_code = 200
         return JobEnvelope(job=JobOut.model_validate(existing))
 
-    if body.format not in PRESET_VERSION:
-        raise _not_ready_yet("format")  # shopping은 task-042
+    fmt = body.format or ("shopping" if body.kind == "shopping" else "category")
+    if (body.kind == "shopping") != (fmt == "shopping"):
+        raise ApiError(400, "VALIDATION", "유형과 형식이 맞지 않습니다.", "format")
+    brief = body.brief.model_dump(exclude_none=True) if body.brief is not None else None
+    affiliates = [a.model_dump() for a in body.affiliates]
+    keyword = body.comment_keyword or None
+    if body.kind == "shopping":
+        if body.vertical is None:
+            raise ApiError(400, "VALIDATION", "분야를 선택하세요.", "vertical")
+        if body.source_kind != "upload":
+            raise ApiError(400, "VALIDATION", "쇼핑 원본은 업로드만 됩니다.", "source_kind")
+        if not body.not_banned_confirmed or shopping.has_banned(body.title, brief, keyword):
+            raise _banned()
+        _check_brief(brief, body.vertical)
+    else:
+        for name in _SHOPPING_FIELDS:
+            if name in body.model_fields_set and getattr(body, name) not in (None, []):
+                raise ApiError(400, "VALIDATION", "쇼핑 작업에만 쓰는 항목입니다.", name)
     source_url = check_source_url(body.source_url) if body.source_url is not None else None
     _check_url_source(body.source_kind, source_url, body.rights_confirmed)
     if body.candidate_id is not None:
@@ -566,7 +709,12 @@ async def create_job(
     row = {
         "workspace_id": str(ws),
         "title": body.title,
-        "format": body.format,
+        "kind": body.kind,
+        "format": fmt,
+        "vertical": body.vertical if body.kind == "shopping" else None,
+        "brief": brief,
+        "affiliates": affiliates,
+        "comment_keyword": keyword,
         "candidate_id": str(body.candidate_id) if body.candidate_id else None,
         "source_kind": body.source_kind,
         "source_url": source_url,
@@ -574,7 +722,7 @@ async def create_job(
         "credit": body.credit or None,
         "source_start_sec": body.source_start_sec,
         "segment_len_sec": body.segment_len_sec,
-        "preset_version": PRESET_VERSION[body.format],
+        "preset_version": PRESET_VERSION[fmt],
         "requested_by": str(user.user_id),
         "idempotency_key": idempotency_key,
         **_rights_patch(body.rights_confirmed, False, user, now),
@@ -606,12 +754,19 @@ async def create_job(
     return JobEnvelope(job=JobOut.model_validate(rows[0]))
 
 
+_LANG_REVISION = {"ko": "current_revision_id", "ja": "current_ja_revision_id"}
+
+
 @router.get("", response_model=JobListOut)
 async def list_jobs(
     request: Request,
     status: Literal["draft", "preparing", "review", "rendering", "inspect", "done", "failed"]
     | None = None,
-    job_format: Annotated[Literal["category", "variety"] | None, Query(alias="format")] = None,
+    job_format: Annotated[
+        Literal["category", "variety", "shopping"] | None, Query(alias="format")
+    ] = None,
+    kind: Literal["general", "shopping"] | None = None,
+    lang: Literal["ko", "ja"] | None = None,
     page: Annotated[int, Query(ge=1, le=1000)] = 1,
     size: Annotated[int, Query(ge=1, le=60)] = 24,
     user: CurrentUser = Depends(get_current_user),
@@ -628,8 +783,19 @@ async def list_jobs(
         params["status"] = f"eq.{status}"
     if job_format is not None:
         params["format"] = f"eq.{job_format}"
+    if kind is not None:
+        params["kind"] = f"eq.{kind}"
+    if lang is not None:
+        # 리비전 보유 언어 = 언어별 현재 리비전이 있음(ko는 첫 리비전부터 항상 current_revision_id)
+        params[_LANG_REVISION[lang]] = "not.is.null"
     rows = await _rows(request, "GET", "production_jobs", params=params)
-    return JobListOut(items=[JobListItem.model_validate(r) for r in rows])
+    items = [
+        JobListItem.model_validate(
+            {**r, "langs": [k for k, col in _LANG_REVISION.items() if r.get(col)]}
+        )
+        for r in rows
+    ]
+    return JobListOut(items=items)
 
 
 @router.get("/{job_id}", response_model=JobDetailOut)
@@ -640,16 +806,20 @@ async def get_job(
     await expire_offline(request, ws)  # task-023 E3: 오프라인 지연 평가
     job = await _get_job(request, ws, job_id, f"{JOB_COLUMNS},claimed_by")
     scope = {"job_id": f"eq.{job_id}", "workspace_id": f"eq.{ws}"}
-    rev_id = job.get("current_revision_id")
+    rev_ids = [str(job[c]) for c in _LANG_REVISION.values() if job.get(c)]
 
     async def _revision() -> list:
-        if not rev_id:
+        if not rev_ids:
             return []
         return await _rows(
             request,
             "GET",
             "edit_revisions",
-            params={"select": "id,rev_no,approved_at,validation", "id": f"eq.{rev_id}", **scope},
+            params={
+                "select": "id,rev_no,approved_at,validation",
+                "id": f"in.({','.join(rev_ids)})",
+                **scope,
+            },
         )
 
     assets, revs, runs = await asyncio.gather(
@@ -671,12 +841,17 @@ async def get_job(
     claimed = (run or {}).get("claimed_by") or job.get("claimed_by")
     last_seen = await _worker_last_seen(request, ws, {"claimed_by": claimed})
     online = last_seen is not None and datetime.now(UTC) - last_seen <= OFFLINE_AFTER
+    by_id = {str(r["id"]): r for r in revs}
+    current = {
+        lang: RevisionSummary.model_validate(by_id[str(job[col])])
+        if job.get(col) and str(job[col]) in by_id
+        else None
+        for lang, col in _LANG_REVISION.items()
+    }
     return JobDetailOut(
         job=JobOut.model_validate(job),
         assets=[AssetOut.model_validate(a) for a in assets],
-        current_revision=CurrentRevisionOut(
-            ko=RevisionSummary.model_validate(revs[0]) if revs else None
-        ),
+        current_revision=CurrentRevisionOut(**current),
         latest_run=RunOut.model_validate(run) if run else None,
         worker_online=online,
     )
@@ -700,7 +875,10 @@ async def patch_job(
 
     ws = user.workspace_id
     job = await _get_job(request, ws, job_id)
-    if not _is_prepare_state(job):
+    # 리뷰 반영 7(P10): 쇼핑 항목(brief·affiliates·vertical·comment_keyword)만 보내면
+    # review·inspect에서도 허용. 그 밖 필드는 기존대로 draft·failed(prepare)만
+    shopping_only = job.get("kind") == "shopping" and sent <= set(_SHOPPING_FIELDS)
+    if not (_is_prepare_state(job) or (shopping_only and job["status"] in _SHOPPING_EDIT_STATES)):
         raise _state_conflict(job["status"])
     # 보낸 값과 저장된 값을 합친 최종 상태로 검사(G8: url 작업의 권리 해제 400)
     kind = body.source_kind if "source_kind" in sent else job["source_kind"]
@@ -714,6 +892,31 @@ async def patch_job(
     _check_url_source(kind, url, bool(rights))
 
     data: dict[str, Any] = {}
+    if job.get("kind") == "shopping":
+        # P10: brief·affiliates·vertical(·comment_keyword). 최종 상태로 분야·금지 품목 재검사
+        if kind != "upload":
+            raise ApiError(400, "VALIDATION", "쇼핑 원본은 업로드만 됩니다.", "source_kind")
+        if "brief" in sent:
+            data["brief"] = (
+                body.brief.model_dump(exclude_none=True) if body.brief is not None else None
+            )
+        if "affiliates" in sent:
+            data["affiliates"] = [a.model_dump() for a in body.affiliates or []]
+        if "comment_keyword" in sent:
+            data["comment_keyword"] = body.comment_keyword or None
+        if "vertical" in sent:
+            data["vertical"] = body.vertical
+        brief = data["brief"] if "brief" in sent else job.get("brief")
+        keyword = (
+            data["comment_keyword"] if "comment_keyword" in sent else job.get("comment_keyword")
+        )
+        if shopping.has_banned(job["title"], brief, keyword):
+            raise _banned()
+        _check_brief(brief, data.get("vertical", job.get("vertical")))
+    else:
+        for name in _SHOPPING_FIELDS:
+            if name in sent:
+                raise ApiError(400, "VALIDATION", "쇼핑 작업에만 쓰는 항목입니다.", name)
     for name in ("source_kind", "license_cc", "credit", "source_start_sec", "segment_len_sec"):
         if name in sent:
             data[name] = getattr(body, name)
@@ -749,6 +952,9 @@ async def patch_job(
 def _upload_state_ok(kind: str, job: dict) -> bool:
     if kind == "source_upload":
         return _is_prepare_state(job)
+    if kind in ("image", "bgm", "narration"):
+        # 쇼핑 사진·BGM·첨부 녹음: 준비·렌더 진행 중과 완료 뒤만 막는다(가정)
+        return job["status"] in ("draft", "review", "inspect", "failed")
     # hook_audio: review·failed(render), task-023 E10으로 failed(audio)도(audio_missing 복구)
     return job["status"] == "review" or (
         job["status"] == "failed" and job.get("failed_stage") in ("render", "audio")
@@ -802,40 +1008,60 @@ async def create_upload(
     if ext is None:
         raise ApiError(400, "VALIDATION", "허용되지 않은 파일 형식입니다.", "mime")
     ws = user.workspace_id
-    job = await _get_job(request, ws, job_id, "id,status,failed_stage,format")
+    job = await _get_job(request, ws, job_id, "id,status,failed_stage,format,kind")
+    is_shopping = job.get("kind") == "shopping"
     if body.kind == "hook_audio" and job["format"] != "category":
         raise ApiError(400, "VALIDATION", "이 형식은 훅 음성을 쓰지 않습니다.", "kind")
+    if body.kind in ("image", "bgm", "narration") and not is_shopping:
+        raise ApiError(400, "VALIDATION", "쇼핑 작업에만 올릴 수 있습니다.", "kind")
+    # P6: 쇼핑은 자산마다 권리 basis 필수, 초상 동의 없는 인물 자산 거부
+    if is_shopping and body.rights is None:
+        raise ApiError(400, "VALIDATION", "권리 근거를 입력하세요.", "rights")
+    if body.rights is not None and body.rights.has_person and not body.rights.portrait_consent:
+        raise ApiError(400, "VALIDATION", "인물 초상 동의가 필요합니다.", "rights.portrait_consent")
     if not _upload_state_ok(body.kind, job):
         raise _state_conflict(job["status"])
 
     current = await _uploads(request, ws, job_id, body.kind)
-    # D5: 원본은 작업당 1건(ready가 있으면 409). 원본·훅 음성 모두 이전 pending은 지운다
-    if body.kind == "source_upload" and any(a["status"] == "ready" for a in current):
-        raise ApiError(409, "CONFLICT", "이미 업로드된 원본이 있습니다.", "kind")
-    for old in current:
-        if old["status"] == "pending":
-            await _drop_pending(request, ws, job_id, old)
+    if is_shopping and body.kind in shopping.MULTI_LIMITS:
+        # P5: 쇼핑 원본·사진·문장별 녹음은 다건. 이전 pending을 지우지 않고 상한에 pending 포함
+        if len(current) >= shopping.MULTI_LIMITS[body.kind]:
+            raise ApiError(409, "CONFLICT", "더 올릴 수 없습니다.", "kind")
+    else:
+        # D5: 일반 원본은 작업당 1건(ready가 있으면 409). 이전 pending은 지운다
+        if body.kind == "source_upload" and any(a["status"] == "ready" for a in current):
+            raise ApiError(409, "CONFLICT", "이미 업로드된 원본이 있습니다.", "kind")
+        for old in current:
+            if old["status"] == "pending":
+                await _drop_pending(request, ws, job_id, old)
 
     asset_id = uuid.uuid4()
     path = storage.object_path(ws, job_id, asset_id, ext)
-    rows = await _rows(
+    row: dict[str, Any] = {
+        "id": str(asset_id),
+        "workspace_id": str(ws),
+        "job_id": str(job_id),
+        "kind": body.kind,
+        "storage_path": path,
+        "mime": body.mime,
+        "size_bytes": body.size_bytes,
+        "status": "pending",
+        "created_by": str(user.user_id),
+    }
+    if body.rights is not None:
+        row["rights"] = body.rights.model_dump(exclude_none=True)
+    resp = await _send(
         request,
         "POST",
         "production_assets",
         params={"select": "id,kind,status"},
-        json={
-            "id": str(asset_id),
-            "workspace_id": str(ws),
-            "job_id": str(job_id),
-            "kind": body.kind,
-            "storage_path": path,
-            "mime": body.mime,
-            "size_bytes": body.size_bytes,
-            "status": "pending",
-            "created_by": str(user.user_id),
-        },
+        json=row,
         headers={"Prefer": "return=representation"},
     )
+    conflict = _write_conflict(resp)
+    if conflict is not None:
+        raise conflict  # 동시 업로드로 쇼핑 원본 상한을 넘김(000023 트리거)
+    rows = _json_list(resp, "POST", "production_assets")
     if not rows:
         raise db_error()
     url, expires_at = await storage.sign_upload(_http(request), request.app.state.settings, path)
@@ -859,10 +1085,10 @@ async def complete_upload(
         return AssetEnvelope(asset=AssetOut.model_validate(asset))
     if asset["kind"] not in UPLOAD_MIME:
         raise ApiError(409, "CONFLICT", "사용자가 올리는 자산이 아닙니다.")
-    job = await _get_job(request, ws, job_id, "id,status,failed_stage,format")
+    job = await _get_job(request, ws, job_id, "id,status,failed_stage,format,kind")
     if not _upload_state_ok(asset["kind"], job):
         raise _state_conflict(job["status"])
-    if asset["kind"] == "source_upload":
+    if asset["kind"] == "source_upload" and job.get("kind") != "shopping":
         others = await _uploads(request, ws, job_id)
         if any(a["status"] == "ready" and a["id"] != str(asset_id) for a in others):
             raise ApiError(409, "CONFLICT", "이미 업로드된 원본이 있습니다.")
@@ -891,9 +1117,9 @@ async def complete_upload(
         json={"status": "ready"},
         headers={"Prefer": "return=representation"},
     )
-    if resp.status_code == 409 and READY_SOURCE_INDEX in resp.text:
-        # 동시 complete 경합: 다른 원본이 먼저 ready가 됐다(000016 부분 unique)
-        raise ApiError(409, "CONFLICT", "이미 업로드된 원본이 있습니다.")
+    conflict = _write_conflict(resp, "이미 업로드된 원본이 있습니다.")
+    if conflict is not None:
+        raise conflict  # 동시 complete 경합(일반 ready 2건째)·준비 시작 뒤 완료(000023 트리거)
     rows = _json_list(resp, "PATCH", "production_assets")
     if not rows:
         # 동시 완료 요청: 이미 ready면 멱등 200
@@ -924,6 +1150,13 @@ async def prepare_job(
         raise ApiError(
             400, "VALIDATION", "URL 원본은 사용 권한 확인이 필요합니다.", "rights_confirmed"
         )
+    if job.get("kind") == "shopping" and shopping.has_banned(
+        job["title"], job.get("brief"), job.get("comment_keyword")
+    ):
+        raise _banned()  # 원본 준비 시작도 금지 품목이면 막는다(PROD-01S)
+    if job.get("kind") == "shopping":
+        # 리뷰 반영 2: task-045(쇼핑 렌더러) 전까지 claim이 쇼핑을 내주지 않아 preparing에 갇힌다
+        raise ApiError(409, "CONFLICT", "쇼핑 렌더러 준비 중입니다.", "kind")
     if job["source_kind"] == "upload":
         uploads = await _uploads(request, ws, job_id)
         if not any(a["status"] == "ready" for a in uploads):
@@ -938,10 +1171,12 @@ async def prepare_job(
     }
     if retry:
         params["failed_stage"] = "eq.prepare"
-    rows = await _patch_job(
+    resp = await _send(
         request,
-        params,
-        {
+        "PATCH",
+        "production_jobs",
+        params={**params, "select": JOB_COLUMNS},
+        json={
             "status": "preparing",
             "retry_count": job["retry_count"] + (1 if retry else 0),
             "failed_stage": None,
@@ -949,7 +1184,13 @@ async def prepare_job(
             "claimed_by": None,
             "updated_at": datetime.now(UTC).isoformat(),
         },
+        headers={"Prefer": "return=representation"},
     )
+    conflict = _write_conflict(resp)
+    if conflict is not None:
+        # 리뷰 반영 3: 확인 뒤 원본이 지워진 경합(000023 production_jobs_prepare_source)
+        raise ApiError(409, "CONFLICT", "업로드된 원본이 없습니다.", "source_upload")
+    rows = _json_list(resp, "PATCH", "production_jobs")
     if not rows:
         raise _stale("status")
     logger.info("제작 준비 요청: job=%s retry=%s", job_id, retry)
@@ -1001,7 +1242,7 @@ async def put_revision(
         ws,
         job_id,
         "id,status,failed_stage,format,lang,source_start_sec,segment_len_sec,preset_version,"
-        "source_meta,current_revision_id",
+        "source_meta,current_revision_id,kind,vertical,brief",
     )
     # D3: review·inspect·failed(audio·render)만, 리비전 없으면 409
     editable = job["status"] in ("review", "inspect") or (
@@ -1010,7 +1251,8 @@ async def put_revision(
     if not editable or not job.get("current_revision_id"):
         raise _state_conflict(job["status"])
 
-    validation = _validate(body.spec, job, await _source_duration(request, ws, job_id))
+    assets = await _shopping_assets(request, ws, job_id) if job["format"] == "shopping" else None
+    validation = _validate(body.spec, job, await _source_duration(request, ws, job_id), assets)
     if _rejected(validation):
         return _validation_response("편집안 형식이 올바르지 않습니다.", validation)
     saved = await _rpc(
@@ -1051,7 +1293,7 @@ async def approve_revision(
         ws,
         job_id,
         "id,status,format,lang,source_start_sec,segment_len_sec,preset_version,source_meta,"
-        "current_revision_id",
+        "current_revision_id,kind,vertical,brief",
     )
     if job["status"] != "review" or not job.get("current_revision_id"):
         raise _state_conflict(job["status"])
@@ -1074,8 +1316,9 @@ async def approve_revision(
     if rev["approved_at"] is not None:
         raise ApiError(409, "CONFLICT", "이미 승인된 리비전입니다.", "rev_no")
 
-    # 서버 재검증(저장된 validation을 믿지 않는다)
-    validation = _validate(rev["spec"], job, await _source_duration(request, ws, job_id))
+    # 서버 재검증(저장된 validation을 믿지 않는다). 쇼핑은 이 작업 자산의 권리까지(task-043)
+    assets = await _shopping_assets(request, ws, job_id) if job["format"] == "shopping" else None
+    validation = _validate(rev["spec"], job, await _source_duration(request, ws, job_id), assets)
     if validation["errors"]:
         return _validation_response("편집안에 오류가 있어 승인할 수 없습니다.", validation)
     approved = await _rpc(
@@ -1179,3 +1422,104 @@ async def download_url(
     response.headers["Cache-Control"] = "no-store"
     logger.info("다운로드 서명 발급: job=%s asset=%s kind=%s", job_id, asset_id, asset["kind"])
     return DownloadOut(url=url, expires_at=expires_at, kind=asset["kind"])
+
+
+# --- P9 자산 삭제 -------------------------------------------------------------------
+
+
+@router.delete("/{job_id}/assets/{asset_id}", status_code=204, response_class=Response)
+async def delete_asset(
+    job_id: uuid.UUID,
+    asset_id: uuid.UUID,
+    request: Request,
+    user: CurrentUser = Depends(get_current_user),
+) -> Response:
+    """사용자 업로드 자산 삭제(객체+행). source_upload는 draft·failed(prepare)에서만,
+    image·bgm·narration은 현재 리비전(ko·ja)이 참조하지 않을 때만(task-044 P9)."""
+    ws = user.workspace_id
+    asset = await _get_asset(request, ws, job_id, asset_id, "id,kind,status,storage_path")
+    if asset["kind"] not in _DELETABLE:
+        raise ApiError(409, "CONFLICT", "지울 수 없는 자산입니다.")
+    job = await _get_job(
+        request, ws, job_id, "id,status,failed_stage,current_revision_id,current_ja_revision_id"
+    )
+    if asset["kind"] == "source_upload":
+        if not _is_prepare_state(job):
+            raise _state_conflict(job["status"])
+    else:
+        rev_ids = [str(job[c]) for c in _LANG_REVISION.values() if job.get(c)]
+        revs = []
+        if rev_ids:
+            revs = await _rows(
+                request,
+                "GET",
+                "edit_revisions",
+                params={
+                    "select": "spec",
+                    "id": f"in.({','.join(rev_ids)})",
+                    "job_id": f"eq.{job_id}",
+                    "workspace_id": f"eq.{ws}",
+                },
+            )
+        if any(str(asset_id) in shopping.spec_asset_refs(r.get("spec")) for r in revs):
+            raise ApiError(409, "CONFLICT", "편집안에서 쓰는 자산입니다.", "asset_id")
+    resp = await _send(
+        request,
+        "DELETE",
+        "production_assets",
+        params={
+            "id": f"eq.{asset_id}",
+            "job_id": f"eq.{job_id}",
+            "workspace_id": f"eq.{ws}",
+            "select": "id",
+        },
+        headers={"Prefer": "return=representation"},
+    )
+    conflict = _write_conflict(resp)
+    if conflict is not None:
+        raise conflict  # 준비 시작과 경합(000023 삭제 가드)·파생 산출물 있음
+    if not _json_list(resp, "DELETE", "production_assets"):
+        raise not_found()
+    # 행이 먼저 사라졌으니 객체 삭제 실패는 로그만(id)
+    await delete_objects(request, [asset["storage_path"]], "삭제")
+    logger.info("자산 삭제: job=%s asset=%s kind=%s", job_id, asset_id, asset["kind"])
+    return Response(status_code=204)
+
+
+# --- A-21 게시 문구 -------------------------------------------------------------------
+
+
+@router.get("/{job_id}/publish-text", response_model=PublishTextOut)
+async def publish_text(
+    job_id: uuid.UUID,
+    request: Request,
+    response: Response,
+    lang: Literal["ko", "ja"] = "ko",
+    render_run_id: uuid.UUID | None = None,
+    user: CurrentUser = Depends(get_current_user),
+) -> PublishTextOut:
+    """쇼핑만. job·워크스페이스·status done·lang이 맞는 run 기준, 제휴 링크는 응답에만(P8)."""
+    ws = user.workspace_id
+    job = await _get_job(request, ws, job_id, "id,kind,affiliates,comment_keyword")
+    if job.get("kind") != "shopping":
+        raise ApiError(400, "VALIDATION", "쇼핑 작업만 게시 문구를 만듭니다.", "kind")
+    params = {
+        "select": "id",
+        "job_id": f"eq.{job_id}",
+        "workspace_id": f"eq.{ws}",
+        "status": "eq.done",
+        "lang": f"eq.{lang}",
+        "order": "finished_at.desc,created_at.desc",
+        "limit": "1",
+    }
+    if render_run_id is not None:
+        params["id"] = f"eq.{render_run_id}"
+    found = await _rows(request, "GET", "render_runs", params=params)
+    if not found:
+        raise ApiError(409, "CONFLICT", "완료된 렌더가 없습니다.", "render_run_id")
+    text = shopping.publish_text(lang, job.get("affiliates"), job.get("comment_keyword"))
+    response.headers["Cache-Control"] = "no-store"
+    logger.info("게시 문구 발급: job=%s run=%s lang=%s", job_id, found[0]["id"], lang)
+    return PublishTextOut(
+        text=PublishText.model_validate(text), render_run_id=found[0]["id"], lang=lang
+    )

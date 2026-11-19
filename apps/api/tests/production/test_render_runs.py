@@ -320,11 +320,18 @@ class ProdDB(FakeDB):
                     if j["workspace_id"] == ws
                     and j["status"] == "preparing"
                     and not j["claimed_by"]
+                    and j.get("kind") != "shopping"  # 000023 P4: task-045 전까지 쇼핑 보류
                 ),
                 key=lambda j: j["created_at"],
             )
             queued = sorted(
-                (r for r in self.runs if r["workspace_id"] == ws and r["status"] == "queued"),
+                (
+                    r
+                    for r in self.runs
+                    if r["workspace_id"] == ws
+                    and r["status"] == "queued"
+                    and self.job(r["job_id"]).get("kind") != "shopping"
+                ),
                 key=lambda r: r["created_at"],
             )
             if jobs and (not queued or jobs[0]["created_at"] <= queued[0]["created_at"]):
@@ -354,7 +361,7 @@ class ProdDB(FakeDB):
                 "kind": "render" if render else "prepare",
                 "id": run["id"] if render else job["id"],
                 "job_id": job["id"],
-                "job_kind": "general",
+                "job_kind": job.get("kind", "general"),
                 "format": job["format"],
                 "preset_version": run["preset_version"] if render else job["preset_version"],
                 "lang": run["lang"] if render else None,
@@ -403,7 +410,26 @@ class ProdDB(FakeDB):
             kinds = [a["kind"] for a in listed]
             if len(listed) != len(ids):
                 return _err("NR012")
-            if kind == "prepare" and (
+            if kind == "prepare" and j.get("kind") == "shopping":
+                # 000023 P3: ready 원본마다 source·analysis 1건·sheet ≥1, 모든 산출물에 parent
+                ready = [
+                    a["id"]
+                    for a in self.assets
+                    if a["job_id"] == j["id"]
+                    and a["kind"] == "source_upload"
+                    and a["status"] == "ready"
+                ]
+                groups: dict[str, list[str]] = {u: [] for u in ready}
+                for a in listed:
+                    if a.get("parent_asset_id") not in groups:
+                        return _err("NR012")
+                    groups[a["parent_asset_id"]].append(a["kind"])
+                if not groups or any(
+                    g.count("source") != 1 or g.count("analysis") != 1 or "sheet" not in g
+                    for g in groups.values()
+                ):
+                    return _err("NR012")
+            elif kind == "prepare" and (
                 kinds.count("source") != 1 or kinds.count("analysis") != 1 or "sheet" not in kinds
             ):
                 return _err("NR012")

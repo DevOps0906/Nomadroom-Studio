@@ -217,3 +217,4 @@ erDiagram
   render_runs ||--o{ production_assets : "render_run_id"
   edit_revisions ||--o{ edit_revisions : "derived_from"
   edit_revisions ||--o{ production_jobs : "current_ja_revision_id"
+  production_assets ||--o{ production_assets : "parent_asset_id"

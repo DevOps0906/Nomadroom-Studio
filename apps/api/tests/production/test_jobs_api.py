@@ -97,6 +97,9 @@ def _match(row: dict, params: dict[str, str]) -> bool:
             want = {"true": True, "false": False, "null": None}[value]
             if cur is not want:
                 return False
+        elif raw == "not.is.null":
+            if cur is None:
+                return False
         else:
             raise AssertionError(f"지원하지 않는 필터 {key}={raw}")
     return True
@@ -156,6 +159,12 @@ def job_row(jid: str | None = None, ws: str = WS, status: str = "draft", **over:
         "created_at": _now(),
         "completed_at": None,
         "idempotency_key": f"k-{uuid.uuid4().hex[:8]}",
+        "kind": "general",
+        "vertical": None,
+        "brief": None,
+        "affiliates": [],
+        "comment_keyword": None,
+        "current_ja_revision_id": None,
     }
     row.update(over)
     return row
@@ -178,6 +187,10 @@ class FakeDB:
         False  # 원본 ready 확인 조회를 놓치는 경합 흉내  # 재검증 후 다른 저장이 끼어든 상황 흉내
     )
     rpc_calls: list[str] = field(default_factory=list)
+    asset_insert_error: str | None = None  # task-044: 자산 insert를 이 SQLSTATE로 거부(트리거 경합)
+    fail_tables: set[str] = field(default_factory=set)  # 이 테이블 요청은 500(저장소 오류)
+    # "METHOD table" → SQLSTATE: 트리거(000023)가 쓰기를 거부한 경합 흉내
+    write_errors: dict[str, str] = field(default_factory=dict)
 
     def table(self, name: str) -> list[dict]:
         return {
@@ -231,6 +244,8 @@ class FakeDB:
             "duration_sec": None,
             "status": status,
             "render_run_id": None,
+            "parent_asset_id": None,
+            "rights": None,
             "created_by": USER,
             "created_at": _now(),
         }
@@ -346,6 +361,11 @@ def install(router: respx.MockRouter, db: FakeDB) -> None:
     def rest(request: httpx.Request, name: str) -> httpx.Response:
         rows = db.table(name)
         p = _params(request)
+        if name in db.fail_tables:
+            return httpx.Response(500, json={"message": "x"})
+        if f"{request.method} {name}" in db.write_errors:
+            code = db.write_errors[f"{request.method} {name}"]
+            return httpx.Response(400, json={"code": code, "message": "x"})
         if request.method == "GET":
             if name == "production_jobs" and "idempotency_key" in p and db.hide_key_lookups > 0:
                 db.hide_key_lookups -= 1
@@ -368,12 +388,20 @@ def install(router: respx.MockRouter, db: FakeDB) -> None:
             hit = [r for r in rows if _match(r, p)]
             if name == "production_assets" and body.get("status") == "ready":
                 for r in hit:
-                    if r["kind"] == "source_upload" and any(
-                        o is not r
-                        and o["job_id"] == r["job_id"]
-                        and o["kind"] == "source_upload"
-                        and o["status"] == "ready"
-                        for o in rows
+                    job_kind = next(
+                        (j.get("kind") for j in db.jobs if j["id"] == r["job_id"]), "general"
+                    )
+                    # 000023 트리거: 일반 작업만 ready 원본 1건
+                    if (
+                        job_kind != "shopping"
+                        and r["kind"] == "source_upload"
+                        and any(
+                            o is not r
+                            and o["job_id"] == r["job_id"]
+                            and o["kind"] == "source_upload"
+                            and o["status"] == "ready"
+                            for o in rows
+                        )
                     ):
                         return httpx.Response(
                             409,
@@ -406,7 +434,16 @@ def install(router: respx.MockRouter, db: FakeDB) -> None:
             db.jobs.append(new)
         else:
             assert name == "production_assets"
-            new = {"duration_sec": None, "render_run_id": None, "created_at": _now(), **body}
+            if db.asset_insert_error:
+                return httpx.Response(409, json={"code": db.asset_insert_error, "message": "x"})
+            new = {
+                "duration_sec": None,
+                "render_run_id": None,
+                "parent_asset_id": None,
+                "rights": None,
+                "created_at": _now(),
+                **body,
+            }
             db.assets.append(new)
         return httpx.Response(201, json=_select([new], {"select": p.get("select", "*")}))
 
@@ -532,10 +569,15 @@ def test_same_key_other_workspace_is_independent(api, auth, db):
     assert r.json()["job"]["workspace_id"] == WS
 
 
-def test_shopping_format_rejected_until_task042(api, auth, db):
+def test_shopping_format_needs_shopping_kind(api, auth, db):
+    # task-044: format=shopping은 kind=shopping과 짝(일반 kind면 400)
     r = post_job(api, auth, format="shopping")
     assert r.status_code == 400
-    assert r.json() == {"code": "VALIDATION", "message": "준비 중인 기능입니다.", "field": "format"}
+    assert r.json() == {
+        "code": "VALIDATION",
+        "message": "유형과 형식이 맞지 않습니다.",
+        "field": "format",
+    }
     assert db.jobs == []
 
 
