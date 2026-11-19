@@ -191,3 +191,10 @@ export async function retryProductionRender(id: string, runId: string): Promise<
   const res = await apiFetch<{ render_run: RenderRun }>(`${jobPath(id)}/render-runs/${encodeURIComponent(runId)}/retry`, { method: "POST" });
   return res.render_run;
 }
+
+export type AiDraftResult = { revision: Revision; ai_draft_count: number; previous_rev_no: number | null };
+
+/** A-14 AI 초안(새 리비전, origin=ai_draft, 기존 편집 보존). 같은 키 재요청은 기존 결과. 자동 승인 없음. */
+export async function requestProductionAiDraft(id: string, idempotencyKey: string): Promise<AiDraftResult> {
+  return apiFetch<AiDraftResult>(`${jobPath(id)}/ai-draft`, { method: "POST", idempotencyKey });
+}

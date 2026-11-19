@@ -26,6 +26,16 @@ class Settings(BaseSettings):
     supabase_jwt_issuer: str | None = None
     # YouTube Data API v3 키: 서버 환경변수로만. 없으면 기록 검증(A-07)만 502로 거부한다.
     youtube_api_key: SecretStr | None = None
+    # Anthropic(Claude) 키: AI 초안(A-14) 전용, 서버 환경변수로만. 없으면 A-14만 503(기동은 정상).
+    anthropic_api_key: SecretStr | None = None
+    # A-14 설정값(tasks/task-029.md#착수-결정 H1·H5). 상한 3회는 01_PRD.md#7 Q7 확정값.
+    ai_draft_model: str = "claude-sonnet-5-5"
+    ai_draft_max_per_job: int = 3
+    ai_draft_max_sheets: int = 16
+    ai_draft_max_tokens: int = 8192
+    ai_draft_max_items: int = 80
+    ai_draft_max_shots: int = 40
+    ai_draft_timeout_sec: float = 90.0
     # /docs·/redoc·/openapi.json 노출. 기본은 끈다.
     api_docs_enabled: bool = False
 
@@ -58,6 +68,14 @@ class Settings(BaseSettings):
             return None
         if not _GOOGLE_API_KEY_RE.fullmatch(v.get_secret_value()):
             raise ValueError("YOUTUBE_API_KEY 형식이 올바르지 않습니다(AIza로 시작하는 39자)")
+        return v
+
+    @field_validator("anthropic_api_key")
+    @classmethod
+    def _blank_anthropic_key(cls, v: SecretStr | None) -> SecretStr | None:
+        # 빈 값은 미설정(A-14 503). 형식 검사는 하지 않는다(값을 메시지에 넣지 않음).
+        if v is None or not v.get_secret_value().strip():
+            return None
         return v
 
     @cached_property
