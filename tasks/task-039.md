@@ -32,3 +32,24 @@
 - T4 상태: finish는 job status와 무관하게 transcript만 ready + transcribe_state 갱신. 승인(A-13)·상태 이탈 시 queued 받아쓰기는 failed로 정리. claim 우선순위 render > prepare > transcribe. queued 10분·running 3분 만료(렌더와 같음).
 - T5 비신뢰 텍스트: vad_filter=True·no_speech 임계값, 결과는 "초안"으로 표시하고 사용자가 수정·저장해야 spec 반영. 화면 이스케이프, 로그에 대사 원문 금지.
 - T6 검증: whisper 목 단위 + 로컬 DB RPC 테스트(수령·재시작·만료·상태 이탈·capabilities) + 원본→출력 컷 시각 변환 웹 테스트. 실모델 1회 실행(180초 구간 소요·최대 메모리)은 모델 설치가 운영자 명령이라 에이전트는 하지 않고, 사용자 확인 항목으로 남긴다.
+
+## 구현 결정 (2026-11-20, builder — 0단계 미통과, 구현 보류)
+- 결론: **0단계 미통과 → 착수 결정대로 구현하지 않고 보류**(Q10 기본값 "수동 입력만"). 코드·마이그레이션·의존성 변경 없음. 팀장 결정 대기.
+- 확인 방법: scratchpad 격리 venv(Python 3.14, uv 0.11.24)에서 `uv pip install --dry-run --no-deps --only-binary :all:` + `pip download --no-deps --only-binary=:all:`로 wheel만 받아 메타데이터·동봉 파일 확인. 설치·모델 가중치 다운로드·실행 없음.
+- Python 3.14 Windows(win_amd64) wheel: 모두 있음.
+  | 패키지 | 버전 | wheel | 라이선스(메타데이터) | 비고 |
+  |---|---|---|---|---|
+  | faster-whisper | 1.2.1 | py3-none-any | MIT | `audio.py`가 모듈 첫 줄에서 `import av`(av 필수, 빼면 import 실패) |
+  | ctranslate2 | 4.9.0 | cp314-win_amd64 | MIT | `cudnn64_9.dll`(NVIDIA 독점 재배포 라이선스)·`libiomp5md.dll`(Intel) 동봉, wheel 안 라이선스 파일 없음 |
+  | onnxruntime | 1.32.0 | cp314-win_amd64 | MIT | ThirdPartyNotices 동봉 |
+  | tokenizers | 0.23.3 | cp310-abi3-win_amd64 | Apache-2.0 | |
+  | av(PyAV) | 19.0.2 | cp312-abi3-win_amd64 | BSD-3-Clause | **GPL 동봉 — 아래** |
+- **차단 사유(GPL)**: PyAV wheel `av.libs/`에 `libx264-165-*.dll`·`libx265-*.dll`(x264·x265 = GPL-2.0-or-later)이 동봉되어 같은 프로세스에 적재된다. 동봉 FFmpeg 9.0.2 configure: `--enable-version3 ... --enable-libx265 --enable-libx264 ...`(`--enable-gpl` 없음), DLL 자체 표기는 "LGPL version 3 or later"지만 GPL 라이브러리를 링크한다. wheel 안에 x264·x265 라이선스 파일은 없다. cp314 Windows wheel이 있는 av 15.1.0·16.0.1·16.1.0·17.1.0·18.1.0·19.0.2 전부 같은 구성(x264·x265 동봉) → 버전 고정으로 피할 수 없음.
+- `secscan license`(scratchpad에 `faster-whisper==1.2.1`만 둔 uv.lock, 25개 패키지): 허용 0 · 검토 0 · 거부 0 · **정보 없음 25**(lockfile에 라이선스 없음, syft 미설치) → 도구로는 "통과" 판정 불가. 위 wheel 메타데이터 수동 확인으로 대신함.
+- 모델 가중치(다운로드·웹 조회 안 함): Systran/faster-whisper-small 모델 카드 라이선스 **미확인**(통상 MIT로 알려짐), 원본 OpenAI Whisper 코드·가중치 **미확인**(통상 MIT). repo commit revision·model.bin·tokenizer sha256도 받지 않았으므로 **미확인** → 설치 명령·해시 기록은 착수 후 운영자 실행 단계로 미룸.
+- 팀장 확인 필요(택1, 결정은 팀장): (a) 착수 결정대로 받아쓰기 접고 "수동 입력만"으로 task-039 보류 (b) av를 의존성에서 빼고(uv override로 제외) 기존 외부 ffmpeg 프로세스로 16kHz PCM을 만들어 numpy로 넘기는 방식 — 단 `import faster_whisper`가 `import av`를 하므로 스텁 모듈 등 우회가 필요(취약·비권장, challenger 재검토 대상) (c) 내부 전용·비배포라 GPL 의무가 생기지 않는다고 보고 예외 허용(AGENTS.md "GPL 거부" 규칙 예외라 사용자 결정 필요).
+
+## 팀장 결정 (2026-11-20)
+- 0단계 불통과(PyAV wheel에 libx264·libx265 GPL 동봉, cp314 Windows 6개 버전 모두 동일) → 사용자 사전 결정 Q10 기본값("secscan 통과 시에만, 아니면 수동 입력만") 적용: **task-039 보류**. 예능형 자막은 수동 입력만.
+- 재개 조건: GPL 구성요소가 없는 디코더 경로(예: av 미의존 whisper 런타임)가 생기거나 사용자가 내부 비배포 예외를 명시적으로 허용할 때.
+- task-040은 transcript 대신 "현재 리비전에 사용자가 입력한 대사 자막 텍스트"를 입력으로 쓴다(없으면 시트·제목만).

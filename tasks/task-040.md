@@ -18,3 +18,6 @@
 
 ## 완료 조건 (실행 가능한 확인)
 - [ ] `cd apps/api && pytest -q tests/production/test_ai_draft_variety.py` 통과(Claude 응답 모의: 정상·스키마 위반·상한 초과)
+
+## 착수 메모 (2026-11-20, 팀장)
+- 선행 task-039 보류(GPL) → 입력은 transcript 대신 현재 리비전의 대사 자막 텍스트(사용자 입력, 비신뢰 데이터). 없으면 시트·제목만.
