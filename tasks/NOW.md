@@ -1,45 +1,19 @@
 # NOW — 재진입 스냅샷 (30줄 이내, 매 작업 끝에 덮어쓴다)
 
-- 갱신: 2026-11-19
-- 현재 작업: W7 완료(039 보류), W8 042·043·044(3d46771) 완료. 진행 중(병렬): task-045 쇼핑 렌더러(opus, 000024, 로컬 DB 사용) · task-046 쇼핑 화면(sonnet). 다음: 047 쇼핑 인수(실환경 종단) → W9 048·054. API는 apps/api/.env.local도 읽음(baf6a2d)
-- 단계: W5(P1: 029~033) → W6·W7 예능형(034~041, 브리프 `tasks/plan-variety-shorts.md`, 미결 Q9~Q11) → W8~W10 쇼핑·AI 영상·일본어판(042~054, 브리프 `tasks/plan-shopping-japanese.md`, 미결 Q12~Q16). 카테고리형 브리프 `tasks/plan-category-shorts.md`
-- 다음 한 걸음: `/next` (task-029). 사용자 지시(2026-11-19): W5~W9(029~048·054) 멈추지 말고 연속 진행. Q9~Q16·Claude API 목 전용 결정은 `tasks/plan-*.md#사용자 결정`
-- W4 결과(커밋 7fb183f·b5267ec·634d949·131a458·1f83631·1fc1d2c·a3bfed5 + 028): 제작 API A-09~A-18·워커 API W-05~W-09(000016·000017 RPC), 화면 PROD-00~03, 로컬 제작 워커 `apps/worker`(배포본 이식, 사용자 권리 확인). 결정은 각 task 파일 "착수 결정·구현 결정·리뷰 반영 결정"
-- task-028 CAT-01~07: 단위 모두 통과, 실환경(로컬 Supabase+API 8028+워커) 렌더 608x1080·30/1·h264/aac 15초 → 검수 승인 done. CAT-05 실환경 미실행·CAT-07 재시도는 단위만. 상세 `tasks/task-028.md#구현 결정`
-  - 결함 2건(🟡, `it.fails`로 재현, `tasks/README.md#발견한 문제`): 훅 초과 시 필요 초 안내 없음 · PROD-03 검수 3항목 안내 없음
-- 계약 메모: 업로드 서명 만료는 Supabase 고정 2시간(04 반영) · finish 재호출 409=이미 처리됨 · 오프라인 3분·queued 10분 만료 · 렌더 ko만(ja 400) · URL 원본 400(task-031)
-- 사람 할 일: `.env.example`에 WORKER_API_BASE_URL·WORKER_TOKEN·WORKER_FFMPEG·WORKER_FFPROBE·WORKER_WORK_DIR·WORKER_POLL_INTERVAL_SEC·WORKER_PROGRESS_INTERVAL_SEC 이름 추가(.env* 에이전트 권한 없음) · 미커밋 `design/`(spec.json·와이어프레임 8개, 20:25 수정, 문구 깨짐, 출처 미상) 유지/되돌리기 결정
-- 모델 규칙: 워커 model 위험도별 — 낮음 haiku · 보통 sonnet · 높음 opus. Opus 2회 실패 → fable
-- 주의(함정):
-  - Supabase CLI `npx supabase@3.1.0`, Docker Desktop 필요, 로컬 포트 547xx. 키는 `status -o env`를 셸 변수로만(파일 금지)
-  - api 통합 테스트 `uv run pytest -q -m integration` · pnpm은 `npx corepack pnpm`(apps/web) · jsdom 없음(클릭·visibility 동작은 자동 테스트 불가)
-  - 테스트의 가짜 키·토큰은 런타임 조립(gitleaks) — 조립 결과가 원래 값과 같은지 테스트로 확인 후 커밋
-  - lock·.env* 읽기 거부 → 의존성 취약점은 `uv export` + `uvx pip-audit --no-deps`
-  - Docker 실행 후 9327~9526 포트 예약 → CDP 19335. 실환경 스크립트 scratchpad `acc028/e2e_real.py`(API 8028)
-  - Codex CLI 401 → codex-reviewer 대신 reviewer
-  - 워커 실행: `cd apps/worker && uv run python main.py`(WORKER_* 환경변수, 로컬은 http://127.0.0.1 허용), 시스템 ffmpeg 8.1.1
-- 열린 결정: vidIQ 준비 중(수집은 YouTube 검색) · 구간별 폰트 최종값 · Dependabot PR 9건 · GitHub 보안 알림 켜기(사람) · .env.example API_BASE_URL 중복 줄 · nomad-agent-os 미커밋 21파일
-- 커밋 안 된 사용자 수정: AGENTS.md·CLAUDE.md·.claude/rules/db.md(건드리지 않음)
+- 갱신: 2026-11-20 · 사용자 지시로 여기서 멈춤(045까지 커밋·푸시, 이후 작업 미착수)
+- 완료: W1~W7(039 받아쓰기 보류 — PyAV GPL 코덱, Q10 기본값), W8 042~046, 055. 마지막 기능 커밋 4789ab3(task-045)
+- 다음 한 걸음: `/next` → task-047 쇼핑 인수 SHOP-01~06(실환경 종단 + 3구간 화면 캡처) → W9 048 AI 대본 3안·054 AI 영상 연동(Q16: 어댑터만, 기본 꺼짐) → (범위 밖) W10 일본어판 049~053
+- 결정 기록: 각 `tasks/task-0NN.md`의 착수·구현·리뷰 반영 결정, 사용자 결정은 `tasks/plan-*.md#사용자 결정`(Q9~Q16 기본값·Claude 목 전용·쇼핑 내레이션 문장별 녹음 4개)
+- 실행 순서(로컬):
+  1. `npx supabase@3.1.0 start` → `db reset`(000001~000024) → `status -o env`
+  2. API `apps/api/.env.local`(SUPABASE_URL·SUPABASE_SERVICE_ROLE_KEY·YOUTUBE_API_KEY·ANTHROPIC_API_KEY 선택·API_PORT=8001) → `cd apps/api && uv run python -m app` (`.env`·`.env.local` 둘 다 읽음)
+  3. 워커 토큰 `uv run python -m app.cli.worker_tokens issue --workspace <uuid> --name <이름>`
+  4. 웹 `apps/web/.env.local`(API_BASE_URL·APP_ORIGIN·SUPABASE_URL·SUPABASE_PUBLISHABLE_KEY) → `npx corepack pnpm dev`
+  5. 워커 env(WORKER_API_BASE_URL·WORKER_TOKEN·WORKER_FFMPEG·WORKER_FFPROBE·WORKER_WORK_DIR·WORKER_TTS_ENABLED=0) → `cd apps/worker && uv run python main.py`
+  6. 배포 시 워커 먼저 → 000024 적용(쇼핑 배정은 capabilities를 알린 워커만)
+- 사람 할 일: `.env.example`에 이름 추가(WORKER_* 11개·ANTHROPIC_API_KEY·AI_DRAFT_* 7개) · 미커밋 `design/`(spec.json·와이어프레임 8개, 출처 미상·문구 깨짐) 유지/되돌리기 · 실제 외부 호출 첫 확인(Claude·edge-tts·yt-dlp — 모두 목으로만 검증) · 운영 Supabase Pro·GitHub 보안 알림·Dependabot PR
+- 알려진 한계: ERD 도구가 ADD COLUMN 미표시 · jsdom 없음(클릭·visibility 자동 테스트 불가) · 3구간 캡처 미검증(046) · 쇼핑은 영상 원본 ≥1 필요·원본당 최대 60초 · YouTube URL은 JS 런타임 미사용이라 실패 잦음
+- 주의(함정): Supabase 키는 셸 변수로만 · 테스트 가짜 키는 런타임 조립(gitleaks) · lock·.env* 읽기 거부 → 취약점은 `uv export`+`uvx pip-audit --no-deps` · 병렬 작업은 마이그레이션 번호·로컬 DB 순서를 팀장이 조정 · Codex CLI 401 → reviewer
+- 모델 규칙: 워커 model 위험도별 낮음 haiku · 보통 sonnet · 높음 opus, Opus 2회 실패 → fable
 - SDLC 단계: 06 구현
-- 테스트 상태: supabase test db 524 · api pytest 1149 + integration 13 · web test 445 · worker pytest 308(skip 0)
-
-## task-033 인수 결과 (2026-11-19, tester) — 상세 `tasks/task-033.md#구현 결정`
-| CAT | 결과 | 근거(실환경=로컬 Supabase+API+워커, 목: Claude·edge-tts·yt-dlp) |
-|---|---|---|
-| 01~07 | PASS | 단위(api 975·worker 246·web 433) + P0 실환경 e2e 재실행(608x1080 30/1 h264/aac) |
-| 08 오버레이 | PASS | 실환경 A(URL목·AI초안목·오버레이·TTS실패→첨부·렌더·done)·B(TTS 성공+오버레이), ffprobe 15.00s, 프레임 확인 |
-| 목 대체 | 표시 | Claude=로컬 HTTP(ANTHROPIC_BASE_URL)·edge-tts=워커 래퍼 목·yt-dlp=워커 다운로더 목 |
-| 결함 🟡 | it.fails | TTS 선택 UI 없음 · review 복귀 시 사유·편집 링크 안 보임 · header 가림 경고 없음 · AI 초안이 overlays 누락 |
-
-## task-038 인수 결과 (2026-11-20, tester) — 상세 `tasks/task-038.md#구현 결정`
-| VAR | 결과 | 근거(합성 lavfi 16:9 원본, 실환경=로컬 Supabase+API 8038+워커) |
-|---|---|---|
-| 01 | PASS | 예제 14컷 1080x1920·30/1·h264/aac, 24.00s(±1프레임), 리포트 컷 표=편집안, 실환경 생성→검수 done |
-| 02 | PASS | 띠 밖 원본 0·띠 안 빈 곳 0(14컷 전부·경계 배율 1.343) |
-| 03 | PASS | 대사·펀치·반응 동시 표시·제목 영상 내내(픽셀 검사) |
-| 04 | PASS | 범위초과·빈 화면·겹침·0.2초 미만 승인 차단(API·워커·실환경), 0.5초 미만 컷·1.4초 미만 자막 경고만 |
-| 05 | PASS | CAT-01~08 회귀(api 993·worker 308 skip 0·web 443·supabase 432). 결함 없음 |
-
-## task-041 인수 결과 (2026-11-20, tester) — 상세 `tasks/task-041.md#구현 결정`
-- VAR-06 PASS(받아쓰기 task-039 보류 -> "수동 입력 대사 -> AI 초안 -> 수정 저장"·"대사 없이 수동만"·AI 502 후 수동 저장으로 대체) · VAR-07 PASS(variety 검증 통과 / 오류 경로 cuts.1 표시 / 형식 위반 502 미저장).
-- CAT 회귀: api production 534 passed · worker 308 passed(skip 0) · web 445 passed. 제품 결함 없음.
+- 테스트 상태: supabase test db 533 · api pytest 1174 + integration 13 · web test 522 · worker pytest 348(skip 0)
