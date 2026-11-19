@@ -39,7 +39,7 @@
 | task-035 | 예능형 API 연결 (A-09·A-12·어댑터·W-05 task.format) | W6 | 034 | 높음 | builder + tester | 완료 |
 | task-036 | 예능형 렌더러 (로컬 워커 · 글꼴 라이선스) | W6 | 035 | 높음 | builder + tester | 완료 |
 | task-037 | PROD-01 형식 선택 + PROD-02 예능형 패널 | W6 | 035 | 보통 | builder | 완료 |
-| task-038 | 예능형 P0 인수 테스트 VAR-01~05 | W6 | 036, 037 | 보통 | tester | 대기 |
+| task-038 | 예능형 P0 인수 테스트 VAR-01~05 | W6 | 036, 037 | 보통 | tester | 완료 |
 | task-039 | 로컬 받아쓰기 transcribe (faster-whisper · A-19 · transcribe_state) | W7 | 038 | 높음 | builder + tester | 대기 |
 | task-040 | 예능형 AI 초안 (A-14 형식 분기) | W7 | 039, 029 | 높음 | builder + tester | 대기 |
 | task-041 | 예능형 P1 인수 테스트 VAR-06·07 + 회귀 | W7 | 040 | 보통 | tester | 대기 |

@@ -1,7 +1,7 @@
 # NOW — 재진입 스냅샷 (30줄 이내, 매 작업 끝에 덮어쓴다)
 
 - 갱신: 2026-11-19
-- 현재 작업: W5 029~032 완료, W6 034(bf46d56)·035(b054227) 완료. 진행 중(병렬): task-033 W5 인수 테스트(tester) · task-036 예능형 렌더러(opus, 착수 결정 W1~W11) · task-037 예능형 화면(sonnet). 다음: 038 예능형 인수 → W7(039~041) → W8(042~047) → W9(048·054)
+- 현재 작업: W5 완료 · W6 034~037 완료(036 0932e65) · 055 결함 보완 완료(df2ca20). 진행 중: task-038 예능형 인수(tester, acc038) ∥ 039·042 착수 전 검토(challenger). 다음: 039(W7)·042(W8) 병렬 → 040·043… → W9(048·054)
 - 단계: W5(P1: 029~033) → W6·W7 예능형(034~041, 브리프 `tasks/plan-variety-shorts.md`, 미결 Q9~Q11) → W8~W10 쇼핑·AI 영상·일본어판(042~054, 브리프 `tasks/plan-shopping-japanese.md`, 미결 Q12~Q16). 카테고리형 브리프 `tasks/plan-category-shorts.md`
 - 다음 한 걸음: `/next` (task-029). 사용자 지시(2026-11-19): W5~W9(029~048·054) 멈추지 말고 연속 진행. Q9~Q16·Claude API 목 전용 결정은 `tasks/plan-*.md#사용자 결정`
 - W4 결과(커밋 7fb183f·b5267ec·634d949·131a458·1f83631·1fc1d2c·a3bfed5 + 028): 제작 API A-09~A-18·워커 API W-05~W-09(000016·000017 RPC), 화면 PROD-00~03, 로컬 제작 워커 `apps/worker`(배포본 이식, 사용자 권리 확인). 결정은 각 task 파일 "착수 결정·구현 결정·리뷰 반영 결정"
@@ -21,7 +21,7 @@
 - 열린 결정: vidIQ 준비 중(수집은 YouTube 검색) · 구간별 폰트 최종값 · Dependabot PR 9건 · GitHub 보안 알림 켜기(사람) · .env.example API_BASE_URL 중복 줄 · nomad-agent-os 미커밋 21파일
 - 커밋 안 된 사용자 수정: AGENTS.md·CLAUDE.md·.claude/rules/db.md(건드리지 않음)
 - SDLC 단계: 06 구현
-- 테스트 상태: supabase test db 432 · api pytest 901(acceptance 제외) + integration 13 · web test 417 · worker pytest 236
+- 테스트 상태: supabase test db 432 · api pytest 983 + integration 13 · web test 443 · worker pytest 302(skip 0)
 
 ## task-033 인수 결과 (2026-11-19, tester) — 상세 `tasks/task-033.md#구현 결정`
 | CAT | 결과 | 근거(실환경=로컬 Supabase+API+워커, 목: Claude·edge-tts·yt-dlp) |
@@ -30,3 +30,12 @@
 | 08 오버레이 | PASS | 실환경 A(URL목·AI초안목·오버레이·TTS실패→첨부·렌더·done)·B(TTS 성공+오버레이), ffprobe 15.00s, 프레임 확인 |
 | 목 대체 | 표시 | Claude=로컬 HTTP(ANTHROPIC_BASE_URL)·edge-tts=워커 래퍼 목·yt-dlp=워커 다운로더 목 |
 | 결함 🟡 | it.fails | TTS 선택 UI 없음 · review 복귀 시 사유·편집 링크 안 보임 · header 가림 경고 없음 · AI 초안이 overlays 누락 |
+
+## task-038 인수 결과 (2026-11-20, tester) — 상세 `tasks/task-038.md#구현 결정`
+| VAR | 결과 | 근거(합성 lavfi 16:9 원본, 실환경=로컬 Supabase+API 8038+워커) |
+|---|---|---|
+| 01 | PASS | 예제 14컷 1080x1920·30/1·h264/aac, 24.00s(±1프레임), 리포트 컷 표=편집안, 실환경 생성→검수 done |
+| 02 | PASS | 띠 밖 원본 0·띠 안 빈 곳 0(14컷 전부·경계 배율 1.343) |
+| 03 | PASS | 대사·펀치·반응 동시 표시·제목 영상 내내(픽셀 검사) |
+| 04 | PASS | 범위초과·빈 화면·겹침·0.2초 미만 승인 차단(API·워커·실환경), 0.5초 미만 컷·1.4초 미만 자막 경고만 |
+| 05 | PASS | CAT-01~08 회귀(api 993·worker 308 skip 0·web 443·supabase 432). 결함 없음 |
