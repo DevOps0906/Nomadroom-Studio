@@ -139,6 +139,38 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"edit_revisions": {
+                  Row: {
+                    "approved_at": string | null,"approved_by": string | null,"created_at": string,"created_by": string | null,"derived_from": string | null,"id": string,"job_id": string,"lang": string,"origin": string,"rev_no": number,"schema_version": number,"spec": NonNullable<Json>,"updated_at": string,"validation": NonNullable<Json>,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "approved_at"?: string | null,"approved_by"?: string | null,"created_at"?: string,"created_by"?: string | null,"derived_from"?: string | null,"id"?: string,"job_id": string,"lang"?: string,"origin"?: string,"rev_no": number,"schema_version"?: number,"spec"?: NonNullable<Json>,"updated_at"?: string,"validation"?: NonNullable<Json>,"workspace_id": string
+                  }
+                  Update: {
+                    "approved_at"?: string | null,"approved_by"?: string | null,"created_at"?: string,"created_by"?: string | null,"derived_from"?: string | null,"id"?: string,"job_id"?: string,"lang"?: string,"origin"?: string,"rev_no"?: number,"schema_version"?: number,"spec"?: NonNullable<Json>,"updated_at"?: string,"validation"?: NonNullable<Json>,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "edit_revisions_derived_from_fk"
+      columns: ["derived_from","job_id"]
+isOneToOne: false
+      referencedRelation: "edit_revisions"
+      referencedColumns: ["id","job_id"]
+    },{
+      foreignKeyName: "edit_revisions_job_fk"
+      columns: ["job_id","workspace_id"]
+isOneToOne: false
+      referencedRelation: "production_jobs"
+      referencedColumns: ["id","workspace_id"]
+    },{
+      foreignKeyName: "edit_revisions_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"job_profile_runs": {
                   Row: {
                     "chrome_state": string | null,"collected_count": number,"detail": string | null,"id": string,"job_id": string,"position": number,"profile_id": string,"status": string,"updated_at": string,"workspace_id": string
@@ -235,6 +267,88 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"production_assets": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"duration_sec": number | null,"id": string,"job_id": string,"kind": string,"mime": string,"render_run_id": string | null,"rights": Json | null,"size_bytes": number | null,"status": string,"storage_path": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"duration_sec"?: number | null,"id"?: string,"job_id": string,"kind": string,"mime": string,"render_run_id"?: string | null,"rights"?: Json | null,"size_bytes"?: number | null,"status"?: string,"storage_path": string,"workspace_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"duration_sec"?: number | null,"id"?: string,"job_id"?: string,"kind"?: string,"mime"?: string,"render_run_id"?: string | null,"rights"?: Json | null,"size_bytes"?: number | null,"status"?: string,"storage_path"?: string,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "production_assets_job_fk"
+      columns: ["job_id","workspace_id"]
+isOneToOne: false
+      referencedRelation: "production_jobs"
+      referencedColumns: ["id","workspace_id"]
+    },{
+      foreignKeyName: "production_assets_render_run_fk"
+      columns: ["render_run_id","job_id"]
+isOneToOne: false
+      referencedRelation: "render_runs"
+      referencedColumns: ["id","job_id"]
+    },{
+      foreignKeyName: "production_assets_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"production_jobs": {
+                  Row: {
+                    "affiliates": NonNullable<Json>,"ai_draft_count": number,"ai_draft_requests": NonNullable<Json>,"brief": Json | null,"candidate_id": string | null,"claimed_by": string | null,"comment_keyword": string | null,"completed_at": string | null,"created_at": string,"credit": string | null,"current_ja_revision_id": string | null,"current_revision_id": string | null,"error_code": string | null,"failed_stage": string | null,"format": string,"id": string,"idempotency_key": string,"kind": string,"lang": string,"license_cc": boolean | null,"preset_version": string,"requested_by": string | null,"retry_count": number,"rights_confirmed": boolean,"rights_confirmed_at": string | null,"rights_confirmed_by": string | null,"segment_len_sec": number,"source_kind": string,"source_meta": Json | null,"source_start_sec": number,"source_url": string | null,"status": string,"title": string,"transcribe_error": string | null,"transcribe_state": string | null,"transcribe_updated_at": string | null,"updated_at": string,"vertical": string | null,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "affiliates"?: NonNullable<Json>,"ai_draft_count"?: number,"ai_draft_requests"?: NonNullable<Json>,"brief"?: Json | null,"candidate_id"?: string | null,"claimed_by"?: string | null,"comment_keyword"?: string | null,"completed_at"?: string | null,"created_at"?: string,"credit"?: string | null,"current_ja_revision_id"?: string | null,"current_revision_id"?: string | null,"error_code"?: string | null,"failed_stage"?: string | null,"format"?: string,"id"?: string,"idempotency_key": string,"kind"?: string,"lang"?: string,"license_cc"?: boolean | null,"preset_version": string,"requested_by"?: string | null,"retry_count"?: number,"rights_confirmed"?: boolean,"rights_confirmed_at"?: string | null,"rights_confirmed_by"?: string | null,"segment_len_sec": number,"source_kind"?: string,"source_meta"?: Json | null,"source_start_sec"?: number,"source_url"?: string | null,"status"?: string,"title": string,"transcribe_error"?: string | null,"transcribe_state"?: string | null,"transcribe_updated_at"?: string | null,"updated_at"?: string,"vertical"?: string | null,"workspace_id": string
+                  }
+                  Update: {
+                    "affiliates"?: NonNullable<Json>,"ai_draft_count"?: number,"ai_draft_requests"?: NonNullable<Json>,"brief"?: Json | null,"candidate_id"?: string | null,"claimed_by"?: string | null,"comment_keyword"?: string | null,"completed_at"?: string | null,"created_at"?: string,"credit"?: string | null,"current_ja_revision_id"?: string | null,"current_revision_id"?: string | null,"error_code"?: string | null,"failed_stage"?: string | null,"format"?: string,"id"?: string,"idempotency_key"?: string,"kind"?: string,"lang"?: string,"license_cc"?: boolean | null,"preset_version"?: string,"requested_by"?: string | null,"retry_count"?: number,"rights_confirmed"?: boolean,"rights_confirmed_at"?: string | null,"rights_confirmed_by"?: string | null,"segment_len_sec"?: number,"source_kind"?: string,"source_meta"?: Json | null,"source_start_sec"?: number,"source_url"?: string | null,"status"?: string,"title"?: string,"transcribe_error"?: string | null,"transcribe_state"?: string | null,"transcribe_updated_at"?: string | null,"updated_at"?: string,"vertical"?: string | null,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "production_jobs_candidate_fk"
+      columns: ["candidate_id","workspace_id"]
+isOneToOne: false
+      referencedRelation: "candidate_list_v"
+      referencedColumns: ["id","workspace_id"]
+    },{
+      foreignKeyName: "production_jobs_candidate_fk"
+      columns: ["candidate_id","workspace_id"]
+isOneToOne: false
+      referencedRelation: "candidates"
+      referencedColumns: ["id","workspace_id"]
+    },{
+      foreignKeyName: "production_jobs_claimed_by_fkey"
+      columns: ["claimed_by"]
+isOneToOne: false
+      referencedRelation: "workers"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "production_jobs_current_ja_revision_fk"
+      columns: ["current_ja_revision_id","id"]
+isOneToOne: false
+      referencedRelation: "edit_revisions"
+      referencedColumns: ["id","job_id"]
+    },{
+      foreignKeyName: "production_jobs_current_revision_fk"
+      columns: ["current_revision_id","id"]
+isOneToOne: false
+      referencedRelation: "edit_revisions"
+      referencedColumns: ["id","job_id"]
+    },{
+      foreignKeyName: "production_jobs_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"profiles": {
                   Row: {
                     "category": string | null,"cc_only": boolean,"format": string,"id": string,"include_broadcast": boolean,"keywords": (string)[],"market": string,"max_growth_pct": number,"min_views": number,"name": string,"selected": boolean,"updated_at": string,"workspace_id": string
@@ -249,6 +363,68 @@ isOneToOne: false
                   Relationships: [
                     {
       foreignKeyName: "profiles_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"render_runs": {
+                  Row: {
+                    "attempt": number,"claimed_by": string | null,"created_at": string,"error_code": string | null,"error_stage": string | null,"finished_at": string | null,"hook_audio_asset_id": string | null,"id": string,"idempotency_key": string,"job_id": string,"lang": string,"mp4_asset_id": string | null,"preset_version": string,"progress_pct": number,"progress_stage": string | null,"report_asset_id": string | null,"requested_by": string | null,"retry_of": string | null,"revision_id": string,"started_at": string | null,"status": string,"updated_at": string,"workspace_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "attempt"?: number,"claimed_by"?: string | null,"created_at"?: string,"error_code"?: string | null,"error_stage"?: string | null,"finished_at"?: string | null,"hook_audio_asset_id"?: string | null,"id"?: string,"idempotency_key": string,"job_id": string,"lang"?: string,"mp4_asset_id"?: string | null,"preset_version": string,"progress_pct"?: number,"progress_stage"?: string | null,"report_asset_id"?: string | null,"requested_by"?: string | null,"retry_of"?: string | null,"revision_id": string,"started_at"?: string | null,"status"?: string,"updated_at"?: string,"workspace_id": string
+                  }
+                  Update: {
+                    "attempt"?: number,"claimed_by"?: string | null,"created_at"?: string,"error_code"?: string | null,"error_stage"?: string | null,"finished_at"?: string | null,"hook_audio_asset_id"?: string | null,"id"?: string,"idempotency_key"?: string,"job_id"?: string,"lang"?: string,"mp4_asset_id"?: string | null,"preset_version"?: string,"progress_pct"?: number,"progress_stage"?: string | null,"report_asset_id"?: string | null,"requested_by"?: string | null,"retry_of"?: string | null,"revision_id"?: string,"started_at"?: string | null,"status"?: string,"updated_at"?: string,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "render_runs_claimed_by_fkey"
+      columns: ["claimed_by"]
+isOneToOne: false
+      referencedRelation: "workers"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "render_runs_hook_audio_asset_fk"
+      columns: ["hook_audio_asset_id","job_id"]
+isOneToOne: false
+      referencedRelation: "production_assets"
+      referencedColumns: ["id","job_id"]
+    },{
+      foreignKeyName: "render_runs_job_fk"
+      columns: ["job_id","workspace_id"]
+isOneToOne: false
+      referencedRelation: "production_jobs"
+      referencedColumns: ["id","workspace_id"]
+    },{
+      foreignKeyName: "render_runs_mp4_asset_fk"
+      columns: ["mp4_asset_id","job_id"]
+isOneToOne: false
+      referencedRelation: "production_assets"
+      referencedColumns: ["id","job_id"]
+    },{
+      foreignKeyName: "render_runs_report_asset_fk"
+      columns: ["report_asset_id","job_id"]
+isOneToOne: false
+      referencedRelation: "production_assets"
+      referencedColumns: ["id","job_id"]
+    },{
+      foreignKeyName: "render_runs_retry_of_fk"
+      columns: ["retry_of","job_id"]
+isOneToOne: false
+      referencedRelation: "render_runs"
+      referencedColumns: ["id","job_id"]
+    },{
+      foreignKeyName: "render_runs_revision_fk"
+      columns: ["revision_id","job_id","lang"]
+isOneToOne: false
+      referencedRelation: "edit_revisions"
+      referencedColumns: ["id","job_id","lang"]
+    },{
+      foreignKeyName: "render_runs_workspace_id_fkey"
       columns: ["workspace_id"]
 isOneToOne: false
       referencedRelation: "workspaces"
@@ -373,7 +549,16 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "apply_collect_batch":
+            "_ai_draft_json":
+{ Args: { "p_count": number,"p_replay": boolean,"p_req": Json }; Returns: Json
+                           },
+"_ai_draft_set":
+{ Args: { "p_job": string,"p_key": string,"p_patch": Json }; Returns: Json
+                           },
+"_render_run_json":
+{ Args: { "p_created": boolean,"p_run": Omit<Database["public"]['Tables']["render_runs"]['Row'], Database["public"]['Tables']["render_runs"]['ComputedFields']> }; Returns: Json
+                           },
+"apply_collect_batch":
 { Args: { "p_job": string,"p_payload": Json,"p_profile": string,"p_worker": string,"p_workspace": string }; Returns: number
                            },
 "apply_search_batch":
@@ -382,14 +567,41 @@ isOneToOne: false
 "apply_verify_batch":
 { Args: { "p_job": string,"p_payload": Json,"p_workspace": string }; Returns: number
                            },
+"approve_production_revision":
+{ Args: { "p_job": string,"p_rev_no": number,"p_updated_at": string,"p_user": string,"p_validation": Json,"p_workspace": string }; Returns: Json
+                           },
+"claim_production_task":
+{ Args: { "p_worker": string,"p_workspace": string }; Returns: Json
+                           },
+"create_ai_draft_revision":
+{ Args: { "p_job": string,"p_key": string,"p_spec": Json,"p_user": string,"p_validation": Json,"p_workspace": string }; Returns: Json
+                           },
+"expire_production_offline":
+{ Args: { "p_workspace": string }; Returns: Json
+                           },
+"fail_ai_draft":
+{ Args: { "p_job": string,"p_key": string,"p_workspace": string }; Returns: undefined
+                           },
+"finish_production_task":
+{ Args: { "p_asset_ids": (string)[],"p_error_code": string,"p_error_stage": string,"p_kind": string,"p_meta": Json,"p_spec": Json,"p_status": string,"p_task": string,"p_validation": Json,"p_worker": string,"p_workspace": string }; Returns: Json
+                           },
 "is_workspace_member":
 { Args: { "ws": string }; Returns: boolean
+                           },
+"production_affiliates_valid":
+{ Args: { "p": Json }; Returns: boolean
                            },
 "quota_day":
 { Args: { "p_ts": string }; Returns: string
                            },
 "release_search_quota":
 { Args: { "p_units": number }; Returns: undefined
+                           },
+"request_render_run":
+{ Args: { "p_job": string,"p_key": string,"p_lang": string,"p_revision": string,"p_user": string,"p_workspace": string }; Returns: Json
+                           },
+"reserve_ai_draft":
+{ Args: { "p_job": string,"p_key": string,"p_limit": number,"p_user": string,"p_workspace": string }; Returns: Json
                            },
 "reserve_collect_lookup":
 { Args: { "p_job": string,"p_n": number,"p_worker": string,"p_workspace": string }; Returns: number
@@ -402,6 +614,12 @@ isOneToOne: false
                            },
 "retry_collect_job":
 { Args: { "p_job": string,"p_workspace": string }; Returns: Json
+                           },
+"retry_render_run":
+{ Args: { "p_job": string,"p_run": string,"p_user": string,"p_workspace": string }; Returns: Json
+                           },
+"save_production_revision":
+{ Args: { "p_base_rev_no": number,"p_job": string,"p_spec": Json,"p_user": string,"p_validation": Json,"p_workspace": string }; Returns: Json
                            },
 "set_profile_selection":
 { Args: { "p_ids": (string)[],"p_workspace": string }; Returns: (string)[]

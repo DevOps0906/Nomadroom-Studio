@@ -43,7 +43,7 @@
 | task-039 | 로컬 받아쓰기 transcribe (faster-whisper · A-19 · transcribe_state) | W7 | 038 | 높음 | builder + tester | 대기 |
 | task-040 | 예능형 AI 초안 (A-14 형식 분기) | W7 | 039, 029 | 높음 | builder + tester | 대기 |
 | task-041 | 예능형 P1 인수 테스트 VAR-06·07 + 회귀 | W7 | 040 | 보통 | tester | 대기 |
-| task-042 | 스키마: 유형·분야·brief·제휴·권리·리비전 언어 | W8 | 038 | 높음 | builder + tester | 대기 |
+| task-042 | 스키마: 유형·분야·brief·제휴·권리·리비전 언어 | W8 | 038 | 높음 | builder + tester | 완료 |
 | task-043 | 쇼핑 편집안 검증 | W8 | 042 | 보통 | builder + tester | 대기 |
 | task-044 | 쇼핑 API | W8 | 043 | 높음 | builder + tester | 대기 |
 | task-045 | 쇼핑 렌더러 (로컬 워커) | W8 | 044, 030 | 높음 | builder + tester | 대기 |

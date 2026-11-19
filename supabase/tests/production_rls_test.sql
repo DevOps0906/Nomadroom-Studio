@@ -114,7 +114,7 @@ select throws_ok(
   $$insert into public.render_runs (workspace_id, job_id, revision_id, lang, idempotency_key, preset_version, status)
     values ('cccccccc-0000-4000-8000-000000000001', 'cccccccc-0000-4000-8000-000000000012',
             'cccccccc-0000-4000-8000-000000000032', 'ja', 'rr-5', 'category-v1', 'failed')$$,
-  '23514', null, 'lang ja는 아직 거부(task-042에서 확장)');
+  '23503', null, 'lang ja run이 ko 리비전 참조 = 거부(task-042: run 언어 = 리비전 언어 FK)');
 
 -- 8. 다른 작업의 리비전·자산 참조 = FK 위반
 select throws_ok(

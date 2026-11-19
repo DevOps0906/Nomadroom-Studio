@@ -71,8 +71,10 @@ project.json 열은 배포본 규격 사본 `research/category-shorts-ref/projec
 | production_jobs | `kind`(`general`(기본)·`shopping`, 생성 후 변경 불가) | `format` check에 `shopping` 추가. `kind`=`shopping` ⇔ `format`=`shopping`, `kind`=`general`이면 `format` in (`category`,`variety`) |
 | production_jobs | `vertical`(null·`product`·`travel`) | `kind`=`shopping`이면 필수, 아니면 null |
 | production_jobs | `brief`(jsonb, 쇼핑만) | 상품: 제품명·불편 1개·실제 장면 3~5·빼야 할 말·확인된 사실. 여행: 목적지·상품 종류(숙소·투어·패키지)·소구점 1개·장면 3~5·확인된 사실. `target`(성별·연령대, 메모용) 포함 |
-| production_jobs | `affiliates`(jsonb[], `{lang, partner, url}`) | 운영자가 발급한 링크를 수동 입력. url은 http/https만, 클라이언트 번들·로그에 키 없음. 링크는 spec·산출물 파일에 박지 않고 게시 문구에만 쓴다 |
+| production_jobs | `affiliates`(jsonb[], `{lang, partner, url}`) | 운영자가 발급한 링크를 수동 입력. 배열, 원소 lang `ko`·`ja`·partner 비어 있지 않음·url은 https만(DB check), 클라이언트 번들·로그에 키 없음. 링크는 spec·산출물 파일에 박지 않고 게시 문구에만 쓴다 |
 | production_jobs | `comment_keyword`(text·null) | 댓글 유도 단어(게시 문구에 사용) |
+| production_jobs | `current_ja_revision_id`(→edit_revisions, null) | 일본어판 현재 리비전. `current_revision_id`는 ko 그대로. (id, job_id) 복합 FK로 같은 작업만 |
+| production_jobs | `candidate_id` FK를 (candidate_id, workspace_id)→candidates(id, workspace_id)로 교체 | 다른 워크스페이스 후보 참조 거부, 후보 삭제 시 `candidate_id`만 null |
 | production_jobs | `lang` | 원본 작업 언어 `ko` 고정. 일본어판은 작업이 아니라 리비전·렌더의 `lang`이다 |
 | production_assets | `kind`에 `source_upload`·`source`가 작업당 여러 건(쇼핑), `bgm`·`image` 추가 | `rights`(jsonb·null): `{basis(`own`·`licensed`·`permission`·`quote`·`platform_audio`·`ai_generated`(P1)), source_url, author, has_person, portrait_consent, note, gen?}`. `gen`={platform, model, request_id, cost_krw(정수 원)}는 basis=`ai_generated`일 때만 필수(`generation_runs`와 같은 값 복사). `ai_generated` 자산(`source_upload`)은 입력 사진의 권리를 이어받고 `reviewed`(bool)=true여야 승인. 쇼핑은 모든 원본·이미지·BGM이 basis 필수, `has_person`=true면 `portrait_consent`=true여야 승인. 일반쇼츠는 선택(기존 `rights_confirmed` 유지) |
 | edit_revisions | `lang`(`ko`(기본)·`ja`), `derived_from`(→edit_revisions, null) | `ja`는 `derived_from` 필수·승인된 ko 리비전. **unique(job_id, lang, rev_no)**(기존 unique(job_id, rev_no)를 대체, ko 행의 의미는 같음). `rev_no`는 언어별로 1부터. 승인·spec 불변 규칙은 언어별 동일 |

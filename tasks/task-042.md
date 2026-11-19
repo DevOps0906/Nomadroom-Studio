@@ -32,3 +32,23 @@
 - S6 derived_from: (derived_from, job_id)→edit_revisions(id, job_id) FK + check(lang='ja' ⇔ derived_from not null). render_runs (revision_id, job_id, lang)→edit_revisions(id, job_id, lang) 복합 FK(unique(id, job_id, lang) 추가). 기존 unique·(id, workspace_id) 중복 생성 금지.
 - S7 jsonb 형태: affiliates는 배열·url `^https://` 검사(immutable 함수 check), rights.basis 허용 목록 check, vertical·brief는 kind 정합 check, kind 변경은 update 트리거로 거부.
 - S8 제휴 링크 노출: 내부 운영 도구라 같은 워크스페이스 구성원 select 허용(기존 RLS 그대로). 비밀이 아닌 추적 링크로 본다.
+
+## 구현 결정 (2026-11-20, builder)
+- 마이그레이션 `supabase/migrations/20261120000021_shopping_lang.sql`, 테스트 `supabase/tests/production_shopping_test.sql`(47건).
+- affiliates: `jsonb not null default '[]'`, check는 immutable 함수 `production_affiliates_valid`(배열·원소 객체·lang ko|ja·partner 비어 있지 않음·url `^https://`). kind와 무관하게 허용(일반 작업은 빈 배열).
+- brief: `null` 또는 (kind=shopping이고 객체). 쇼핑이라도 null 허용(필수 여부는 A-09/044 API). vertical은 kind=shopping ⇔ not null.
+- rights: null 또는 객체, `basis`는 없음·null·허용 목록만(쇼핑 필수 여부·portrait_consent는 승인 때 API).
+- kind 변경 트리거는 errcode 23514, 메시지 `production_jobs.kind is immutable`. 같은 값 update는 통과.
+- render_runs: 기존 `render_runs_revision_fk`(revision_id, job_id)를 같은 이름의 (revision_id, job_id, lang)→edit_revisions(id, job_id, lang) FK로 교체(중복 FK 두지 않음). edit_revisions에 unique(id, job_id, lang) 추가.
+- derived_from FK는 on delete no action(ko 단독 삭제 시 ja가 있으면 거부, job cascade 삭제는 통과 — 테스트 13).
+- candidates FK: `production_jobs_candidate_id_fkey` → `production_jobs_candidate_fk`(on delete set null (candidate_id)), drop 전 불일치 0건 assert.
+- `production_rls_test.sql` 7번 "lang ja는 아직 거부(23514)" → "ja run이 ko 리비전 참조 거부(23503)"로 수정.
+- ERD: sql2erd는 alter table add column 중 references 없는 칼럼을 그리지 않아 새 FK 관계 2줄(derived_from·current_ja_revision_id)만 반영됨(도구 한계).
+
+## 리뷰 반영 결정 (2026-11-20, code·security 리뷰 🔴 없음, 000021 미커밋·원격 미적용이라 직접 수정)
+- R1 affiliates: 최대 20건, url `^https://[^[:space:][:cntrl:]]+$`, url 2048자 이하(`production_affiliates_valid`).
+- R2 크기 상한: `pg_column_size(brief) <= 32768`(brief check), `pg_column_size(rights) <= 8192`(rights check).
+- R3 rights.source_url: null(없음) 또는 `^https?://[^[:space:][:cntrl:]]+$`.
+- R4 참조 리비전 언어: 생성 칼럼+복합 FK 대신 트리거 2개로 강제(칼럼·타입 추가 없음). `edit_revisions_derived_from_lang`(부모 lang=ko), `production_jobs_current_ja_revision_lang`(대상 lang=ja), 위반 23514. 전제: 리비전 lang은 생성 후 바뀌지 않는다.
+- R5 check 식의 함수도 실행 권한 검사 대상이다. service_role에서 revoke하면 `permission denied for function production_affiliates_valid`가 재현돼 `grant execute ... to service_role`을 추가했고, pgTAP에서 service_role insert 성공·http 거부를 확인했다.
+- pgTAP: production_shopping_test 60건(+13).
