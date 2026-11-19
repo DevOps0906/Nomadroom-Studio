@@ -29,7 +29,7 @@
 | task-025 | PROD-00·PROD-01 화면 + MON-01 제작 버튼 | W4 | 022 | 보통 | builder | 완료 |
 | task-026 | PROD-02 편집안 화면 | W4 | 022, 025 | 보통 | builder | 완료 |
 | task-027 | PROD-03 작업·검수 화면 | W4 | 023, 025 | 보통 | builder | 완료 |
-| task-028 | P0 인수 테스트 CAT-01~07 | W4 | 024, 026, 027 | 보통 | tester | 대기 |
+| task-028 | P0 인수 테스트 CAT-01~07 | W4 | 024, 026, 027 | 보통 | tester | 완료 |
 | task-029 | AI 초안 A-14 (Claude) | W5 | 028 | 높음 | builder + tester | 대기 |
 | task-030 | TTS (edge-tts, 워커 전용) | W5 | 028 | 높음 | builder | 대기 |
 | task-031 | URL 원본 (권리 확인 · yt-dlp · SSRF 방지) | W5 | 028 | 높음 | builder + tester | 대기 |
@@ -82,6 +82,8 @@
 | 2026-11-18 | 수집 POST 키 미설정(task-019) | YOUTUBE_API_KEY가 없으면 API 502 → 화면은 일반 "요청을 처리하지 못했습니다" | 배포 체크리스트에 키 설정 확인, 필요 시 전용 문구 |
 | 2026-11-16 | 앱 셸 | 로그아웃 버튼(SignOutButton)이 셸에 아직 없음 | DASH-01(task-016) 또는 셸 보강 때 상단 바에 배치 |
 | 2026-11-19 | 배포(원격 Supabase) | 원본 업로드 한도 500MB(Q8 확정) → 원격은 Pro 플랜 필요, 프로젝트 Storage 업로드 상한 500MB로 설정. 적용 후 `production` 버킷 public=false 확인(기존 버킷이 있으면 on conflict로 유지됨) | 08 배포 체크리스트 |
+| 2026-11-19 | PROD-03·워커 실패 보고(task-028 CAT-04) | 훅 음성이 길 때 필요한 초 안내가 화면·W-09 보고에 없음(`it.fails` 재현: cat-acceptance.test.tsx) | W-09 실패에 필요 초(detail) 추가 + REASON_TEXT 안내(보통) |
+| 2026-11-19 | PROD-03 검수(task-028 CAT-06) | 글자 잘림·검은 틈·피사체 잘림 확인 안내 없음, docs/03에도 항목 없음. 가로 원본 중앙 크롭은 자동 탐지 없음 | docs/03 PROD-03에 검수 3항목 추가 + 화면 체크리스트(낮음) |
 
 ## 교훈 (다음 작업에 그대로 적용할 것만, 20줄 이내 유지)
 - 테스트의 가짜 JWT·키는 문자열 리터럴로 두지 말고 런타임에 조립한다(gitleaks pre-commit 차단).
