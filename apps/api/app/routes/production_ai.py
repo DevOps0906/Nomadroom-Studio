@@ -220,7 +220,8 @@ async def create_ai_draft(
         request,
         ws,
         job_id,
-        "id,status,format,lang,source_start_sec,preset_version,candidate_id,current_revision_id",
+        "id,status,format,lang,source_start_sec,segment_len_sec,preset_version,source_meta,"
+        "candidate_id,current_revision_id",
     )
     ids = {"p_workspace": str(ws), "p_job": str(job_id), "p_key": idempotency_key}
     reserved = await _rpc(

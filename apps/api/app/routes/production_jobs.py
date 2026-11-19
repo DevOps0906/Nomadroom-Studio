@@ -21,8 +21,9 @@ from app.errors import ApiError, db_error, not_found
 from app.jobs.state import OFFLINE_AFTER
 from app.production import storage
 from app.production.runs import expire_offline
-from app.production.spec import TOL, validate_spec
+from app.production.spec import TOL
 from app.production.url_guard import check_source_url
+from app.production.validation_variety import validate_for_format
 from app.routes.collect_jobs import _worker_last_seen
 from app.routes.profiles import _json_list, _send
 from app.routes.verify_runs import _KEY_RE
@@ -45,8 +46,8 @@ REVISION_COLUMNS = "id,rev_no,spec,origin,validation,approved_at"
 IDEMPOTENCY_CONSTRAINT = "production_jobs_workspace_id_idempotency_key_key"
 READY_SOURCE_INDEX = "production_assets_one_ready_source_uidx"
 
-# 형식별 출력 프리셋(서버가 정함). variety 값은 task-035에서 연다.
-PRESET_VERSION = {"category": "category-1080-v1"}
+# 형식별 출력 프리셋(서버가 정함). shopping은 task-042에서 연다.
+PRESET_VERSION = {"category": "category-1080-v1", "variety": "variety-1080-v1"}
 MAX_PREPARE_RETRY = 3  # 02_ARCHITECTURE.md#3-3과 같은 값(가정)
 MAX_SOURCE_START_SEC = 86_400  # 원본 시작점 상한 24시간(가정)
 _CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
@@ -423,14 +424,44 @@ async def _source_duration(request: Request, ws: uuid.UUID, job_id: uuid.UUID) -
     return float(value) if isinstance(value, int | float) else None
 
 
-def _validate(spec: dict, job: dict, source_duration: float | None) -> dict:
-    """validate_spec + 작업 값 비교(source_start_sec·preset_version, task-021 리뷰 🟡2).
+def _source_size(job: dict) -> tuple[float, float] | None:
+    meta = job.get("source_meta")
+    if not isinstance(meta, dict):
+        return None
+    w, h = meta.get("width"), meta.get("height")
+    if isinstance(w, int | float) and isinstance(h, int | float):
+        return float(w), float(h)
+    return None
 
-    스키마 오류가 있으면 의미 검사(작업 값 비교 포함)를 하지 않는다.
+
+def _validate(spec: dict, job: dict, source_duration: float | None) -> dict:
+    """작업 format별 검증(validate_for_format) + 작업 값 비교(source_start_sec·preset_version).
+
+    스키마 오류가 있으면 의미 검사(작업 값 비교 포함)를 하지 않는다(task-021 리뷰 🟡2).
+    variety: 구간 길이 = min(segment_len_sec, 원본 길이), 원본 크기 = source_meta(task-035 V4).
     """
-    result = validate_spec(spec, source_duration=source_duration, job_lang=job.get("lang"))
+    size = _source_size(job)
+    segment_len = float(job["segment_len_sec"]) if job.get("segment_len_sec") is not None else None
+    if segment_len is not None and source_duration is not None:
+        segment_len = min(segment_len, source_duration)
+    result = validate_for_format(
+        job["format"],
+        spec,
+        source_duration=source_duration,
+        segment_len=segment_len,
+        source_size=size,
+        job_lang=job.get("lang"),
+    )
     if any(e["code"].startswith("schema.") for e in result["errors"]):
         return result
+    if job["format"] == "variety" and size is None:
+        result["errors"].append(
+            {
+                "code": "source_size.missing",
+                "path": "source_size",
+                "message": "원본 크기를 알 수 없습니다. 준비를 다시 실행하세요.",
+            }
+        )
     start = spec.get("source_start_sec")
     if start is not None and abs(float(start) - float(job["source_start_sec"])) > TOL:
         result["errors"].append(
@@ -517,8 +548,8 @@ async def create_job(
         response.status_code = 200
         return JobEnvelope(job=JobOut.model_validate(existing))
 
-    if body.format != "category":
-        raise _not_ready_yet("format")  # variety는 task-035, shopping은 task-042
+    if body.format not in PRESET_VERSION:
+        raise _not_ready_yet("format")  # shopping은 task-042
     source_url = check_source_url(body.source_url) if body.source_url is not None else None
     _check_url_source(body.source_kind, source_url, body.rights_confirmed)
     if body.candidate_id is not None:
@@ -969,7 +1000,8 @@ async def put_revision(
         request,
         ws,
         job_id,
-        "id,status,failed_stage,lang,source_start_sec,preset_version,current_revision_id",
+        "id,status,failed_stage,format,lang,source_start_sec,segment_len_sec,preset_version,"
+        "source_meta,current_revision_id",
     )
     # D3: review·inspect·failed(audio·render)만, 리비전 없으면 409
     editable = job["status"] in ("review", "inspect") or (
@@ -1018,7 +1050,8 @@ async def approve_revision(
         request,
         ws,
         job_id,
-        "id,status,lang,source_start_sec,preset_version,current_revision_id",
+        "id,status,format,lang,source_start_sec,segment_len_sec,preset_version,source_meta,"
+        "current_revision_id",
     )
     if job["status"] != "review" or not job.get("current_revision_id"):
         raise _state_conflict(job["status"])

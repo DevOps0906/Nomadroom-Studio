@@ -33,6 +33,7 @@ from tests.conftest import (
     WORKSPACE_ID,
     make_settings,
 )
+from tests.production.test_validation_variety import good as variety_good
 
 REST = f"{SUPABASE_URL}/rest/v1"
 STORAGE = f"{SUPABASE_URL}/storage/v1"
@@ -531,8 +532,8 @@ def test_same_key_other_workspace_is_independent(api, auth, db):
     assert r.json()["job"]["workspace_id"] == WS
 
 
-def test_variety_format_rejected_while_w4(api, auth, db):
-    r = post_job(api, auth, format="variety")
+def test_shopping_format_rejected_until_task042(api, auth, db):
+    r = post_job(api, auth, format="shopping")
     assert r.status_code == 400
     assert r.json() == {"code": "VALIDATION", "message": "준비 중인 기능입니다.", "field": "format"}
     assert db.jobs == []
@@ -1165,3 +1166,290 @@ def test_review_patch_and_review_approve_record_updated_at(api, auth, db):
     r = api.post(f"{URL}/{done['id']}/review/approve", headers=auth)
     out = r.json()["job"]
     assert out["updated_at"] == out["completed_at"]
+
+
+# === task-035 예능형(variety) API 연결 ============================================
+
+VARIETY_META = {"duration_sec": 60.0, "width": 1920, "height": 1080, "has_audio": True}
+
+
+def variety_job(db: FakeDB, **over: Any) -> dict:
+    over.setdefault("status", "review")
+    over.setdefault("source_meta", VARIETY_META)
+    return db.add_job(format="variety", preset_version="variety-1080-v1", **over)
+
+
+def vspec() -> dict:
+    spec = variety_good()
+    spec["source_start_sec"] = 0
+    spec["preset_version"] = "variety-1080-v1"
+    return spec
+
+
+def test_v_create_variety_job_201_with_variety_preset(api, auth, db):
+    r = post_job(api, auth, format="variety")
+    assert r.status_code == 201
+    job = r.json()["job"]
+    assert job["format"] == "variety" and job["preset_version"] == "variety-1080-v1"
+    assert db.jobs[0]["format"] == "variety"
+
+
+def test_v3_same_key_other_format_returns_existing_200(api, auth, db):
+    assert post_job(api, auth, key="vk-1").status_code == 201
+    r = post_job(api, auth, key="vk-1", format="variety")
+    assert r.status_code == 200 and r.json()["job"]["format"] == "category"
+    assert len(db.jobs) == 1
+
+
+def test_v_patch_format_change_rejected_400_and_unchanged(api, auth, db):
+    job = variety_job(db, status="draft")
+    r = api.patch(f"{URL}/{job['id']}", json={"format": "category"}, headers=auth)
+    assert r.status_code == 400
+    assert r.json()["code"] == "VALIDATION" and r.json()["field"] == "format"
+    assert job["format"] == "variety"
+
+
+def test_v_list_filter_by_format_and_item_format(api, auth, db):
+    db.add_job(title="c")
+    variety_job(db, title="v")
+    r = api.get(URL, params={"format": "variety"}, headers=auth)
+    assert [(i["title"], i["format"]) for i in r.json()["items"]] == [("v", "variety")]
+
+
+def test_v_put_variety_spec_valid_saves_with_warnings_only(api, auth, db):
+    job = variety_job(db)
+    rev = db.add_revision(job, spec={})
+    r = put_rev(api, auth, job["id"], vspec())
+    assert r.status_code == 200
+    v = r.json()["revision"]["validation"]
+    assert v["errors"] == [] and [w["code"] for w in v["warnings"]] == ["cuts.short"]
+    assert rev["spec"] == vspec()
+
+
+def test_v_put_variety_semantic_errors_saved(api, auth, db):
+    job = variety_job(db)
+    rev = db.add_revision(job, spec={})
+    spec = vspec()
+    spec["cuts"][0]["x"] = 900  # 빈 화면
+    spec["subtitles"][1]["start"] = 1.0  # 자막 겹침
+    spec["preset_version"] = "category-1080-v1"
+    r = put_rev(api, auth, job["id"], spec)
+    assert r.status_code == 200
+    codes = {e["code"] for e in r.json()["revision"]["validation"]["errors"]}
+    assert {"cuts.empty_area", "subtitles.overlap", "preset_version.mismatch"} <= codes
+    assert rev["spec"] == spec
+
+
+def test_v4_segment_len_is_min_of_job_segment_and_source_duration(api, auth, db):
+    job = variety_job(db, segment_len_sec=60)
+    db.add_revision(job, spec={})
+    db.add_asset(job, "source", duration_sec=40)  # 컷 끝 48.6 > 40
+    r = put_rev(api, auth, job["id"], vspec())
+    assert "cuts.out_of_range" in [e["code"] for e in r.json()["revision"]["validation"]["errors"]]
+    short = variety_job(db, segment_len_sec=45)  # 원본 길이 없음 → 작업 구간 45
+    db.add_revision(short, spec={})
+    r = put_rev(api, auth, short["id"], vspec())
+    assert "cuts.out_of_range" in [e["code"] for e in r.json()["revision"]["validation"]["errors"]]
+
+
+def test_v4_source_size_missing_is_error_and_blocks_approve(api, auth, db):
+    job = variety_job(db, source_meta=None)
+    db.add_revision(job, spec={})
+    r = put_rev(api, auth, job["id"], vspec())
+    assert r.status_code == 200
+    errors = r.json()["revision"]["validation"]["errors"]
+    assert [(e["code"], e["path"]) for e in errors] == [("source_size.missing", "source_size")]
+    r = approve(api, auth, job["id"])
+    assert r.status_code == 400
+    assert [e["code"] for e in r.json()["errors"]] == ["source_size.missing"]
+
+
+def test_v4_source_size_used_for_empty_area(api, auth, db):
+    # 배율 1·이동 0 컷: 세로 원본(1080x1920)은 띠를 덮고, 가로(1920x1080)는 높이 607px라 빈 화면
+    spec = vspec()
+    for c in spec["cuts"]:
+        c.update(scale=1, x=0, y=0)
+    portrait = variety_job(db, source_meta={**VARIETY_META, "width": 1080, "height": 1920})
+    db.add_revision(portrait, spec={})
+    r = put_rev(api, auth, portrait["id"], spec)
+    assert r.json()["revision"]["validation"]["errors"] == []
+    landscape = variety_job(db)
+    db.add_revision(landscape, spec={})
+    r = put_rev(api, auth, landscape["id"], spec)
+    codes = {e["code"] for e in r.json()["revision"]["validation"]["errors"]}
+    assert codes == {"cuts.empty_area"}
+
+
+def test_v_put_category_spec_on_variety_job_400_not_saved(api, auth, db):
+    job = variety_job(db)
+    rev = db.add_revision(job, spec={})
+    r = put_rev(api, auth, job["id"], good_spec())
+    assert r.status_code == 400
+    assert all(e["code"].startswith("schema.") for e in r.json()["errors"])
+    assert rev["spec"] == {}
+    assert "save" not in db.rpc_calls
+
+
+def test_v_category_job_rejects_variety_spec(api, auth, db):
+    job = db.add_job(status="review")
+    db.add_revision(job)
+    r = put_rev(api, auth, job["id"], vspec())
+    assert r.status_code == 400
+    assert all(e["code"].startswith("schema.") for e in r.json()["errors"])
+
+
+@pytest.mark.parametrize(
+    ("path", "value"),
+    [
+        (("header", "lines", 0), "제목\u0000"),
+        (("subtitles", 0, "text"), "대사\u0007"),
+        (("reactions", 0, "text"), "\u001b[31m반응"),
+        (("subtitles", 0, "text"), "탭\t문자"),
+        (("reactions", 0, "text"), "끝\u007f"),
+    ],
+)
+def test_v6_control_chars_rejected_400_not_saved(api, auth, db, path, value):
+    job = variety_job(db)
+    rev = db.add_revision(job, spec={})
+    spec = vspec()
+    _set(spec, path, value)
+    r = put_rev(api, auth, job["id"], spec)
+    assert r.status_code == 400
+    assert [e["code"] for e in r.json()["errors"]] == ["schema.value_error"]
+    assert value not in r.text  # 입력 값은 응답에 없음
+    assert rev["spec"] == {}
+
+
+def test_v6_header_newline_stays_header_invalid(api, auth, db):
+    job = variety_job(db)
+    db.add_revision(job, spec={})
+    spec = vspec()
+    spec["header"]["lines"] = ["한 줄\n두 줄"]
+    r = put_rev(api, auth, job["id"], spec)
+    assert r.status_code == 200
+    codes = [e["code"] for e in r.json()["revision"]["validation"]["errors"]]
+    assert codes == ["header.invalid"]
+
+
+def _sub(i: int) -> dict:
+    return {"start": i * 0.2, "end": i * 0.2 + 0.1, "style": "line", "text": "a"}
+
+
+def _react(i: int) -> dict:
+    return {"start": 0, "end": 1, "text": "r", "x": 1, "y": 1}
+
+
+@pytest.mark.parametrize(("field_name", "make"), [("subtitles", _sub), ("reactions", _react)])
+def test_v6_subtitles_reactions_count_cap_200(api, auth, db, field_name, make):
+    job = variety_job(db)
+    db.add_revision(job, spec={})
+    spec = vspec()
+    spec[field_name] = [make(i) for i in range(201)]
+    r = put_rev(api, auth, job["id"], spec)
+    assert r.status_code == 400
+    assert [(e["code"], e["path"]) for e in r.json()["errors"]] == [("schema.too_long", field_name)]
+    spec[field_name] = spec[field_name][:200]
+    assert put_rev(api, auth, job["id"], spec).status_code == 200
+
+
+def _set(spec: dict, path: tuple, value: Any) -> None:
+    target: Any = spec
+    for k in path[:-1]:
+        target = target[k]
+    target[path[-1]] = value
+
+
+@pytest.mark.parametrize(
+    ("path", "limit"),
+    [
+        (("header", "lines", 0), 60),
+        (("subtitles", 0, "text"), 200),
+        (("reactions", 0, "text"), 200),
+    ],
+)
+def test_v6_text_length_caps(api, auth, db, path, limit):
+    job = variety_job(db)
+    db.add_revision(job, spec={})
+    spec = vspec()
+    _set(spec, path, "가" * (limit + 1))
+    r = put_rev(api, auth, job["id"], spec)
+    assert r.status_code == 400
+    assert [e["code"] for e in r.json()["errors"]] == ["schema.string_too_long"]
+    _set(spec, path, "가" * limit)
+    assert put_rev(api, auth, job["id"], spec).status_code == 200
+
+
+def test_v_approve_variety_ok_when_no_errors(api, auth, db):
+    job = variety_job(db)
+    rev = db.add_revision(job, spec=vspec())
+    r = approve(api, auth, job["id"])
+    assert r.status_code == 200
+    assert rev["approved_at"] is not None
+
+
+def test_v_approve_variety_with_errors_400_revalidates(api, auth, db):
+    job = variety_job(db)
+    spec = vspec()
+    spec["cuts"][0]["src_end"] = spec["cuts"][0]["src_start"] + 0.1  # 0.2초 미만
+    rev = db.add_revision(job, spec=spec, validation={"errors": [], "warnings": []})
+    r = approve(api, auth, job["id"])
+    assert r.status_code == 400
+    assert "cuts.too_short" in [e["code"] for e in r.json()["errors"]]
+    assert rev["approved_at"] is None
+    assert "approve" not in db.rpc_calls
+
+
+# --- task-035 리뷰 반영: 보이지 않는 문자·컷 개수 스키마 상한 ---
+
+
+@pytest.mark.parametrize(
+    "ch",
+    [
+        "\u0080",  # C1 시작
+        "\u0085",  # NEL
+        "\u009f",  # C1 끝
+        "​",  # 제로폭 공백
+        "‌",
+        "‍",
+        "‎",  # LRM
+        "‏",  # RLM
+        "‪",  # LRE
+        "‫",
+        "‬",
+        "‭",
+        "‮",  # RLO
+        "⁦",  # LRI
+        "⁧",
+        "⁨",
+        "⁩",  # PDI
+        "﻿",  # BOM
+        " ",  # 줄 구분
+        " ",  # 문단 구분
+    ],
+)
+@pytest.mark.parametrize(
+    "path", [("header", "lines", 0), ("subtitles", 0, "text"), ("reactions", 0, "text")]
+)
+def test_review_invisible_chars_rejected_400(api, auth, db, ch, path):
+    job = variety_job(db)
+    rev = db.add_revision(job, spec={})
+    spec = vspec()
+    _set(spec, path, f"문구{ch}끝")
+    r = put_rev(api, auth, job["id"], spec)
+    assert r.status_code == 400
+    assert [e["code"] for e in r.json()["errors"]] == ["schema.value_error"]
+    assert rev["spec"] == {}
+
+
+def test_review_cuts_over_60_rejected_at_schema(api, auth, db):
+    job = variety_job(db)
+    rev = db.add_revision(job, spec={})
+    spec = vspec()
+    spec["cuts"] = [dict(spec["cuts"][0]) for _ in range(61)]
+    r = put_rev(api, auth, job["id"], spec)
+    assert r.status_code == 400
+    assert [(e["code"], e["path"]) for e in r.json()["errors"]] == [("schema.too_long", "cuts")]
+    assert rev["spec"] == {}
+    spec["cuts"] = spec["cuts"][:60]
+    spec["subtitles"], spec["reactions"] = [], []
+    assert put_rev(api, auth, job["id"], spec).status_code == 200

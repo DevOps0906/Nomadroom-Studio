@@ -655,3 +655,17 @@ def test_review5_report_size_cap(api, db):
     claim(api)
     big = item("report", "application/json", size=50 * 1024 * 1024 + 1)
     assert outputs(api, "render", run["id"], [big]).status_code == 400
+
+
+def test_v4_variety_prepare_done_first_revision_uses_variety_validation(api, db):
+    job = preparing(db, format="variety", preset_version="variety-1080-v1")
+    claim(api)
+    ids = upload_all(db, outputs(api, "prepare", job["id"], PREPARE_ITEMS))
+    r = finish(api, "prepare", job["id"], status="done", asset_ids=ids, meta=META)
+    assert r.status_code == 200
+    j = db.job(job["id"])
+    rev = next(r for r in db.revisions if r["id"] == j["current_revision_id"])
+    assert rev["spec"] == {}
+    paths = {e["path"] for e in rev["validation"]["errors"]}
+    assert {"header", "cuts"} <= paths and "shots" not in paths  # 카테고리형 아님
+    assert all(e["code"].startswith("schema.") for e in rev["validation"]["errors"])

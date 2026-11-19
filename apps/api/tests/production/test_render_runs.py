@@ -828,3 +828,28 @@ def test_review6_retry_with_null_error_code_and_failed_stage_is_409(api, auth, d
     run = db.add_run(job, rev, status="failed", error_stage=None, error_code=None)
     assert retry(api, auth, job, run).status_code == 409
     assert db.job(job["id"])["status"] == "failed"
+
+
+# === task-035 V2: 예능형 렌더 요청은 렌더러(task-036) 전까지 409 ==================
+
+
+def test_v2_variety_render_request_is_409_without_run(api, auth, db):
+    job = db.add_job(status="review", format="variety", preset_version="variety-1080-v1")
+    rev = db.add_revision(job, approved=True)
+    r = render(api, auth, job, rev)
+    assert r.status_code == 409
+    assert r.json()["code"] == "CONFLICT" and r.json()["field"] == "format"
+    assert db.runs == [] and db.job(job["id"])["status"] == "review"
+    assert "request" not in db.rpc_calls
+
+
+def test_v2_variety_retry_is_409_without_new_run(api, auth, db):
+    job = db.add_job(status="failed", failed_stage="render", error_code="render_failed")
+    job.update(format="variety", preset_version="variety-1080-v1")
+    rev = db.add_revision(job, approved=True)
+    run = db.add_run(job, rev, status="failed", error_stage="render", error_code="render_failed")
+    r = retry(api, auth, job, run)
+    assert r.status_code == 409
+    assert r.json()["code"] == "CONFLICT" and r.json()["field"] == "format"
+    assert len(db.runs) == 1 and db.job(job["id"])["status"] == "failed"
+    assert "retry" not in db.rpc_calls

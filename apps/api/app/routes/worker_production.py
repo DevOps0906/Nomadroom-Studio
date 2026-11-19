@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from app.auth.worker import CurrentWorker, get_current_worker
 from app.errors import ApiError, db_error, not_found
 from app.production import runs, storage
-from app.production.spec import validate_spec
+from app.production.validation_variety import validate_for_format
 from app.routes.production_jobs import UPLOAD_MIME
 from app.routes.profiles import _json_list, _send
 from app.routes.worker import _touch_heartbeat
@@ -521,10 +521,13 @@ async def task_finish(
         await _verify_outputs(request, worker, kind, job, run, body.asset_ids)
         if kind == "prepare":
             # 첫 편집안 리비전(빈 편집안 + 서버 검증 결과, A-12로 채운다)
+            # format별 검증(task-035 V4). 빈 편집안이라 스키마 오류에서 멈추므로 구간 길이는 생략
             spec = {}
-            validation = validate_spec(
+            validation = validate_for_format(
+                job["format"],
                 spec,
                 source_duration=body.meta.duration_sec if body.meta else None,
+                source_size=(body.meta.width, body.meta.height) if body.meta else None,
                 job_lang=job.get("lang"),
             )
     result = await runs.rpc(

@@ -87,7 +87,8 @@ def test_count_and_total():
     assert "cuts.count" in codes(run(s))
     s = good()
     s["cuts"] = [copy.deepcopy(s["cuts"][0]) for _ in range(61)]
-    assert "cuts.count" in codes(run(s, segment_len=None))
+    # task-035 리뷰: 61개 이상은 파싱 단계 스키마 상한(schema.too_long)
+    assert codes(run(s, segment_len=None)) == ["schema.too_long"]
     s = good()
     s["cuts"] = [{"src_start": 0, "src_end": 50, "scale": 1.5, "x": 0, "y": 0}] * 4
     assert "cuts.total_too_long" in codes(run(s, segment_len=None))

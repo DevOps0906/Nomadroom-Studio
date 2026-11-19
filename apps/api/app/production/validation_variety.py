@@ -5,9 +5,17 @@
 """
 
 import math
+import re
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    ValidationError,
+)
 
 from app.production.spec import _PATHLIKE, validate_spec
 
@@ -23,7 +31,30 @@ WARN_CUT_SEC = 0.5
 MAX_CUTS = 60
 MAX_TOTAL_SEC = 180.0
 MIN_SHOW_SEC = 1.4
+# 입력 상한(task-035 V6, 가정): 개수·문구 길이. 위반은 스키마 오류(저장 안 함)
+MAX_SUBTITLES = 200
+MAX_REACTIONS = 200
+MAX_HEADER_LINE_CHARS = 60
+MAX_TEXT_CHARS = 200
+# 제어·보이지 않는 문자 거부: C0(LF·CR 제외, header.invalid가 따로 판정)·DEL·C1·제로폭·
+# 방향 표시/제어·BOM·줄/문단 구분(U+2028·U+2029). task-035 리뷰 반영
+_CONTROL = re.compile(
+    r"[\x00-\x09\x0b\x0c\x0e-\x1f\x7f-\x9f\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff]"
+)
+_LINE_BREAKS = ("\n", "\r", "\u2028", "\u2029")
 _Num = Annotated[float, Field(strict=True, allow_inf_nan=False)]
+
+
+def _no_control(v: str) -> str:
+    if _CONTROL.search(v):
+        raise ValueError("제어 문자는 사용할 수 없습니다")
+    return v
+
+
+_HeaderLine = Annotated[
+    str, StringConstraints(max_length=MAX_HEADER_LINE_CHARS), AfterValidator(_no_control)
+]
+_Text = Annotated[str, StringConstraints(max_length=MAX_TEXT_CHARS), AfterValidator(_no_control)]
 
 
 class _M(BaseModel):
@@ -31,7 +62,7 @@ class _M(BaseModel):
 
 
 class Header(_M):
-    lines: list[str]
+    lines: list[_HeaderLine]
 
 
 class Cut(_M):
@@ -46,13 +77,13 @@ class Subtitle(_M):
     start: _Num
     end: _Num
     style: str
-    text: str
+    text: _Text
 
 
 class Reaction(_M):
     start: _Num
     end: _Num
-    text: str
+    text: _Text
     x: _Num
     y: _Num
 
@@ -60,9 +91,9 @@ class Reaction(_M):
 class VarietySpec(_M):
     lang: Literal["ko"] | None = None
     header: Header
-    cuts: list[Cut]
-    subtitles: list[Subtitle] = []
-    reactions: list[Reaction] = []
+    cuts: Annotated[list[Cut], Field(max_length=MAX_CUTS)]
+    subtitles: Annotated[list[Subtitle], Field(max_length=MAX_SUBTITLES)] = []
+    reactions: Annotated[list[Reaction], Field(max_length=MAX_REACTIONS)] = []
     source_start_sec: _Num | None = None
     preset_version: str | None = None
 
@@ -117,7 +148,8 @@ def validate_variety_spec(
         errors.append(_e("path.forbidden", "preset_version", "경로·URL 문자열은 둘 수 없습니다."))
 
     lines = s.header.lines
-    if not 1 <= len(lines) <= 2 or any(not ln.strip() or "\n" in ln or "\r" in ln for ln in lines):
+    bad_line = any(not ln.strip() or any(b in ln for b in _LINE_BREAKS) for ln in lines)
+    if not 1 <= len(lines) <= 2 or bad_line:
         errors.append(_e("header.invalid", "header.lines", "제목은 1~2줄, 빈 줄·줄바꿈 불가"))
 
     size = source_size or (1080.0, 1920.0)
