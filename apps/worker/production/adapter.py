@@ -1,11 +1,12 @@
 """승인 리비전 spec → 렌더러 project 매핑(docs/05_DATA_MODEL.md#편집안-spec-필드).
 
 경로 필드(source·output·hook_audio)는 spec에 없고 렌더러가 작업 폴더 안 고정 이름을 쓴다.
+hook.tts는 runner가 읽어 TTS 경로로 보낸다(task-030, production/tts.py).
 """
 
 from typing import Any
 
-from production.errors import AudioMissing, RenderFailed
+from production.errors import RenderFailed
 from production.overlays import normalize
 
 PRESET_VERSION = "category-1080-v1"  # F9: 워커 렌더 프리셋. task·spec 값과 다르면 렌더하지 않는다
@@ -16,8 +17,6 @@ def to_project(spec: Any, lang: str | None) -> dict[str, Any]:
         raise RenderFailed("spec 없음")
     try:
         hook = spec["hook"]
-        if hook.get("tts") is not None:
-            raise AudioMissing("TTS 훅은 task-030 전까지 지원하지 않음")  # F8
         if spec.get("preset_version") not in (None, PRESET_VERSION):
             raise RenderFailed("spec preset_version 불일치")
         if lang is not None and spec["lang"] != lang:

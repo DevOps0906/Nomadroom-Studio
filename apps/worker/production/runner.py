@@ -11,6 +11,7 @@ from typing import Any
 
 from production.adapter import PRESET_VERSION, to_project
 from production.api import SignedUrl, Task, UrlRejected, WorkerApi
+from production.config import TtsSettings
 from production.errors import (
     ApiCallError,
     AudioMissing,
@@ -24,6 +25,7 @@ from production.media import Cancel, Media, MediaError
 from production.paths import WorkDir
 from production.prepare import prepare
 from production.render import CAPTION_FONT, TITLE_FONT, render
+from production.tts import TtsFailed, synthesize
 
 logger = logging.getLogger("nomadroom.worker.production")
 
@@ -164,25 +166,34 @@ def _prepare(
 
 
 def _render(
-    api: WorkerApi, task: Task, work: WorkDir, media: Media, cancel: Cancel, reporter: Reporter
+    api: WorkerApi,
+    task: Task,
+    work: WorkDir,
+    media: Media,
+    cancel: Cancel,
+    reporter: Reporter,
+    tts_cfg: TtsSettings,
 ) -> dict:
     if task.preset_version != PRESET_VERSION:  # F9
         raise RenderFailed("preset_version 불일치")
     if task.format != "category":
         raise RenderFailed("지원하지 않는 형식")
     project = to_project(task.spec, task.lang)
+    tts = task.spec["hook"].get("tts")  # I3: TTS면 W-06 hook_audio를 쓰지 않는다
     reporter.set("download", 0)
     inputs = api.inputs(task)
-    if "hook_audio" not in inputs:  # F8: W-06 최신 ready hook_audio가 정본
+    if tts is None and "hook_audio" not in inputs:  # F8: W-06 최신 ready hook_audio가 정본
         raise AudioMissing("훅 음성 없음")
     if "source" not in inputs:
         raise RenderFailed("source 없음")
     source = work.path("source.mp4")
     hook_raw = work.path("hook_input.bin")
+    hook_used = None
     try:
         src_used = _download(api, task, inputs["source"], source, cancel)
         reporter.set("download", 50)
-        hook_used = _download(api, task, inputs["hook_audio"], hook_raw, cancel, MAX_HOOK_BYTES)
+        if tts is None:
+            hook_used = _download(api, task, inputs["hook_audio"], hook_raw, cancel, MAX_HOOK_BYTES)
     except TransferError as exc:
         raise RenderFailed(str(exc)) from None
 
@@ -194,7 +205,16 @@ def _render(
     if source_meta["demuxer"] != "mov" or not source_meta["has_video"]:
         raise RenderFailed("source 형식 오류")
     hook_wav = work.path("hook.wav")
-    hook_duration = make_hook(media, hook_raw, hook_wav, cancel)
+    tts_note = "supplied recording"
+    if tts is None:
+        hook_duration = make_hook(media, hook_raw, hook_wav, cancel)
+    else:
+        hook_raw = work.path("hook_tts.mp3")
+        tts_note = synthesize(project["hook"], tts, hook_raw, cancel, tts_cfg)
+        try:
+            hook_duration = make_hook(media, hook_raw, hook_wav, cancel)
+        except AudioMissing:
+            raise TtsFailed("생성 음성을 읽을 수 없음") from None
 
     output = work.path("result_ko.mp4")
     result = render(
@@ -208,9 +228,10 @@ def _render(
                 **result,
                 "preset_version": PRESET_VERSION,
                 "source_asset_id": str(src_used.asset_id),
-                "hook_audio_asset_id": str(hook_used.asset_id),  # F8: 실제로 쓴 음성
+                # F8: 실제로 쓴 음성(TTS면 입력 자산 없음)
+                "hook_audio_asset_id": str(hook_used.asset_id) if hook_used else None,
                 "spec_hook_audio_asset_id": (task.spec or {}).get("hook", {}).get("audio_asset_id"),
-                "tts": "supplied recording",
+                "tts": tts_note,  # I3: 실제 경로(voice·rate 또는 supplied recording)
                 "fonts": [TITLE_FONT.stem, CAPTION_FONT.stem],
                 "review_required": "Watch final video and inspect every cut before delivery.",
             },
@@ -250,9 +271,15 @@ def _finish(api: WorkerApi, task: Task, body: dict) -> None:
 
 
 def run_task(
-    api: WorkerApi, task: Task, work_root: Path, media: Media, progress_interval: float
+    api: WorkerApi,
+    task: Task,
+    work_root: Path,
+    media: Media,
+    progress_interval: float,
+    tts_cfg: TtsSettings | None = None,
 ) -> str:
-    """task 1건을 처음부터 끝까지 처리한다. 반환: done·failed·cancelled·aborted."""
+    """task 1건을 처음부터 끝까지 처리한다. 반환: done·failed·cancelled·aborted.
+    tts_cfg가 없으면 환경변수 WORKER_TTS_*에서 읽는다(기본 꺼짐)."""
     work = WorkDir(work_root, task.id)
     try:
         work.reset()  # F5: 다시 받은 task는 처음부터
@@ -268,7 +295,7 @@ def run_task(
             if task.kind == "prepare":
                 body = _prepare(api, task, work, media, cancel, reporter)
             else:
-                body = _render(api, task, work, media, cancel, reporter)
+                body = _render(api, task, work, media, cancel, reporter, tts_cfg or TtsSettings())
         except TaskFailed as f:
             logger.info(
                 "제작 task 실패 보고: kind=%s id=%s stage=%s code=%s (%s)",

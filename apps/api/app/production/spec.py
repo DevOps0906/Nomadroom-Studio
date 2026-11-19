@@ -32,9 +32,14 @@ class Header(_M):
     lines: list[str] = Field(min_length=2, max_length=2)
 
 
+# task-030 리뷰 반영: edge-tts가 voice·rate를 SSML에 그대로 넣어 형식 고정(워커 tts.py와 같음)
+TTS_VOICE_PATTERN = r"^[a-z]{2,3}-[A-Z]{2,4}-[A-Za-z0-9]+Neural$"
+TTS_RATE_PATTERN = r"^[+-]\d{1,3}%$"
+
+
 class Tts(_M):
-    voice: str = Field(min_length=1)
-    rate: str = "+50%"
+    voice: str = Field(pattern=TTS_VOICE_PATTERN)
+    rate: str = Field(default="+50%", pattern=TTS_RATE_PATTERN)
 
 
 class Hook(_M):

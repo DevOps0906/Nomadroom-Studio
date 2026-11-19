@@ -56,7 +56,9 @@ RENDER_KINDS = ("output_mp4", "report", "hook_audio")
 PrepareCode = Literal[
     "range_invalid", "input_invalid", "url_unavailable", "download_failed", "unknown"
 ]
-RenderCode = Literal["hook_too_long", "text_too_long", "audio_missing", "render_failed", "unknown"]
+RenderCode = Literal[
+    "hook_too_long", "text_too_long", "tts_failed", "audio_missing", "render_failed", "unknown"
+]
 PREPARE_CODES = set(PrepareCode.__args__)  # type: ignore[attr-defined]
 RENDER_CODES = set(RenderCode.__args__)  # type: ignore[attr-defined]
 ERROR_STAGES = {"prepare": {"prepare"}, "render": {"audio", "render"}}

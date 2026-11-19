@@ -31,3 +31,11 @@
 - I4 edge-tts==7.3.1 고정. Communicate에 connect·receive 타임아웃 + asyncio.wait_for 전체 상한, 시작 전후 cancel.check(). 외부로 나가는 것은 hook.text·voice·rate뿐. 문구·voice 로그 금지, edge_tts·aiohttp 로거 WARNING, 예외는 type 이름만. voice·rate ValueError → tts_failed.
 - I5 검증: pytest는 목으로 성공·실패·꺼짐·중단 4경우. 실제 edge-tts 호출 스모크는 이용 조건 미확인이라 에이전트가 하지 않는다(사용자가 켜고 직접 확인). ffprobe 길이는 목이 만든 합성 mp3로 확인.
 - 순서: task-032(adapter·render 수정 중) 커밋 뒤 착수, 그 다음 task-031.
+
+## 구현 결정 (2026-11-19, builder)
+- 설정: `production/config.py` `TtsSettings`(env_prefix `WORKER_TTS_`, 필수 값 없음). runner가 인자 없으면 직접 읽어 `main.py`는 바꾸지 않음. 사람이 `.env.example`에 추가할 이름: `WORKER_TTS_ENABLED`(기본 false) · `WORKER_TTS_TIMEOUT_SEC`(전체 상한, 기본 90) · `WORKER_TTS_CONNECT_TIMEOUT_SEC`(10) · `WORKER_TTS_RECEIVE_TIMEOUT_SEC`(30).
+- `production/tts.py`: `synthesize`가 꺼짐·voice/rate 형식 오류·예외·타임아웃·빈 파일을 모두 `TtsFailed`(audio/tts_failed, detail은 예외 종류 이름만)로. rate 없으면 `+50%`(05_DATA_MODEL). 409 중단은 0.2초 간격으로 확인해 합성 task를 취소하고 `TaskCancelled`. edge_tts는 켜졌을 때만 import.
+- runner: spec.hook.tts면 W-06 hook_audio를 받지 않음 → TTS mp3 → `make_hook`(정리·실측 wav, 무음·형식 오류는 tts_failed) → `check_hook` 그대로 → W-07 hook_audio 업로드. report `tts`=`edge-tts voice=… rate=…`, `hook_audio_asset_id`=null.
+- DB: `20261119000020_production_tts_failed.sql`(retry_render_run·finish_production_task 코드 목록에 tts_failed만 추가) + pgTAP `supabase/tests/production_tts_failed_test.sql`. 미실행(팀장이 순서 잡아 실행).
+- 범위 밖 수정 1건: `tests/production/test_units.py`의 "TTS 훅 → AudioMissing" 테스트를 새 동작(문구 매핑)으로 바꿈.
+- 리뷰 반영(security): voice는 `[a-z]{2,3}-[A-Z]{2,4}-[A-Za-z0-9]+Neural`, rate는 `[+-]\d{1,3}%`로 fullmatch(edge-tts가 SSML에 이스케이프 없이 넣음·끝 개행 거부). 워커 `tts.py`(불일치 tts_failed, 합성 전)와 API `spec.py` Tts 모델(검증 오류로 승인 차단)이 같은 패턴. 네트워크: edge-tts는 aiohttp `trust_env=True`라 운영자 PC 프록시 설정(HTTPS_PROXY 등)을 따른다. 대상 호스트는 라이브러리가 고정한 Microsoft 엔드포인트, TLS 검증 유지(certifi).

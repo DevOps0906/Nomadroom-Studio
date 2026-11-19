@@ -376,7 +376,7 @@ export function EditForm({
         <Field
           id="ed-audio"
           label="훅 음성 (첨부 업로드)"
-          hint={draft.audioAssetId ? "첨부 음성이 지정되어 있습니다." : draft.tts ? "현재 TTS 음성을 쓰고 있습니다. 파일을 올리면 첨부 음성으로 바뀝니다." : "wav·mp3·m4a, 50MB 이하"}
+          hint={draft.audioAssetId ? "첨부 음성이 지정되어 있습니다." : draft.tts ? "현재 TTS 음성을 쓰고 있습니다. 워커 설정에서 TTS가 꺼져 있으면 실패합니다. 파일을 올리면 첨부 음성으로 바뀝니다." : "wav·mp3·m4a, 50MB 이하"}
           issues={<IssueList list={issuesAt(errors, "hook.audio_asset_id")} />}
         >
           <input ref={fileRef} id="ed-audio" type="file" accept={AUDIO_ACCEPT} disabled={lock} className={cn(INPUT, "py-2")} onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />

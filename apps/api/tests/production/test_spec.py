@@ -90,6 +90,34 @@ def test_hook_tts_only_ok():
     assert run(m)["errors"] == []
 
 
+@pytest.mark.parametrize(
+    "tts",
+    [
+        {"voice": "ko-KR-SunHiNeural'><break time='9s'/>"},
+        {"voice": "ko-KR-<SunHi>Neural"},
+        {"voice": "ko-KR-SunHiNeural\n"},
+        {"voice": "ko-KR-SunHiNeural", "rate": "+50%'>"},
+        {"voice": "ko-KR-SunHiNeural", "rate": "+50%\n"},
+        {"voice": "ko-KR-SunHiNeural", "rate": "<prosody>"},
+    ],
+)
+def test_hook_tts_ssml_injection_rejected(tts):
+    # task-030 리뷰 반영: voice·rate 형식 고정(SSML 주입·끝 개행 차단) → 검증 오류로 승인 막힘
+    def m(s):
+        s["hook"].pop("audio_asset_id")
+        s["hook"]["tts"] = tts
+
+    assert run(m)["errors"]
+
+
+def test_hook_tts_rate_ok():
+    def m(s):
+        s["hook"].pop("audio_asset_id")
+        s["hook"]["tts"] = {"voice": "ja-JP-NanamiNeural", "rate": "-10%"}
+
+    assert run(m)["errors"] == []
+
+
 def test_duration_range():
     assert "duration.range" in codes(run(lambda s: s.__setitem__("duration", 0.05)))
     assert "duration.range" in codes(run(lambda s: s.__setitem__("duration", 61)))

@@ -3,11 +3,12 @@ import type { ProductionJobDetail } from "@/server/api/production";
 // PROD-03 화면 판단(순수). 서버가 정본이고 여기는 버튼 노출·문구만 정한다. 근거: docs/03_SCREENS_UX.md PROD-03.
 
 /** 편집안으로 돌아가 고쳐야 하는 사유(재시도 불가, A-16 409). */
-export const EDIT_FIRST_CODES = ["hook_too_long", "text_too_long"] as const;
+export const EDIT_FIRST_CODES = ["hook_too_long", "text_too_long", "tts_failed"] as const;
 
 export const REASON_TEXT: Record<string, string> = {
   hook_too_long: "훅 음성이 허용 길이보다 깁니다. 훅 문구를 줄이거나 더 짧은 음성으로 바꾼 뒤 다시 승인하세요.",
   text_too_long: "자막이 한 줄에 들어가기에 너무 깁니다. 자막 문구를 줄인 뒤 다시 승인하세요.",
+  tts_failed: "TTS 훅 음성을 만들지 못했습니다(워커 TTS 꺼짐·음성 설정 오류·연결 실패). 편집안에서 첨부 음성으로 바꾼 뒤 다시 승인하세요.",
   worker_offline: "제작 워커가 응답하지 않아 중단되었습니다. 워커를 켠 뒤 재시도하세요.",
 };
 

@@ -250,7 +250,7 @@ class ProdDB(FakeDB):
             return _err("NR009")
         if (
             old["status"] != "failed"
-            or old["error_code"] in ("hook_too_long", "text_too_long")
+            or old["error_code"] in ("hook_too_long", "text_too_long", "tts_failed")
             or j["status"] != "failed"
             or j["failed_stage"] not in ("audio", "render")
             or old["revision_id"] != j["current_revision_id"]
@@ -464,7 +464,7 @@ class ProdDB(FakeDB):
                     updated_at=now,
                 )
                 if run["lang"] == "ko" and j["status"] == "rendering":
-                    if b["p_error_code"] in ("hook_too_long", "text_too_long"):
+                    if b["p_error_code"] in ("hook_too_long", "text_too_long", "tts_failed"):
                         j.update(
                             status="review", failed_stage=None, error_code=None, updated_at=now
                         )
@@ -729,7 +729,7 @@ def test_e5_retry_cap_three_attempts(api, auth, db):
     assert r.status_code == 409 and r.json()["message"] == "재시도 횟수를 넘었습니다."
 
 
-@pytest.mark.parametrize("code", ["hook_too_long", "text_too_long"])
+@pytest.mark.parametrize("code", ["hook_too_long", "text_too_long", "tts_failed"])
 def test_e5_retry_rejects_review_return_codes(api, auth, db, code):
     job, rev, run = failed_render_job(db, code=code)
     assert retry(api, auth, job, run).status_code == 409

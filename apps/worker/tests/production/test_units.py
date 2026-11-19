@@ -11,7 +11,6 @@ from worker_fakes import make_spec, make_task, needs_ffmpeg
 from production.adapter import PRESET_VERSION, to_project
 from production.config import Settings
 from production.errors import (
-    AudioMissing,
     HookTooLong,
     RenderFailed,
     TaskCancelled,
@@ -86,9 +85,10 @@ def test_adapter_maps_spec_to_project():
     assert "source" not in project and "output" not in project  # 경로 필드 없음
 
 
-def test_adapter_tts_hook_is_audio_missing():
-    with pytest.raises(AudioMissing):
-        to_project(make_spec(hook={"text": "a", "tts": {"voice": "v", "rate": "+50%"}}), "ko")
+def test_adapter_tts_hook_maps_text():
+    # task-030: TTS 훅은 runner가 production/tts.py로 처리한다(adapter는 문구만 넘긴다)
+    project = to_project(make_spec(hook={"text": "a", "tts": {"voice": "v", "rate": "+50%"}}), "ko")
+    assert project["hook"] == "a"
 
 
 @pytest.mark.parametrize(

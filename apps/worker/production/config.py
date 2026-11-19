@@ -39,3 +39,15 @@ class Settings(BaseSettings):
         if not is_allowed_url(value):
             raise ValueError("api_base_url은 https만(로컬 http://127.0.0.1·localhost 예외)")
         return value
+
+
+class TtsSettings(BaseSettings):
+    """TTS(edge-tts, task-030) 설정. 이용 조건 미확인이라 기본 꺼짐(docs/01_PRD.md#7 Q6).
+    필수 값이 없어 따로 읽는다(꺼져 있으면 spec.hook.tts 렌더는 tts_failed)."""
+
+    model_config = SettingsConfigDict(env_prefix="WORKER_TTS_", extra="ignore")
+
+    enabled: bool = False  # WORKER_TTS_ENABLED
+    timeout_sec: float = 90.0  # 전체 상한(asyncio.wait_for)
+    connect_timeout_sec: int = 10  # edge-tts 연결 타임아웃
+    receive_timeout_sec: int = 30  # edge-tts 수신 타임아웃

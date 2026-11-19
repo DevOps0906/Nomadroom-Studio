@@ -429,7 +429,7 @@ def test_w09_render_done_requires_mp4_and_report(api, db):
     assert finish(api, "render", run["id"], status="done", asset_ids=ids).status_code == 400
 
 
-@pytest.mark.parametrize("code", ["hook_too_long", "text_too_long"])
+@pytest.mark.parametrize("code", ["hook_too_long", "text_too_long", "tts_failed"])
 def test_w09_review_return_codes_send_job_back_to_review(api, db, code):
     job, rev, run = rendering(db)
     claim(api)

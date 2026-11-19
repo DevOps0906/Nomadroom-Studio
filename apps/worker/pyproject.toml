@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Nomadroom Studio 로컬 워커: FastAPI /worker/v1/*만 호출(DB·Supabase 키 없음). 제작 prepare·render"
 requires-python = ">=3.14"
 dependencies = [
+    "edge-tts==7.3.1",
     "httpx>=0.28.1",
     "pillow>=12.0.0",
     "pydantic-settings>=2.16.3",
