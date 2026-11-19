@@ -56,7 +56,7 @@ const req = (method: string, body?: unknown, origin: string | null = ORIGIN, ext
 const ctx = { params: Promise.resolve({ id: ID }) };
 const ctx2 = { params: Promise.resolve({ id: ID, assetId: AID }) };
 const VALID = { title: "제목", rights_confirmed: true, source_kind: "upload", source_start_sec: 0, segment_len_sec: 30 };
-const KEY = { "idempotency-key": ["key", "1234", "5678"].join("-") };
+const KEY = { "idempotency-key": ["key-", "1234", "5678"].join("") };
 
 const handlers: [string, (origin: string | null) => Promise<Response>][] = [
   ["POST /", (o) => create.POST(req("POST", VALID, o, KEY))],
