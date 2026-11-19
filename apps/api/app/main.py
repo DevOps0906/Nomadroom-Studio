@@ -18,9 +18,11 @@ from app.routes import (
     collect_jobs,
     dashboard,
     production_jobs,
+    production_render,
     profiles,
     verify_runs,
     worker,
+    worker_production,
 )
 
 HTTP_TIMEOUT_SECONDS = 5.0
@@ -60,7 +62,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(verify_runs.router)
     app.include_router(collect_jobs.router)
     app.include_router(production_jobs.router)
+    app.include_router(production_render.router)
     app.include_router(worker.router)
+    app.include_router(worker_production.router)
     app.add_middleware(worker.WorkerBodyLimit)
 
     @app.get("/healthz", response_model=HealthOut)

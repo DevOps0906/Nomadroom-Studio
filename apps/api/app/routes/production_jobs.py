@@ -20,6 +20,7 @@ from app.auth.user import CurrentUser, get_current_user
 from app.errors import ApiError, db_error, not_found
 from app.jobs.state import OFFLINE_AFTER
 from app.production import storage
+from app.production.runs import expire_offline
 from app.production.spec import TOL, validate_spec
 from app.routes.collect_jobs import _worker_last_seen
 from app.routes.profiles import _json_list, _send
@@ -569,6 +570,7 @@ async def list_jobs(
     size: Annotated[int, Query(ge=1, le=60)] = 24,
     user: CurrentUser = Depends(get_current_user),
 ) -> JobListOut:
+    await expire_offline(request, user.workspace_id)  # task-023 E3
     params = {
         "select": LIST_COLUMNS,
         "workspace_id": f"eq.{user.workspace_id}",
@@ -589,6 +591,7 @@ async def get_job(
     job_id: uuid.UUID, request: Request, user: CurrentUser = Depends(get_current_user)
 ) -> JobDetailOut:
     ws = user.workspace_id
+    await expire_offline(request, ws)  # task-023 E3: 오프라인 지연 평가
     job = await _get_job(request, ws, job_id, f"{JOB_COLUMNS},claimed_by")
     scope = {"job_id": f"eq.{job_id}", "workspace_id": f"eq.{ws}"}
     rev_id = job.get("current_revision_id")
@@ -687,8 +690,9 @@ async def patch_job(
 def _upload_state_ok(kind: str, job: dict) -> bool:
     if kind == "source_upload":
         return _is_prepare_state(job)
+    # hook_audio: review·failed(render), task-023 E10으로 failed(audio)도(audio_missing 복구)
     return job["status"] == "review" or (
-        job["status"] == "failed" and job.get("failed_stage") == "render"
+        job["status"] == "failed" and job.get("failed_stage") in ("render", "audio")
     )
 
 

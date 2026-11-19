@@ -422,6 +422,10 @@ def install(router: respx.MockRouter, db: FakeDB) -> None:
     router.post(f"{REST}/rpc/save_production_revision").mock(
         side_effect=lambda r: db.save_revision(json.loads(r.content))
     )
+    # task-023 E3: A-09 GET의 오프라인 지연 평가(만료 대상 없음으로 본다)
+    router.post(f"{REST}/rpc/expire_production_offline").mock(
+        return_value=httpx.Response(200, json={"expired": 0, "deleted_paths": []})
+    )
     router.post(f"{REST}/rpc/approve_production_revision").mock(
         side_effect=lambda r: db.approve_revision(json.loads(r.content))
     )
@@ -761,7 +765,7 @@ def test_d5_hook_audio_state_and_format_rules(api, auth, db):
     failed_audio = db.add_job(status="failed", failed_stage="audio")
     assert (
         upload(api, auth, failed_audio["id"], kind="hook_audio", mime="audio/wav").status_code
-        == 409
+        == 201  # task-023 E10: audio_missing 복구
     )
     variety = db.add_job(status="review", format="variety")
     assert upload(api, auth, variety["id"], kind="hook_audio", mime="audio/wav").status_code == 400
