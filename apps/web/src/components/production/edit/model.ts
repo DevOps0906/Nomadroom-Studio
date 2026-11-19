@@ -10,6 +10,9 @@ const KINDS = Object.keys(KIND_LABEL) as ItemKind[];
 
 export type ShotDraft = { start: string; end: string; scale: string; y: string };
 export type ItemDraft = { start: string; end: string; kind: ItemKind; text: string; y: string };
+export type OverlayKind = "comment" | "source";
+/** 댓글·출처 오버레이 입력. 위치 x·y는 608×1080 화면의 카드 중심. 이미지·URL 첨부 없음. */
+export type OverlayDraft = { kind: OverlayKind; text: string; start: string; end: string; x: string; y: string; ref?: string };
 export type Tts = { voice: string; rate?: string };
 
 /** 입력 중인 편집안. 숫자는 입력 문자열 그대로 두고, overlays 등 이 화면이 다루지 않는 필드는 rest로 통과시킨다. */
@@ -22,6 +25,7 @@ export type Draft = {
   duration: string;
   shots: ShotDraft[];
   items: ItemDraft[];
+  overlays: OverlayDraft[];
   rest: Record<string, unknown>;
 };
 
@@ -31,11 +35,11 @@ const obj = (v: unknown): Record<string, unknown> => (typeof v === "object" && v
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
 export function emptyDraft(): Draft {
-  return { lang: "ko", header: ["", ""], hookText: "", audioAssetId: null, tts: null, duration: "", shots: [], items: [], rest: {} };
+  return { lang: "ko", header: ["", ""], hookText: "", audioAssetId: null, tts: null, duration: "", shots: [], items: [], overlays: [], rest: {} };
 }
 
 export function toDraft(spec: Record<string, unknown>): Draft {
-  const { lang, header, hook, duration, shots, items, ...rest } = spec;
+  const { lang, header, hook, duration, shots, items, overlays, ...rest } = spec;
   const lines = arr(obj(header).lines);
   const h = obj(hook);
   const tts = obj(h.tts);
@@ -53,6 +57,12 @@ export function toDraft(spec: Record<string, unknown>): Draft {
     items: arr(items).map((i) => {
       const o = obj(i);
       return { start: numStr(o.start), end: numStr(o.end), kind: KINDS.includes(o.kind as ItemKind) ? (o.kind as ItemKind) : "white", text: str(o.text), y: numStr(o.y) };
+    }),
+    overlays: arr(overlays).map((x) => {
+      const o = obj(x);
+      const row: OverlayDraft = { kind: o.kind === "source" ? "source" : "comment", text: str(o.text), start: numStr(o.start), end: numStr(o.end), x: numStr(o.x), y: numStr(o.y) };
+      if (typeof o.ref === "string") row.ref = o.ref;
+      return row;
     }),
     rest,
   };
@@ -98,10 +108,24 @@ export function buildSpec(d: Draft): BuildResult {
     }
     items.push(row);
   }
+  const overlays = [];
+  for (const [i, o] of d.overlays.entries()) {
+    const start = parse(o.start);
+    const end = parse(o.end);
+    const x = parse(o.x);
+    const y = parse(o.y);
+    if (start === null) return bad(`overlays.${i}.start`);
+    if (end === null) return bad(`overlays.${i}.end`);
+    if (x === null) return bad(`overlays.${i}.x`);
+    if (y === null) return bad(`overlays.${i}.y`);
+    const row: Record<string, unknown> = { kind: o.kind, text: o.text, start, end, x, y };
+    if (o.ref !== undefined) row.ref = o.ref;
+    overlays.push(row);
+  }
   const hook: Record<string, unknown> = { text: d.hookText };
   if (d.audioAssetId) hook.audio_asset_id = d.audioAssetId;
   if (d.tts) hook.tts = d.tts;
-  return { ok: true, spec: { ...d.rest, lang: d.lang, header: { lines: [...d.header] }, hook, duration, shots, items } };
+  return { ok: true, spec: { ...d.rest, lang: d.lang, header: { lines: [...d.header] }, hook, duration, shots, items, ...(overlays.length > 0 ? { overlays } : {}) } };
 }
 
 // ---- 검증 항목 표시 ----
@@ -121,6 +145,13 @@ const LABELS: Record<string, string> = {
   "hook.audio_xor": "훅 음성·TTS 중 하나만",
   "path.forbidden": "경로·URL 불가",
   "duration.range": "길이 범위",
+  "overlays.range": "오버레이 구간 범위",
+  "overlays.overlap": "오버레이 구간 겹침",
+  "overlays.pos": "오버레이 위치 범위",
+  "overlays.text.empty": "빈 오버레이 문구",
+  "overlays.text.newline": "오버레이 줄바꿈 불가",
+  "overlays.text.long": "오버레이 문구 길이",
+  "overlays.caption_overlap": "자막과 겹침",
 };
 export const issueLabel = (i: SpecIssue) => LABELS[i.code] ?? i.code;
 
@@ -134,7 +165,7 @@ export const issuesOf = (list: SpecIssue[], p: string) => list.filter((i) => i.p
 
 /** 행(shots.N·items.N)에 걸리지 않은 항목: 훅·길이·헤더·목록 전체. */
 export function globalIssues(list: SpecIssue[]): SpecIssue[] {
-  return list.filter((i) => !/^(shots|items)\.\d+/.test(i.path));
+  return list.filter((i) => !/^(shots|items|overlays)\.\d+/.test(i.path));
 }
 
 // ---- 타임라인 ----
@@ -183,13 +214,15 @@ export const durationOf = (d: Draft) => parse(d.duration) ?? 0;
 export type Blocker = { id: string; text: string };
 
 /** 승인을 막는 사유(없으면 빈 배열). 서버가 최종 재검증하므로 여기는 안내용. */
-export function approveBlockers(a: { status: ProductionStatus; hasRevision: boolean; dirty: boolean; approved: boolean; errorCount: number; busy: boolean }): Blocker[] {
+export function approveBlockers(a: { status: ProductionStatus; hasRevision: boolean; dirty: boolean; approved: boolean; errorCount: number; overlayErrorCount?: number; busy: boolean }): Blocker[] {
   const out: Blocker[] = [];
   if (!a.hasRevision) out.push({ id: "none", text: "편집안 초안이 아직 없습니다." });
   if (a.status !== "review") out.push({ id: "status", text: "편집안 검토 상태에서만 승인할 수 있습니다." });
   if (a.approved) out.push({ id: "approved", text: "이미 승인된 편집안입니다. 고치면 새 리비전으로 저장됩니다." });
   if (a.dirty) out.push({ id: "dirty", text: "저장하지 않은 변경이 있습니다. 먼저 저장하세요." });
-  if (a.errorCount > 0) out.push({ id: "errors", text: `검증 오류 ${a.errorCount}건을 고쳐야 합니다.` });
+  const ov = a.overlayErrorCount ?? 0;
+  if (a.errorCount - ov > 0) out.push({ id: "errors", text: `검증 오류 ${a.errorCount - ov}건을 고쳐야 합니다.` });
+  if (ov > 0) out.push({ id: "overlays", text: `댓글·출처 탭 오류 ${ov}건을 고쳐야 합니다.` });
   if (a.busy) out.push({ id: "busy", text: "처리 중입니다." });
   return out;
 }

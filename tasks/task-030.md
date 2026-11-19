@@ -21,3 +21,13 @@
 - [ ] `~/.claude/nomad/bin/secscan license` 통과(GPL·AGPL 0건), Q6 결과 기록됨
 - [ ] `cd apps/worker && pytest -q tests/production/test_tts.py` 통과(TTS는 목: 성공 업로드, 실패 시 첨부 음성 유지·무음 생성 0건)
 - [ ] 생성 음성 `ffprobe -v error -show_entries format=duration` 길이 출력, 훅 길이 규칙(W-09) 적용 확인
+
+## 착수 결정 (2026-11-19, challenger 검토 반영 · 팀장 결정)
+- Q6 결과는 `docs/01_PRD.md#7` Q6·Q14 행에 기록됨(LGPL-3.0 수용, 이용 조건 미확인 → 기본 꺼짐 `WORKER_TTS_ENABLED`).
+- 쓰기 허용 추가: `apps/worker/production/adapter.py`·`runner.py`·`config.py` · `apps/worker/uv.lock` · `apps/worker/tests/production/test_runner.py` · `apps/api/app/routes/worker_production.py`(RenderCode에 tts_failed만) · `supabase/migrations/*000020*.sql`(job 전이·A-16 거부 목록에 tts_failed가 SQL에 있으면 그 함수 교체만, 필요 없으면 만들지 않음) · `apps/web/src/components/production/run/model.ts`(REASON_TEXT·EDIT_FIRST_CODES만) · `docs/04_API.md`(W-09·A-16). `.env*`는 에이전트 권한 밖 — 새 변수 이름은 구현 결정에 적어 사람이 추가.
+- I1 실패 계약: TTS 실패는 `tts_failed`(stage=audio). hook_too_long·text_too_long처럼 review 복귀·A-16 재시도 거부·웹 "편집안으로 돌아가 고치기"(첨부 음성으로 바꿔 재승인). 첨부로 자동 대체하지 않는다(승인본과 다른 음성 금지).
+- I2 TTS 꺼짐인데 spec.hook.tts면 `tts_failed`(detail에 비활성 표시), 웹 TTS 선택 옆에 "워커 설정에서 TTS가 꺼져 있으면 실패합니다" 안내. 상태 노출 API는 만들지 않는다.
+- I3 spec.hook.tts가 있으면 W-06 hook_audio를 쓰지 않고 TTS만. 생성 음성은 make_hook로 정리·실측한 wav를 W-07 hook_audio로 올리고 check_hook를 그대로 거친다. report.json tts 칸에 실제 경로(voice·rate 또는 supplied recording).
+- I4 edge-tts==7.3.1 고정. Communicate에 connect·receive 타임아웃 + asyncio.wait_for 전체 상한, 시작 전후 cancel.check(). 외부로 나가는 것은 hook.text·voice·rate뿐. 문구·voice 로그 금지, edge_tts·aiohttp 로거 WARNING, 예외는 type 이름만. voice·rate ValueError → tts_failed.
+- I5 검증: pytest는 목으로 성공·실패·꺼짐·중단 4경우. 실제 edge-tts 호출 스모크는 이용 조건 미확인이라 에이전트가 하지 않는다(사용자가 켜고 직접 확인). ffprobe 길이는 목이 만든 합성 mp3로 확인.
+- 순서: task-032(adapter·render 수정 중) 커밋 뒤 착수, 그 다음 task-031.

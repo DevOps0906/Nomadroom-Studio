@@ -93,3 +93,8 @@
 | task-031 | URL 원본(권리 확인 체크·yt-dlp·SSRF 방지) | W5 | 028 | 높음 | builder + tester | 01#8 SSRF, 04 A-09 PATCH·W-06 |
 | task-032 | 댓글·출처 오버레이 레이어(렌더러+PROD-02 탭) | W5 | 028 | 보통 | builder | 05 overlays, spec PROD-02 |
 | task-033 | P1 인수 테스트 CAT-08 + 회귀 | W5 | 029, 030, 031, 032 | 보통 | tester | 01 S10 |
+
+## 사용자 결정 (2026-11-19, W5~W9 연속 진행 지시와 함께)
+- Q9~Q15는 문서 기본값으로 진행: Q9 라이선스 근거 없으면 Pretendard Black(OFL) 대체 · Q10 secscan 통과 시에만 faster-whisper small·CPU, 아니면 수동 입력만 · Q11 예능형 총길이 180초·컷 1~60 · Q12 영상 안 고정 문구(ko "제휴 링크 포함")+게시 문구 첫 줄 · Q13 제휴처 이미지 사용 안 함(rights basis 구분) · Q14 edge-tts 불가 시 해당 기능 보류 · Q15 미확인 이미지 없이 현재 근거로.
+- Claude API(task-029·040·048): 목으로만 구현·테스트, 실제 호출은 사용자가 키를 넣은 뒤 직접 확인(비용 0).
+- Q16(task-054): xAI 어댑터·비용 상한 장치만 만들고 기본 꺼짐(상한 0원). 키 발급·예산은 나중에 사용자 결정.

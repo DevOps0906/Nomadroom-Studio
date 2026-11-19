@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from production.errors import HookTooLong, RenderFailed, TextTooLong
 from production.media import Cancel, Media, MediaError, file_input
+from production.overlays import build_layers, normalize
 
 W, H, FPS = 608, 1080, 30
 FONTS = Path(__file__).resolve().parent.parent / "fonts"
@@ -170,6 +171,7 @@ def render(
     """source(작업 폴더의 source.mp4)와 정리된 hook(WAV)로 output을 만들고 측정 결과를 돌려준다."""
     duration = validate(project, source_meta)
     title, captions = overlays(project)
+    cards = build_layers(normalize(project.get("overlays") or [], duration))
     hook_end = check_hook(hook_duration, duration, float(project["items"][0][1]))
     frames = math.ceil(duration * FPS - 1e-6)
     encoded_duration = frames / FPS
@@ -285,6 +287,9 @@ def render(
                 if item[0] <= t < item[1]:
                     canvas.paste(captions[index], (0, 0), captions[index])
                     break
+            for start, end, card in cards:
+                if start <= t < end:
+                    canvas.paste(card, (0, 0), card)
             encoder.stdin.write(canvas.tobytes())
             if n % FPS == 0:
                 on_progress("compose", n * 100 // frames)

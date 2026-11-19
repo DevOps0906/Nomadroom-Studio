@@ -6,6 +6,7 @@
 from typing import Any
 
 from production.errors import AudioMissing, RenderFailed
+from production.overlays import normalize
 
 PRESET_VERSION = "category-1080-v1"  # F9: 워커 렌더 프리셋. task·spec 값과 다르면 렌더하지 않는다
 
@@ -19,8 +20,6 @@ def to_project(spec: Any, lang: str | None) -> dict[str, Any]:
             raise AudioMissing("TTS 훅은 task-030 전까지 지원하지 않음")  # F8
         if spec.get("preset_version") not in (None, PRESET_VERSION):
             raise RenderFailed("spec preset_version 불일치")
-        if spec.get("overlays"):
-            raise RenderFailed("오버레이는 task-032 전까지 지원하지 않음")
         if lang is not None and spec["lang"] != lang:
             raise RenderFailed("spec 언어 불일치")
         items = []
@@ -29,6 +28,7 @@ def to_project(spec: Any, lang: str | None) -> dict[str, Any]:
             if it.get("y") is not None:
                 row.append(it["y"])
             items.append(row)
+        project_overlays = normalize(spec.get("overlays") or [], spec["duration"])
         return {
             "lang": spec["lang"],
             "header": list(spec["header"]["lines"]),
@@ -36,6 +36,7 @@ def to_project(spec: Any, lang: str | None) -> dict[str, Any]:
             "duration": spec["duration"],
             "shots": [[s["start"], s["end"], s["scale"], s["y"]] for s in spec["shots"]],
             "items": items,
+            "overlays": project_overlays,
         }
     except KeyError, TypeError, AttributeError:
         raise RenderFailed("spec 형식 오류") from None

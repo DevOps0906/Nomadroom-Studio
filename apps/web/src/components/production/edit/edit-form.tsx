@@ -23,6 +23,7 @@ import {
   type ItemKind,
   type ShotDraft,
 } from "./model";
+import { OverlaysTab } from "./OverlaysTab";
 import { SheetPanel, type SheetInfo } from "./sheet-panel";
 import { Timeline } from "./timeline";
 
@@ -137,6 +138,7 @@ export function EditForm({
   const [phase, setPhase] = useState<"idle" | "saving" | "approving" | "uploading">("idle");
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [section, setSection] = useState<Section>("hook");
+  const [tab, setTab] = useState<"edit" | "comment" | "source">("edit");
   const [audioSec, setAudioSec] = useState<number | null>(null);
   const busy = phase !== "idle";
   const lock = !editable || busy || conflict;
@@ -201,7 +203,7 @@ export function EditForm({
     return true;
   }
 
-  const blockers = approveBlockers({ status: job.status, hasRevision: revNo !== null, dirty, approved: approvedAt !== null, errorCount: rejected ? Math.max(errors.length, 1) : errors.length, busy });
+  const blockers = approveBlockers({ status: job.status, hasRevision: revNo !== null, dirty, approved: approvedAt !== null, errorCount: rejected ? Math.max(errors.length, 1) : errors.length, overlayErrorCount: errors.filter((i) => i.path.startsWith("overlays")).length, busy });
 
   async function approve() {
     if (blockers.length > 0 || conflict || revNo === null) return;
@@ -256,7 +258,7 @@ export function EditForm({
   const at = (path: string) => [...issuesAt(errors, path), ...loc(path)];
   const firstItemLen = draft.items[0] ? Number(draft.items[0].end) - Number(draft.items[0].start) : NaN;
   const hookWarn = audioSec !== null && Number.isFinite(firstItemLen) && audioSec > firstItemLen + 0.001;
-  const vis = (s: Section) => cn(section === s ? "flex" : "hidden", "tablet:flex");
+  const vis = (s: Section) => (tab !== "edit" ? "hidden" : cn(section === s ? "flex" : "hidden", "tablet:flex"));
 
   return (
     <form
@@ -268,7 +270,7 @@ export function EditForm({
       className="flex flex-col gap-4 pb-28 tablet:pb-0"
       aria-busy={busy}
     >
-      {/* 탭: 언어·편집안·댓글·출처. ja·댓글·출처는 후속 작업 */}
+      {/* 탭: 언어·편집안·댓글·출처. ja·댓글·출처는 후속 작업(댓글·출처는 task-032) */}
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-border text-body">
         <div role="tablist" aria-label="언어" className="flex gap-4">
           <span role="tab" aria-selected="true" className="border-b-2 border-primary py-2 font-semibold">
@@ -279,20 +281,22 @@ export function EditForm({
           </span>
         </div>
         <div role="tablist" aria-label="편집안 탭" className="flex gap-4">
-          <span role="tab" aria-selected="true" className="border-b-2 border-primary py-2 font-semibold">
-            편집안
-          </span>
-          <span role="tab" aria-selected="false" aria-disabled="true" className="py-2 text-text-muted">
-            댓글 (준비 중)
-          </span>
-          <span role="tab" aria-selected="false" aria-disabled="true" className="py-2 text-text-muted">
-            출처 (준비 중)
-          </span>
+          {(
+            [
+              { id: "edit", label: "편집안" },
+              { id: "comment", label: "댓글" },
+              { id: "source", label: "출처" },
+            ] as const
+          ).map((t) => (
+            <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={cn("min-h-11 py-2", FOCUS, tab === t.id ? "border-b-2 border-primary font-semibold" : "text-text-muted")}>
+              {t.label}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* ~767 섹션 탭 4개 */}
-      <div role="tablist" aria-label="편집 구역" className="flex gap-2 tablet:hidden">
+      <div role="tablist" aria-label="편집 구역" className={cn("gap-2 tablet:hidden", tab === "edit" ? "flex" : "hidden")}>
         {SECTIONS.map((s) => (
           <button key={s.id} type="button" role="tab" aria-selected={section === s.id} onClick={() => setSection(s.id)} className={cn(BTN, "grow", FOCUS, section === s.id ? "bg-primary-soft text-primary-soft-fg" : "border border-border text-text")}>
             {s.label}
@@ -481,6 +485,17 @@ export function EditForm({
         <Timeline draft={draft} duration={durationOf(draft)} />
       </section>
 
+      {tab !== "edit" && (
+        <OverlaysTab
+          kind={tab}
+          overlays={draft.overlays}
+          errors={[...errors, ...(localErr?.path.startsWith("overlays.") ? [{ code: "input.number", path: localErr.path, message: localErr.message }] : [])]}
+          warnings={warnings}
+          lock={lock}
+          onChange={(overlays) => set({ overlays })}
+        />
+      )}
+
       {message && (
         <p role={message.tone === "error" ? "alert" : "status"} className={cn("rounded-control px-3 py-2 text-body", message.tone === "error" ? "bg-danger-soft text-danger-soft-fg" : "bg-success-soft text-success-soft-fg")}>
           {message.text}
@@ -504,7 +519,7 @@ export function EditForm({
           {blockers.map((b, n) => (
             <span key={b.id}>
               {n > 0 ? " · " : ""}
-              {b.id === "errors" && errors.length > 0 ? (
+              {(b.id === "errors" || b.id === "overlays") && errors.length > 0 ? (
                 <a href="#edit-issues" className="underline">
                   {b.text}
                 </a>

@@ -12,6 +12,13 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 TOL = 0.001
 H = 1080
+W = 608
+OVERLAY_MAX_UNITS = 80
+OVERLAY_MAX_COUNT = 20
+NARROW = " .,'!?:;-()"
+CAPTION_Y = {"emph": 390, "white": 700, "paren": 700}
+CAPTION_HALF_H = 45  # 자막 한 줄 높이의 절반(어림)
+CARD_HALF_H = 30  # 오버레이 카드 높이의 절반(어림)
 MIN_SHOW_SEC = 1.4
 _Num = Annotated[float, Field(strict=True, allow_inf_nan=False)]
 _PATHLIKE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*:|^~|[/\\]|^\.\.$")
@@ -73,6 +80,11 @@ class Spec(_M):
     preset_version: str | None = None
 
 
+def text_units(text: str) -> int:
+    """문구 폭 단위: 공백·ASCII 구두점 1, 그 밖 2. 워커 overlays.py와 같은 규칙."""
+    return sum(1 if ch in NARROW else 2 for ch in text)
+
+
 def _e(code: str, path: str, message: str) -> dict[str, str]:
     return {"code": code, "path": path, "message": message}
 
@@ -128,12 +140,29 @@ def validate_spec(
 
     _check_shots(s, errors)
     _check_items(s, errors, warnings)
+    if len(s.overlays) > OVERLAY_MAX_COUNT:
+        errors.append(
+            _e("overlays.count", "overlays", f"오버레이는 최대 {OVERLAY_MAX_COUNT}개입니다.")
+        )
     for i, o in enumerate(s.overlays):
         p = f"overlays.{i}"
         if o.start < -TOL or o.end <= o.start or o.end > d + TOL:
             errors.append(_e("overlays.range", p, "시간이 0~duration 범위를 벗어났습니다."))
         if not o.text.strip():
             errors.append(_e("overlays.text.empty", f"{p}.text", "문구가 비어 있습니다."))
+        elif "\n" in o.text or "\r" in o.text:
+            errors.append(_e("overlays.text.newline", f"{p}.text", "줄바꿈 불가"))
+        elif text_units(o.text) > OVERLAY_MAX_UNITS:
+            errors.append(
+                _e(
+                    "overlays.text.long",
+                    f"{p}.text",
+                    f"폭 단위 {OVERLAY_MAX_UNITS} 이하여야 합니다.",
+                )
+            )
+        if not (0 <= o.x <= W and 0 <= o.y <= H):
+            errors.append(_e("overlays.pos", p, f"위치는 화면 안(x 0~{W}, y 0~{H})이어야 합니다."))
+    _check_overlays(s, errors, warnings)
     return {"errors": errors, "warnings": warnings}
 
 
@@ -186,3 +215,36 @@ def _check_items(s: Spec, errors: list[dict[str, str]], warnings: list[dict[str,
         prev = it.end
     if abs(s.items[0].start) > TOL:
         errors.append(_e("items.first_not_zero", "items.0.start", "첫 자막은 0초에 시작"))
+
+
+def _check_overlays(s: Spec, errors: list[dict[str, str]], warnings: list[dict[str, str]]) -> None:
+    """같은 종류 오버레이 구간 겹침은 오류, 자막과 시간·위치가 겹치면 경고."""
+    for kind in ("comment", "source"):
+        rows = sorted(
+            ((o.start, o.end, i) for i, o in enumerate(s.overlays) if o.kind == kind),
+        )
+        for a, b in zip(rows, rows[1:], strict=False):
+            if b[0] < a[1] - TOL:
+                errors.append(
+                    _e(
+                        "overlays.overlap",
+                        f"overlays.{b[2]}",
+                        "같은 종류 오버레이 구간이 겹칩니다.",
+                    )
+                )
+    for i, o in enumerate(s.overlays):
+        for j, it in enumerate(s.items):
+            cy = it.y if it.y is not None else CAPTION_Y[it.kind]
+            if (
+                o.start < it.end - TOL
+                and it.start < o.end - TOL
+                and abs(o.y - cy) < CAPTION_HALF_H + CARD_HALF_H
+            ):
+                warnings.append(
+                    _e(
+                        "overlays.caption_overlap",
+                        f"overlays.{i}",
+                        f"자막 {j + 1}과 시간·위치가 겹칩니다.",
+                    )
+                )
+                break
