@@ -17,7 +17,10 @@ def is_jwt_format(value: str) -> bool:
 
 class Settings(BaseSettings):
     # hide_input_in_errors: 검증 오류 문자열에 입력값(키 원문)을 넣지 않는다.
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore", hide_input_in_errors=True)
+    # .env.local이 있으면 .env보다 우선(둘 다 git 무시). 실행 위치는 apps/api.
+    model_config = SettingsConfigDict(
+        env_file=(".env", ".env.local"), extra="ignore", hide_input_in_errors=True
+    )
 
     supabase_url: str
     # service_role(또는 sb_secret_) 키: 서버 환경변수로만 받는다. 로그·응답에 쓰지 않는다.
