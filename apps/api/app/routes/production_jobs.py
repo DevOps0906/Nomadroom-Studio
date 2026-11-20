@@ -57,6 +57,7 @@ LIST_COLUMNS = (
 # task-045: rights·parent_asset_id는 쇼핑 PROD-03 권리 목록·원본 계보용(A-09 상세)
 ASSET_COLUMNS = "id,kind,status,size_bytes,duration_sec,rights,parent_asset_id"
 RUN_COLUMNS = "id,status,progress_pct,progress_stage,error_stage,error_code,attempt,claimed_by"
+DETAIL_ASSET_COLUMNS = f"{ASSET_COLUMNS},render_run_id"
 REVISION_COLUMNS = "id,rev_no,spec,origin,validation,approved_at,derived_from,updated_at"
 IDEMPOTENCY_CONSTRAINT = "production_jobs_workspace_id_idempotency_key_key"
 # 원본 개수 트리거(000023): 23505 = 일반 ready 2건째·쇼핑 11건째, NR010 = 상태 불가
@@ -280,6 +281,8 @@ class AssetOut(BaseModel):
     duration_sec: float | None
     rights: dict[str, Any] | None = None  # task-045: 사용자 입력 권리(쇼핑), 없으면 null
     parent_asset_id: uuid.UUID | None = None  # task-044 P1 계보(파생 산출물의 원본)
+    # task-060: 산출물이 연결된 render run의 lang(없거나 run 삭제됐으면 null)
+    render_lang: Literal["ko", "ja"] | None = None
 
 
 class RevisionSummary(BaseModel):
@@ -304,11 +307,17 @@ class RunOut(BaseModel):
     attempt: int
 
 
+class LatestRunsOut(BaseModel):
+    ko: RunOut | None = None
+    ja: RunOut | None = None
+
+
 class JobDetailOut(BaseModel):
     job: JobOut
     assets: list[AssetOut]
     current_revision: CurrentRevisionOut
     latest_run: RunOut | None
+    latest_runs: LatestRunsOut  # task-060: 언어별 최신 run(없으면 null)
     worker_online: bool
 
 
@@ -943,12 +952,27 @@ async def get_job(
             },
         )
 
-    assets, revs, runs = await asyncio.gather(
+    async def _latest_run(lang: str) -> dict | None:
+        rows = await _rows(
+            request,
+            "GET",
+            "render_runs",
+            params={
+                "select": RUN_COLUMNS,
+                **scope,
+                "lang": f"eq.{lang}",
+                "order": "created_at.desc",
+                "limit": "1",
+            },
+        )
+        return rows[0] if rows else None
+
+    assets, revs, runs, ko_run, ja_run = await asyncio.gather(
         _rows(
             request,
             "GET",
             "production_assets",
-            params={"select": ASSET_COLUMNS, **scope, "order": "created_at.asc,id.asc"},
+            params={"select": DETAIL_ASSET_COLUMNS, **scope, "order": "created_at.asc,id.asc"},
         ),
         _revision(),
         _rows(
@@ -957,8 +981,20 @@ async def get_job(
             "render_runs",
             params={"select": RUN_COLUMNS, **scope, "order": "created_at.desc", "limit": "1"},
         ),
+        _latest_run("ko"),
+        _latest_run("ja"),
     )
     run = runs[0] if runs else None
+    run_ids = sorted({str(a["render_run_id"]) for a in assets if a.get("render_run_id")})
+    run_lang: dict[str, str | None] = {}
+    if run_ids:  # 자산이 가리키는 run의 lang만 일괄 조회(건수 제한 없음). 못 찾으면 null
+        for r in await _rows(
+            request,
+            "GET",
+            "render_runs",
+            params={"select": "id,lang", "id": f"in.({','.join(run_ids)})", **scope},
+        ):
+            run_lang[str(r["id"])] = r.get("lang")
     claimed = (run or {}).get("claimed_by") or job.get("claimed_by")
     last_seen = await _worker_last_seen(request, ws, {"claimed_by": claimed})
     online = last_seen is not None and datetime.now(UTC) - last_seen <= OFFLINE_AFTER
@@ -971,9 +1007,18 @@ async def get_job(
     }
     return JobDetailOut(
         job=JobOut.model_validate(job),
-        assets=[AssetOut.model_validate(a) for a in assets],
+        assets=[
+            AssetOut.model_validate(
+                {**a, "render_lang": run_lang.get(str(a["render_run_id"])) if a.get("render_run_id") else None}
+            )
+            for a in assets
+        ],
         current_revision=CurrentRevisionOut(**current),
         latest_run=RunOut.model_validate(run) if run else None,
+        latest_runs=LatestRunsOut(
+            ko=RunOut.model_validate(ko_run) if ko_run else None,
+            ja=RunOut.model_validate(ja_run) if ja_run else None,
+        ),
         worker_online=online,
     )
 
@@ -1074,10 +1119,13 @@ def _upload_state_ok(kind: str, job: dict) -> bool:
     if kind == "source_upload":
         return _is_prepare_state(job)
     if kind in ("image", "bgm", "narration"):
-        # 쇼핑 사진·BGM·첨부 녹음: 준비·렌더 진행 중과 완료 뒤만 막는다(가정)
+        # 쇼핑 사진·BGM·첨부 녹음: 준비·렌더 진행 중만 막는다(가정). narration은 완료(done) 뒤 ja 녹음용(task-060)
+        if kind == "narration" and job["status"] == "done":
+            return True
         return job["status"] in ("draft", "review", "inspect", "failed")
-    # hook_audio: review·failed(render), task-023 E10으로 failed(audio)도(audio_missing 복구)
-    return job["status"] == "review" or (
+    # hook_audio: review·failed(render), task-023 E10으로 failed(audio)도(audio_missing 복구).
+    # task-060: ja 녹음용으로 inspect·done도 허용 — W-06은 spec이 참조한 자산만 쓰므로(task-050 K4) ko 렌더에 영향 없음
+    return job["status"] in ("review", "inspect", "done") or (
         job["status"] == "failed" and job.get("failed_stage") in ("render", "audio")
     )
 

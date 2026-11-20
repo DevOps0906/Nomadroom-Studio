@@ -7,7 +7,7 @@ import { RunView } from "@/components/production/run/run-view";
 import { JaRunView } from "@/components/production/lang/ja-run";
 import { LangTabs } from "@/components/production/lang/lang-tabs";
 import { parseLang } from "@/components/production/lang/model";
-import { latestAsset } from "@/components/production/run/model";
+import { assetOfLang, koDetail, runOfLang } from "@/components/production/lang/run-model";
 import { ApiError, SESSION_EXPIRED_PATH, classifyApiError } from "@/server/api/client";
 import { getProductionJob, type ProductionJobDetail } from "@/server/api/production";
 
@@ -66,10 +66,12 @@ export default async function ProductionJobPage({ params, searchParams }: { para
         <JaRunView
           job={{ id: job.id, shopping: job.kind === "shopping" }}
           ja={detail.current_revision.ja ? { id: detail.current_revision.ja.id, rev_no: detail.current_revision.ja.rev_no, approved_at: detail.current_revision.ja.approved_at } : null}
-          reportId={latestAsset(detail.assets, "report")}
+          run={runOfLang(detail, "ja")}
+          mp4Id={assetOfLang(detail.assets, "output_mp4", "ja")}
+          reportId={assetOfLang(detail.assets, "report", "ja")}
         />
       ) : (
-        <RunView detail={detail} />
+        <RunView detail={koDetail(detail)} />
       )}
     </div>
   );

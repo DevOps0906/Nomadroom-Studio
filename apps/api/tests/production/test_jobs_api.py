@@ -745,7 +745,83 @@ def test_get_detail_shape(api, auth, db):
     assert body["current_revision"]["ko"]["rev_no"] == 1
     assert body["current_revision"]["ja"] is None
     assert body["latest_run"] is None
+    assert body["latest_runs"] == {"ko": None, "ja": None}
+    assert body["assets"][0]["render_lang"] is None
     assert body["worker_online"] is True
+
+
+def test_get_detail_latest_runs_and_render_lang(api, auth, db):
+    job = db.add_job(status="inspect", claimed_by=WORKER)
+    db.add_revision(job)
+
+    def run(rid: str, lang: str, created: str, status: str) -> dict:
+        row = {
+            "id": rid,
+            "workspace_id": job["workspace_id"],
+            "job_id": job["id"],
+            "lang": lang,
+            "status": status,
+            "progress_pct": 100,
+            "progress_stage": None,
+            "error_stage": None,
+            "error_code": None,
+            "attempt": 1,
+            "claimed_by": None,
+            "created_at": created,
+        }
+        db.runs.append(row)
+        return row
+
+    ko_run = run(str(uuid.uuid4()), "ko", "2026-11-02T00:00:00+00:00", "done")
+    ja_run = run(str(uuid.uuid4()), "ja", "2026-11-03T00:00:00+00:00", "running")
+    ja_mp4 = db.add_asset(job, "output_mp4", render_run_id=ja_run["id"])
+    ko_mp4 = db.add_asset(job, "output_mp4", render_run_id=ko_run["id"])
+    body = api.get(f"{URL}/{job['id']}", headers=auth).json()
+    assert body["latest_run"]["id"] == ja_run["id"]
+    assert body["latest_runs"]["ko"]["id"] == ko_run["id"]
+    assert body["latest_runs"]["ja"]["id"] == ja_run["id"]
+    lang = {a["id"]: a["render_lang"] for a in body["assets"]}
+    assert lang == {ja_mp4["id"]: "ja", ko_mp4["id"]: "ko"}
+
+
+def test_get_detail_latest_runs_with_many_runs_of_one_lang(api, auth, db):
+    job = db.add_job(status="inspect", claimed_by=WORKER)
+    db.add_revision(job)
+
+    def run(lang: str, n: int) -> dict:
+        row = {
+            "id": str(uuid.uuid4()),
+            "workspace_id": job["workspace_id"],
+            "job_id": job["id"],
+            "lang": lang,
+            "status": "done",
+            "progress_pct": 100,
+            "progress_stage": None,
+            "error_stage": None,
+            "error_code": None,
+            "attempt": 1,
+            "claimed_by": None,
+            "created_at": f"2026-11-01T00:{n // 60:02d}:{n % 60:02d}+00:00",
+        }
+        db.runs.append(row)
+        return row
+
+    old_ja = run("ja", 0)
+    old_mp4 = db.add_asset(job, "output_mp4", render_run_id=old_ja["id"])
+    for n in range(1, 230):  # ko run 229건이 ja보다 새롭다
+        last_ko = run("ko", n)
+    body = api.get(f"{URL}/{job['id']}", headers=auth).json()
+    assert body["latest_runs"]["ja"]["id"] == old_ja["id"]
+    assert body["latest_runs"]["ko"]["id"] == last_ko["id"]
+    assert body["assets"][0]["id"] == old_mp4["id"] and body["assets"][0]["render_lang"] == "ja"
+
+
+def test_get_detail_render_lang_null_when_run_unknown(api, auth, db):
+    job = db.add_job(status="inspect", claimed_by=WORKER)
+    db.add_revision(job)
+    db.add_asset(job, "output_mp4", render_run_id=str(uuid.uuid4()))
+    body = api.get(f"{URL}/{job['id']}", headers=auth).json()
+    assert body["assets"][0]["render_lang"] is None
 
 
 # === A-10 업로드(D4·D5·D9) =====================================================
@@ -834,6 +910,25 @@ def test_d5_hook_audio_state_and_format_rules(api, auth, db):
     )
     variety = db.add_job(status="review", format="variety")
     assert upload(api, auth, variety["id"], kind="hook_audio", mime="audio/wav").status_code == 400
+
+
+def test_task060_ja_recording_upload_allowed_in_inspect_and_done(api, auth, db):
+    # ja 녹음용: hook_audio(category)·narration(shopping)을 inspect·done에서도 받는다(task-060)
+    for status in ("inspect", "done"):
+        job = db.add_job(status=status)
+        assert upload(api, auth, job["id"], kind="hook_audio", mime="audio/wav").status_code == 201
+    rights = {"basis": "own"}
+    for status in ("inspect", "done"):
+        shop = db.add_job(status=status, kind="shopping", format="shopping", vertical="product")
+        r = api.post(
+            f"{URL}/{shop['id']}/uploads",
+            json={"kind": "narration", "size_bytes": 10, "mime": "audio/wav", "rights": rights},
+            headers=auth,
+        )
+        assert r.status_code == 201, r.text
+    # 진행 중은 여전히 막는다
+    busy = db.add_job(status="rendering")
+    assert upload(api, auth, busy["id"], kind="hook_audio", mime="audio/wav").status_code == 409
 
 
 def test_d5_complete_checks_real_size(api, auth, db):

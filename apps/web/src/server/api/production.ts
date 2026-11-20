@@ -77,6 +77,8 @@ export type ProductionAsset = {
   duration_sec: number | null;
   // A-09 GET은 아직 권리를 돌려주지 않는다(ASSET_COLUMNS). 주면 PROD-03 권리 목록이 채운다.
   rights?: AssetRights | null;
+  /** 산출물이 연결된 render run의 언어(task-060). 연결이 없으면 null, 구 API면 없음. */
+  render_lang?: "ko" | "ja" | null;
 };
 
 export type SpecIssue = { code: string; path: string; message: string };
@@ -97,6 +99,16 @@ export type Revision = {
 
 export type RevisionLang = "ko" | "ja";
 
+export type RunSummary = {
+  id: string;
+  status: "queued" | "running" | "done" | "failed";
+  progress_pct: number;
+  progress_stage: string | null;
+  error_stage: string | null;
+  error_code: string | null;
+  attempt: number;
+};
+
 export type ProductionJobDetail = {
   job: ProductionJob;
   assets: ProductionAsset[];
@@ -104,15 +116,9 @@ export type ProductionJobDetail = {
     ko: Pick<Revision, "id" | "rev_no" | "approved_at" | "validation"> | null;
     ja?: Pick<Revision, "id" | "rev_no" | "approved_at" | "validation"> | null;
   };
-  latest_run: {
-    id: string;
-    status: "queued" | "running" | "done" | "failed";
-    progress_pct: number;
-    progress_stage: string | null;
-    error_stage: string | null;
-    error_code: string | null;
-    attempt: number;
-  } | null;
+  latest_run: RunSummary | null;
+  /** 언어별 최신 run(task-060). 구 API면 없음. */
+  latest_runs?: { ko: RunSummary | null; ja: RunSummary | null };
   worker_online: boolean;
 };
 

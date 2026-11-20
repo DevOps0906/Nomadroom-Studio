@@ -46,7 +46,7 @@ export function Stepper({ detail }: { detail: Pick<ProductionJobDetail, "job" | 
   );
 }
 
-function Player({ jobId, assetId }: { jobId: string; assetId: string | null }) {
+export function Player({ jobId, assetId }: { jobId: string; assetId: string | null }) {
   const [src, setSrc] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const retried = useRef(false);

@@ -61,7 +61,7 @@
 | task-057 | PROD-02S 컷별 AI 생성 견적·확인·검수 체크 UI | W9 | 054 | 보통 | builder | 완료 |
 | task-058 | 쇼핑 녹음 상한 ko·ja 공용 8개(task-053 결함) | W10 후속 | 049 | 높음 | builder | 완료 |
 | task-059 | A-12 저장 낙관적 잠금 강화(ko·ja) | W11 | 049 | 높음 | builder + tester | 완료 |
-| task-060 | 언어별 진행 상태(A-09 lang) + ja 녹음 업로드 화면 | W11 | 052, 058 | 보통 | builder | 대기 |
+| task-060 | 언어별 진행 상태(A-09 lang) + ja 녹음 업로드 화면 | W11 | 052, 058 | 보통 | builder | 완료 |
 
 상태: 대기 / 진행 / 완료 / 보류
 
@@ -94,6 +94,6 @@
 ## 교훈 (다음 작업에 그대로 적용할 것만, 20줄 이내 유지)
 - 테스트의 가짜 JWT·키는 문자열 리터럴로 두지 말고 런타임에 조립한다(gitleaks pre-commit 차단).
 - 외부 인증 방식(JWT alg 등)은 계획 전에 실제 엔드포인트로 확인한다(모킹 테스트만으로는 거짓 통과). 
-| 2026-11-20 | A-12 저장(ko·ja, task-049) | 낙관적 잠금이 rev_no만 비교 → 미승인본을 같은 rev_no로 두 사람이 동시에 저장하면 앞선 편집 유실(ko 000016·ja 000027 동일 계약) | base_updated_at(또는 저장 버전) 추가 — API·웹 계약 변경(보통) |
+| 2026-11-20 | A-12 저장(ko·ja, task-049) | 낙관적 잠금이 rev_no만 비교 → 미승인본을 같은 rev_no로 두 사람이 동시에 저장하면 앞선 편집 유실(ko 000016·ja 000027 동일 계약) | base_updated_at(또는 저장 버전) 추가 — API·웹 계약 변경(보통) | → 해결 task-059 |
 | 2026-11-20 | 배포(W-06 훅 음성, task-050 K4) | W-06이 리비전 spec의 hook.audio_asset_id만 줌 → 참조 없이 승인된 기존 category ko 리비전은 audio_missing 실패 가능(운영 데이터 없음) | 배포 전 해당 리비전 탐지 후 재승인 — 08 배포 체크리스트 |
-| 2026-11-20 | A-09 상세 lang(task-052) | latest_run·assets에 lang이 없어 PROD-03 ja 탭이 ja 진행률·MP4 재생·언어별 리포트를 구분 못 함. ja 녹음 대체(JA-04) 업로드 UI도 없음 | A-09에 언어별 latest_run·자산 lang 노출 + ja 녹음 업로드 UI(보통) |
+| 2026-11-20 | A-09 상세 lang(task-052) | latest_run·assets에 lang이 없어 PROD-03 ja 탭이 ja 진행률·MP4 재생·언어별 리포트를 구분 못 함. ja 녹음 대체(JA-04) 업로드 UI도 없음 | A-09에 언어별 latest_run·자산 lang 노출 + ja 녹음 업로드 UI(보통) | → 해결 task-060 |

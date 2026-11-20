@@ -8,6 +8,8 @@ import type { JobFormat, SpecIssue, Validation } from "@/server/api/production";
 import type { EditResult } from "../edit/api";
 import { retainKey } from "../shopping/ai-script";
 import { useLangDirty } from "./dirty-guard";
+import { VoicePanel } from "./voice-panel";
+import { applyVoice, voiceBlocker, voiceDirty, voiceKind, voiceOf, type VoiceDraft } from "./voice-model";
 import { approveJaRevision, requestTranslate, saveJaRevision, type JaRevision } from "./api";
 import {
   LOCKED_NOTE,
@@ -58,6 +60,7 @@ export function JaPanel({ job, ko, ja }: { job: { id: string; format: JobFormat 
   const router = useRouter();
   const [rev, setRev] = useState<JaRevision | null>(ja);
   const [edits, setEdits] = useState<Record<string, string>>(() => (ja ? textsOf(job.format, ja.spec) : {}));
+  const [voice, setVoice] = useState<VoiceDraft>(() => voiceOf(job.format, ja?.spec ?? {}));
   const [busy, setBusy] = useState<null | "translate" | "save" | "approve">(null);
   const [msg, setMsg] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [failed, setFailed] = useState(false);
@@ -66,7 +69,9 @@ export function JaPanel({ job, ko, ja }: { job: { id: string; format: JobFormat 
   const gate = makeGate(ko);
   const validation: Validation = rev?.validation ?? { errors: [], warnings: [] };
   const sourceChanged = hasSourceChanged(validation.errors);
-  const dirty = rev ? isDirty(job.format, rev.spec, edits) : false;
+  const vDirty = rev ? voiceDirty(job.format, rev.spec, voice) : false;
+  const vBlock = voiceBlocker(job.format, voice);
+  const dirty = rev ? isDirty(job.format, rev.spec, edits) || vDirty : false;
   const locked = busy !== null;
   useLangDirty(dirty);
   const blockers = rev ? approveBlockers({ dirty, saving: busy === "save", approved: !!rev.approved_at, errors: validation.errors }) : [];
@@ -92,15 +97,18 @@ export function JaPanel({ job, ko, ja }: { job: { id: string; format: JobFormat 
     setFailed(false);
     setRev(r.data.revision);
     setEdits(textsOf(job.format, r.data.revision.spec));
+    setVoice(voiceOf(job.format, r.data.revision.spec));
     setMsg({ tone: "ok", text: `번역 초안 rev ${r.data.revision.rev_no}을 만들었습니다. 검토·수정 후 저장하고 승인하세요. (사용 ${r.data.translate_count}회)` });
     router.refresh();
   }
 
   async function onSave() {
     if (locked || !rev) return;
+    if (vBlock) return setMsg({ tone: "error", text: vBlock });
     setBusy("save");
     setMsg(null);
-    const spec = applyTexts(job.format, rev.spec, edits);
+    const texts = applyTexts(job.format, rev.spec, edits);
+    const spec = vDirty ? applyVoice(job.format, texts, voice) : texts;
     const r = await saveJaRevision(job.id, spec, rev.rev_no, rev.updated_at);
     setBusy(null);
     if (!r.ok) {
@@ -206,8 +214,10 @@ export function JaPanel({ job, ko, ja }: { job: { id: string; format: JobFormat 
           <span aria-hidden>🔒 </span>잠금 필드
         </h2>
         <p className="text-body text-text-muted">{LOCKED_NOTE[job.format]}</p>
-        <p className="text-body text-text-muted">{VOICE_NOTE}</p>
+        {!voiceKind(job.format) && <p className="text-body text-text-muted">{VOICE_NOTE}</p>}
       </section>
+
+      <VoicePanel jobId={job.id} format={job.format} value={voice} onChange={setVoice} disabled={locked} onError={(text) => setMsg({ tone: "error", text })} />
 
       {(validation.errors.length > 0 || validation.warnings.length > 0) && (
         <section aria-label="검증 결과" className={cn(CARD, "flex flex-col gap-2")}>
@@ -218,7 +228,7 @@ export function JaPanel({ job, ko, ja }: { job: { id: string; format: JobFormat 
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" disabled={locked || !dirty} onClick={() => void onSave()} className={SECONDARY}>
+        <button type="button" disabled={locked || !dirty || !!vBlock} onClick={() => void onSave()} className={SECONDARY}>
           {busy === "save" ? "저장 중…" : "저장"}
         </button>
         <button type="button" disabled={locked || blockers.length > 0} onClick={() => void onApprove()} className={PRIMARY}>

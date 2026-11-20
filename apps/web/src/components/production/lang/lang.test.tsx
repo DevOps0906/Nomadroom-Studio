@@ -76,10 +76,11 @@ describe("번역 경로·잠금 필드", () => {
     const html = renderToStaticMarkup(<JaPanel job={{ id: "j", format: "category" }} ko={{ id: "k", rev_no: 1, approved_at: "x" }} ja={ja} />);
     expect(html).toContain("잠금 필드");
     expect(html).toContain(m.LOCKED_NOTE.category);
-    expect(html).toContain(m.VOICE_NOTE);
+    expect(html).toContain("일본어 TTS");
+    expect(html).toContain("녹음 업로드");
     expect(html).toContain('value="フック"');
     expect(html).not.toContain('id="ja-shots');
-    expect(html.match(/<input /g)).toHaveLength(5);
+    expect(html.match(/<input /g)).toHaveLength(7); // 문구 5 + 음성 방식 라디오 2
     expect(html).toContain("번역 초안");
     expect(html).not.toContain("다시 만들기");
   });
@@ -105,10 +106,10 @@ describe("PROD-03 ja 탭", () => {
     expect(jaRunState({ approved_at: "x" }).canRequest).toBe(true);
   });
   it("승인된 ja는 렌더 요청 버튼(예능형도 막지 않음), 없으면 일본어판 만들기 안내", () => {
-    const ok = renderToStaticMarkup(<JaRunView job={{ id: "j", shopping: false }} ja={{ id: "r", rev_no: 1, approved_at: "x" }} reportId={null} />);
+    const ok = renderToStaticMarkup(<JaRunView job={{ id: "j", shopping: false }} ja={{ id: "r", rev_no: 1, approved_at: "x" }} run={null} mp4Id={null} reportId={null} />);
     expect(ok).toContain("렌더 요청");
     expect(ok).not.toContain("준비 중");
-    const none = renderToStaticMarkup(<JaRunView job={{ id: "j", shopping: false }} ja={null} reportId={null} />);
+    const none = renderToStaticMarkup(<JaRunView job={{ id: "j", shopping: false }} ja={null} run={null} mp4Id={null} reportId={null} />);
     expect(none).toContain("일본어판 만들기(편집안으로)");
     expect(none).toContain("/edit?lang=ja");
   });
@@ -149,9 +150,9 @@ describe("탭 전환 확인·대사 순번·고지", () => {
     expect(m.warningText({ code: "dub_overflow", line: 2, overflow_sec: 0.1 })).toContain("강조 제외 순번");
   });
   it("ja 렌더 요청 근처에 TTS 외부 전송 고지", () => {
-    const html = renderToStaticMarkup(<JaRunView job={{ id: "j", shopping: false }} ja={{ id: "r", rev_no: 1, approved_at: "x" }} reportId={null} />);
+    const html = renderToStaticMarkup(<JaRunView job={{ id: "j", shopping: false }} ja={{ id: "r", rev_no: 1, approved_at: "x" }} run={null} mp4Id={null} reportId={null} />);
     expect(html).toContain("외부 음성 합성(TTS) 서비스로 전송됩니다");
-    expect(renderToStaticMarkup(<JaRunView job={{ id: "j", shopping: false }} ja={null} reportId={null} />)).not.toContain("음성 합성");
+    expect(renderToStaticMarkup(<JaRunView job={{ id: "j", shopping: false }} ja={null} run={null} mp4Id={null} reportId={null} />)).not.toContain("음성 합성");
   });
 });
 
@@ -187,5 +188,78 @@ describe("task-059 저장 잠금(ja)", () => {
     const { SAVE_CONFLICT } = await import("./ja-panel");
     expect(SAVE_CONFLICT).toContain("다른 곳에서 먼저 수정");
     expect(SAVE_CONFLICT).toContain("새로고침");
+  });
+});
+
+// task-060: ja 탭 언어별 run·산출물 선택, 녹음 참조 spec 갱신(순수 함수)
+const { runOfLang, assetOfLang, koDetail } = await import("./run-model");
+const V = await import("./voice-model");
+
+const RUN = (id: string) => ({ id, status: "done" as const, progress_pct: 100, progress_stage: null, error_stage: null, error_code: null, attempt: 1 });
+const ASSET = (id: string, kind: string, render_lang: "ko" | "ja" | null) => ({ id, kind, status: "ready" as const, size_bytes: 1, duration_sec: null, render_lang });
+
+describe("task-060 언어별 run·산출물", () => {
+  const detail = {
+    job: {} as never,
+    assets: [ASSET("k1", "output_mp4", "ko"), ASSET("j1", "output_mp4", "ja"), ASSET("jr", "report", "ja"), ASSET("src", "source", null)],
+    current_revision: { ko: null },
+    latest_run: RUN("rj"),
+    latest_runs: { ko: RUN("rk"), ja: RUN("rj") },
+    worker_online: true,
+  };
+  it("ja run·산출물은 ja 것만, ko는 ja를 제외", () => {
+    expect(runOfLang(detail, "ja")?.id).toBe("rj");
+    expect(runOfLang(detail, "ko")?.id).toBe("rk");
+    expect(assetOfLang(detail.assets, "output_mp4", "ja")).toBe("j1");
+    expect(assetOfLang(detail.assets, "output_mp4", "ko")).toBe("k1");
+    expect(assetOfLang(detail.assets, "report", "ko")).toBeNull();
+    expect(koDetail(detail).latest_run?.id).toBe("rk");
+    expect(koDetail(detail).assets.map((a) => a.id)).toEqual(["k1", "src"]);
+  });
+  it("ja run이 없으면 null, 구 API(latest_runs 없음)는 ko만 latest_run", () => {
+    expect(runOfLang({ latest_run: RUN("x"), latest_runs: { ko: RUN("x"), ja: null } }, "ja")).toBeNull();
+    expect(runOfLang({ latest_run: RUN("x") }, "ko")?.id).toBe("x");
+    expect(runOfLang({ latest_run: RUN("x") }, "ja")).toBeNull();
+    expect(assetOfLang([ASSET("a", "output_mp4", null)], "output_mp4", "ja")).toBeNull();
+    // run을 확인하지 못한 산출물(null)은 ko로도 단정하지 않는다
+    expect(assetOfLang([ASSET("a", "output_mp4", null)], "output_mp4", "ko")).toBeNull();
+    expect(koDetail({ ...detail, assets: [ASSET("a", "output_mp4", null), ASSET("s", "source", null)] }).assets.map((x) => x.id)).toEqual(["s"]);
+  });
+});
+
+describe("task-060 녹음 참조 spec", () => {
+  const HOOK_SPEC = { hook: { text: "フック", tts: { voice: "ja-JP-NanamiNeural", rate: "+50%" } }, items: [] };
+  const SHOP_SPEC = { script: ["a", "b", "c", "d"], voice: { tts: { voice: "ja-JP-KeitaNeural" } } };
+  it("category: 녹음으로 바꾸면 hook.audio_asset_id만 남고 tts 제거, TTS로 되돌리면 반대", () => {
+    const d = V.withHook(V.voiceOf("category", HOOK_SPEC), "asset-1");
+    expect(d.mode).toBe("recording");
+    const rec = V.applyVoice("category", HOOK_SPEC, d) as { hook: Record<string, unknown> };
+    expect(rec.hook).toEqual({ text: "フック", audio_asset_id: "asset-1" });
+    const back = V.applyVoice("category", rec, { ...V.voiceOf("category", rec), mode: "tts", tts: d.tts }) as { hook: Record<string, unknown> };
+    expect(back.hook.audio_asset_id).toBeUndefined();
+    expect(back.hook.tts).toEqual({ voice: "ja-JP-NanamiNeural", rate: "+50%" });
+    expect(HOOK_SPEC.hook.tts).toBeDefined(); // 원본 불변
+  });
+  it("shopping: 문장 4개가 차야 저장 가능, spec은 voice.narration_asset_ids로 교체", () => {
+    let d = V.voiceOf("shopping", SHOP_SPEC);
+    expect(d.mode).toBe("tts");
+    expect(d.tts.voice).toBe("ja-JP-KeitaNeural");
+    d = V.withNarration(d, 0, "n1");
+    expect(V.voiceBlocker("shopping", d)).toMatch(/4개/);
+    d = V.withNarration(V.withNarration(V.withNarration(d, 1, "n2"), 2, "n3"), 3, "n4");
+    expect(V.voiceBlocker("shopping", d)).toBeNull();
+    const spec = V.applyVoice("shopping", SHOP_SPEC, d) as { voice: unknown; script: string[] };
+    expect(spec.voice).toEqual({ narration_asset_ids: ["n1", "n2", "n3", "n4"] });
+    expect(spec.script).toEqual(["a", "b", "c", "d"]);
+    expect(V.voiceDirty("shopping", SHOP_SPEC, d)).toBe(true);
+    expect(V.voiceDirty("shopping", spec, V.voiceOf("shopping", spec))).toBe(false);
+  });
+  it("같은 녹음을 두 문장에 쓰면 불완전, variety는 녹음 없음", () => {
+    let d = V.voiceOf("shopping", SHOP_SPEC);
+    for (let i = 0; i < 4; i++) d = V.withNarration(d, i, i < 2 ? "same" : `n${i}`);
+    expect(V.recordingComplete("shopping", d)).toBe(false);
+    expect(V.voiceKind("variety")).toBeNull();
+    const spec = { subtitles: [] };
+    expect(V.applyVoice("variety", spec, V.voiceOf("variety", spec))).toBe(spec);
   });
 });
