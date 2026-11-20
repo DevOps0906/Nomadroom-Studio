@@ -13,7 +13,7 @@ from typing import Any
 from production.errors import RenderFailed
 
 PRESET_VERSION = "variety-1080-v1"  # F9: 예능형 렌더 프리셋. task·spec 값과 다르면 렌더하지 않는다
-LANGS = ("ko",)  # 예능형 P0는 ko만
+LANGS = ("ko", "ja")  # task-051: ja는 대사 자막 TTS 더빙(variety/dub.py)
 FPS = 30
 TOL = 0.001
 SRC_TOL = 0.05  # 준비된 source 길이와 구간 길이 차이 허용(초)

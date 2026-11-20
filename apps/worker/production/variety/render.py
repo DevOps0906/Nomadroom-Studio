@@ -5,6 +5,7 @@ docs/05_DATA_MODEL.md#예능형-spec-필드.
 제목·대사 자막·반응 자막 합성 → rawvideo pipe → libx264(W5). 소리는 원본을 48k PCM으로 한 번
 풀어 컷마다 같은 프레임 경계(1프레임=1600샘플)로 잘라 이어 붙이고 loudnorm(W2).
 drawtext·concat demuxer·-safe 0을 쓰지 않고, 모든 파일 입력은 file_input()(F3).
+lang=ja(task-051)는 대사 자막 TTS 더빙 믹스(variety/dub.py)를 쓰고 믹스 뒤에는 리미터만 건다.
 """
 
 import math
@@ -18,9 +19,11 @@ from pathlib import Path
 from PIL import Image
 
 from production.adapter_variety import BAND_BOTTOM, BAND_CX, BAND_CY, BAND_TOP, CANVAS_W, FPS
+from production.config import TtsSettings
 from production.errors import RenderFailed
 from production.media import DEFAULT_TIMEOUT, Cancel, Media, MediaError, file_input
 from production.render import read_exact
+from production.variety.dub import LIMITER, build_dub
 from production.variety.text import H, W, reaction_layer, subtitle_layer, title_layer
 
 BAND_H = BAND_BOTTOM - BAND_TOP
@@ -100,11 +103,12 @@ def _cut_audio(media: Media, project: dict, source: Path, meta: dict, work_dir: 
 
 def _layers(project: dict) -> tuple[Image.Image, list, list[str]]:
     fonts: list[str] = []
-    title = title_layer(project["header"], fonts)
+    lang = project["lang"]
+    title = title_layer(project["header"], fonts, lang)
     base = Image.new("RGB", (W, H), "white")
     base.paste(title, (0, 0), title)
-    layers = [subtitle_layer(s, fonts) for s in project["subtitles"]]
-    layers += [reaction_layer(r, fonts) for r in project["reactions"]]
+    layers = [subtitle_layer(s, fonts, lang) for s in project["subtitles"]]
+    layers += [reaction_layer(r, fonts, lang) for r in project["reactions"]]
     # 레이어 이미지는 표시될 때 그린다. 동시에 보이는 면적은 크기만으로 미리 막는다(끝 먼저)
     events = sorted([(x.fs, x.pixels) for x in layers] + [(x.fe, -x.pixels) for x in layers])
     active = 0
@@ -123,14 +127,29 @@ def render_variety(
     media: Media,
     cancel: Cancel,
     on_progress: Progress,
+    tts_cfg: TtsSettings | None = None,
 ) -> dict:
-    """project(adapter_variety)·source(작업 폴더 source.mp4) → output. 측정 결과를 돌려준다."""
+    """project(adapter_variety)·source(작업 폴더 source.mp4) → output. 측정 결과를 돌려준다.
+    ja는 더빙(TTS 포함 전체가 DEADLINE_SEC 안), 결과에 warnings·dub를 더한다."""
     began = time.monotonic()
     base, layers, fonts = _layers(project)
     frames = project["frames"]
     encoded = frames / FPS
     on_progress("audio", 0)
     audio = _cut_audio(media, project, source, meta, output.parent, cancel)
+    extra: dict = {}
+    dubbed = None
+    if project["lang"] == "ja":
+        dubbed, warnings, dub = build_dub(
+            project,
+            audio,
+            output.parent,
+            media,
+            cancel,
+            tts_cfg or TtsSettings(),
+            began + DEADLINE_SEC,
+        )
+        extra = {"warnings": warnings, "dub": dub}
     encoder_args = media.ffmpeg_cmd(
         "-loglevel",
         "error",
@@ -148,7 +167,10 @@ def render_variety(
         "-i",
         "pipe:0",
     )
-    if audio is not None:
+    if dubbed is not None:  # D5: 믹스 뒤 loudnorm 없이 리미터만
+        encoder_args += file_input(dubbed, "wav")
+        chain = f"{LIMITER},aresample={RATE},"
+    elif audio is not None:
         encoder_args += file_input(audio, "wav")
         chain = f"loudnorm=I=-14:TP=-1:LRA=11,aresample={RATE},"
     else:  # W6: 소리 없는 원본도 AAC 트랙(무음)
@@ -305,4 +327,5 @@ def render_variety(
         "frames": frames,
         "fonts": sorted(set(fonts)),
         "render_sec": round(time.monotonic() - began, 2),
+        **extra,
     }

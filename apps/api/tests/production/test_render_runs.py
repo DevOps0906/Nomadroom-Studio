@@ -726,11 +726,13 @@ def test_k2_ja_lang_with_ko_revision_is_400(api, auth, db):
     assert r.status_code == 400 and db.runs == []
 
 
-def test_k1_variety_ja_is_409_before_rpc(api, auth, db):
+def test_task051_variety_ja_is_202(api, auth, db):  # task-051: 예능형 일본어 더빙 렌더 허용
     job, _, ja = ja_job(db, fmt="variety")
     r = render(api, auth, job, ja, lang="ja")
-    assert r.status_code == 409 and r.json()["field"] == "lang"
-    assert "request" not in db.rpc_calls
+    assert r.status_code == 202
+    run = r.json()["render_run"]
+    assert run["lang"] == "ja" and run["revision_id"] == ja["id"]
+    assert db.job(job["id"])["status"] == "inspect"
 
 
 def test_k3_ja_retry_is_409(api, auth, db):

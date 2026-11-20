@@ -161,9 +161,6 @@ async def request_render(
     if idempotency_key is None or not _KEY_RE.fullmatch(idempotency_key):
         raise ApiError(400, "VALIDATION", "Idempotency-Key 헤더가 필요합니다.", "Idempotency-Key")
     fmt = await _require_render_format(request, user, job_id)  # task-035 V2·task-036
-    if body.lang == "ja" and fmt == "variety":
-        # task-050 K1: 예능형 일본어판 렌더는 task-051 전까지 준비 중
-        raise ApiError(409, "CONFLICT", "이 형식의 일본어판 렌더는 아직 준비 중입니다.", "lang")
     if fmt == "shopping" and not await _key_used(request, user, idempotency_key):
         # 리뷰 반영 3: 같은 키 재전송은 RPC가 기존 run을 돌려주게 두고, 새 run 경로만 재확인
         await _require_shopping_assets(request, user, job_id, body.revision_id)

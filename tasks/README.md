@@ -52,7 +52,7 @@
 | task-048 | AI 대본 3안 + 게시 문구 초안 | W9 | 047, 029 | 높음 | builder + tester | 완료 |
 | task-049 | 일본어판 파생·번역 A-20 | W10 | 047 | 높음 | builder + tester | 완료 |
 | task-050 | 일본어 TTS·렌더 | W10 | 049, 030 | 높음 | builder + tester | 완료 |
-| task-051 | 예능형 일본어 더빙 | W10 | 050, 038 | 높음 | builder + tester | 대기 |
+| task-051 | 예능형 일본어 더빙 | W10 | 050, 038 | 높음 | builder + tester | 완료 |
 | task-052 | 언어 탭 화면 | W10 | 049 | 보통 | builder | 완료 |
 | task-053 | 일본어판·쇼핑 P1 인수 + 회귀 | W10 | 048, 051, 052, 054 | 보통 | tester | 대기 |
 | task-054 | AI 영상 생성 연동 (플랫폼 어댑터 · 비용 상한) | W9 | 047, Q16 | 높음 | builder + tester | 완료 |

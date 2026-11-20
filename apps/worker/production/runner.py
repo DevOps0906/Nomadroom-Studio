@@ -20,6 +20,7 @@ from production.adapter_shopping import (
     to_shopping_project,
 )
 from production.adapter_shopping import PRESET_VERSION as SHOPPING_PRESET
+from production.adapter_variety import LANGS as VARIETY_LANGS
 from production.adapter_variety import PRESET_VERSION as VARIETY_PRESET
 from production.adapter_variety import to_variety_project
 from production.api import SignedUrl, Task, UrlRejected, WorkerApi
@@ -262,7 +263,7 @@ def _render(
     tts_cfg: TtsSettings,
 ) -> dict:
     if task.format == "variety":  # W1: 형식 분기(preset·lang 확인은 형식별로 각 함수 안에서)
-        return _render_variety(api, task, work, media, cancel, reporter)
+        return _render_variety(api, task, work, media, cancel, reporter, tts_cfg)
     if task.format == "shopping":
         return _render_shopping(api, task, work, media, cancel, reporter, tts_cfg)
     if task.preset_version != PRESET_VERSION:  # F9
@@ -346,12 +347,19 @@ def _render(
 
 
 def _render_variety(
-    api: WorkerApi, task: Task, work: WorkDir, media: Media, cancel: Cancel, reporter: Reporter
+    api: WorkerApi,
+    task: Task,
+    work: WorkDir,
+    media: Media,
+    cancel: Cancel,
+    reporter: Reporter,
+    tts_cfg: TtsSettings,
 ) -> dict:
-    """예능형 렌더(task-036). 입력은 source만(훅 음성 없음), 산출물은 output_mp4·report."""
+    """예능형 렌더(task-036). 입력은 source만(훅 음성 없음), 산출물은 output_mp4·report.
+    ja(task-051)는 대사 자막 TTS 더빙(녹음 대체 없음), report에 warnings·dub."""
     if task.preset_version != VARIETY_PRESET:  # F9
         raise RenderFailed("preset_version 불일치")
-    if task.lang != "ko":
+    if task.lang not in VARIETY_LANGS:
         raise RenderFailed("지원하지 않는 언어")
     reporter.set("download", 0)
     inputs = api.inputs(task)
@@ -372,14 +380,18 @@ def _render_variety(
     work.path("variety_project.json").write_text(
         json.dumps(project, ensure_ascii=False), encoding="utf-8"
     )
-    output = work.path("result_ko.mp4")
-    result = render_variety(project, source, source_meta, output, media, cancel, reporter.set)
+    out_name = f"result_{project['lang']}.mp4"  # K7: (작업, 리비전, 언어)별 MP4
+    output = work.path(out_name)
+    result = render_variety(
+        project, source, source_meta, output, media, cancel, reporter.set, tts_cfg
+    )
     report = work.path("report.json")
     report.write_text(
         json.dumps(
             {
-                "output": "result_ko.mp4",
+                "output": out_name,
                 "format": "variety",
+                "lang": project["lang"],
                 **result,
                 "preset_version": VARIETY_PRESET,
                 "source_asset_id": str(src_used.asset_id),

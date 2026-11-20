@@ -117,9 +117,10 @@ def test_total_over_180_rejected():
         to_variety_project(vspec(cuts=[cut, cut, {**cut, "src_end": 0.3}]), "ko", meta)
 
 
-def test_job_lang_must_be_ko():
+def test_job_lang_ko_or_ja():  # task-051: ja 허용(더빙), 그 밖의 언어는 거부
+    assert to_variety_project(vspec(lang=None), "ja", META_V)["lang"] == "ja"
     with pytest.raises(RenderFailed):
-        to_variety_project(vspec(lang=None), "ja", META_V)
+        to_variety_project(vspec(lang=None), "en", META_V)
 
 
 def test_cut_boundaries_on_frame_grid():
@@ -405,7 +406,7 @@ def test_render_failures_reported(api, server, media, vsamples, tmp_path, over, 
     ("fmt", "preset", "lang"),
     [
         ("variety", CATEGORY_PRESET, "ko"),
-        ("variety", PRESET_VERSION, "ja"),
+        ("variety", PRESET_VERSION, "en"),
         ("category", PRESET_VERSION, "ko"),
         ("shopping", PRESET_VERSION, "ko"),
     ],
