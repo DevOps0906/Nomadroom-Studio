@@ -89,6 +89,8 @@ export type Revision = {
   origin: "user" | "ai_draft";
   validation: Validation;
   approved_at: string | null;
+  /** 다음 A-12 PUT의 base_updated_at(task-059). 가공 없이 문자열 그대로 돌려보낸다. */
+  updated_at: string;
   /** ja 리비전의 원본 ko 리비전(A-12, task-049). */
   derived_from?: string | null;
 };
@@ -197,12 +199,18 @@ export async function getProductionRevision(id: string, revNo?: number, lang: Re
   return res.revision;
 }
 
-/** A-12 저장(낙관적 잠금 base_rev_no). 의미 오류가 있어도 저장되고 validation에 담긴다. */
-export async function saveProductionRevision(id: string, spec: Record<string, unknown>, baseRevNo: number, lang: RevisionLang = "ko"): Promise<Revision> {
+/** A-12 저장(낙관적 잠금 base_rev_no·base_updated_at). 의미 오류가 있어도 저장되고 validation에 담긴다. */
+export async function saveProductionRevision(
+  id: string,
+  spec: Record<string, unknown>,
+  baseRevNo: number,
+  baseUpdatedAt: string,
+  lang: RevisionLang = "ko",
+): Promise<Revision> {
   const res = await apiFetch<{ revision: Revision }>(`${jobPath(id)}/revision`, {
     method: "PUT",
     query: { lang: lang === "ja" ? "ja" : undefined },
-    body: { spec, base_rev_no: baseRevNo },
+    body: { spec, base_rev_no: baseRevNo, base_updated_at: baseUpdatedAt },
   });
   return res.revision;
 }

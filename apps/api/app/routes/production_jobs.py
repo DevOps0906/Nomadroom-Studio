@@ -16,7 +16,14 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+)
 
 from app.auth.user import CurrentUser, get_current_user
 from app.errors import ApiError, db_error, not_found
@@ -50,7 +57,7 @@ LIST_COLUMNS = (
 # task-045: rights·parent_asset_id는 쇼핑 PROD-03 권리 목록·원본 계보용(A-09 상세)
 ASSET_COLUMNS = "id,kind,status,size_bytes,duration_sec,rights,parent_asset_id"
 RUN_COLUMNS = "id,status,progress_pct,progress_stage,error_stage,error_code,attempt,claimed_by"
-REVISION_COLUMNS = "id,rev_no,spec,origin,validation,approved_at,derived_from"
+REVISION_COLUMNS = "id,rev_no,spec,origin,validation,approved_at,derived_from,updated_at"
 IDEMPOTENCY_CONSTRAINT = "production_jobs_workspace_id_idempotency_key_key"
 # 원본 개수 트리거(000023): 23505 = 일반 ready 2건째·쇼핑 11건째, NR010 = 상태 불가
 _SOURCE_LIMIT = "23505"
@@ -338,6 +345,7 @@ class RevisionOut(BaseModel):
     validation: dict[str, Any]
     approved_at: datetime | None
     derived_from: uuid.UUID | None = None  # ja 리비전의 원본 ko 리비전(task-049)
+    updated_at: datetime  # 다음 PUT의 base_updated_at(task-059 L1)
 
 
 class RevisionEnvelope(BaseModel):
@@ -349,6 +357,8 @@ class RevisionPutIn(BaseModel):
 
     spec: dict[str, Any]
     base_rev_no: Annotated[int, Field(strict=True, ge=1)]
+    # task-059 L3·L4: 읽은 리비전 updated_at(필수, 시간대 포함). 잠금 안에서 rev_no와 함께 비교
+    base_updated_at: AwareDatetime
 
 
 class ApproveIn(BaseModel):
@@ -1377,6 +1387,7 @@ async def put_revision(
             "p_job": str(job_id),
             "p_user": str(user.user_id),
             "p_base_rev_no": body.base_rev_no,
+            "p_base_updated_at": body.base_updated_at.isoformat(),
             "p_spec": body.spec,
             "p_validation": validation,
         },
@@ -1423,6 +1434,7 @@ async def _put_ja(
             "p_job": str(job_id),
             "p_user": str(user.user_id),
             "p_base_rev_no": body.base_rev_no,
+            "p_base_updated_at": body.base_updated_at.isoformat(),
             "p_spec": body.spec,
             "p_validation": validation,
         },

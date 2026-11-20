@@ -10,6 +10,8 @@ export type JaRevision = {
   origin: "user" | "ai_draft";
   validation: Validation;
   approved_at: string | null;
+  /** 다음 A-12 PUT의 base_updated_at(task-059). */
+  updated_at: string;
   derived_from?: string | null;
 };
 export type Translated = { revision: JaRevision; translate_count: number; replay: boolean };
@@ -20,8 +22,8 @@ export function requestTranslate(id: string, revisionId: string, key: string, f:
   return call<Translated>(`${base(id)}/translate`, "POST", { revision_id: revisionId }, withKey);
 }
 
-export const saveJaRevision = (id: string, spec: Record<string, unknown>, baseRevNo: number, f?: typeof fetch) =>
-  call<{ revision: SavedRevision }>(`${base(id)}/revision`, "PUT", { spec, base_rev_no: baseRevNo, lang: "ja" }, f);
+export const saveJaRevision = (id: string, spec: Record<string, unknown>, baseRevNo: number, baseUpdatedAt: string, f?: typeof fetch) =>
+  call<{ revision: SavedRevision }>(`${base(id)}/revision`, "PUT", { spec, base_rev_no: baseRevNo, base_updated_at: baseUpdatedAt, lang: "ja" }, f);
 
 export const approveJaRevision = (id: string, revNo: number, f?: typeof fetch) =>
   call<{ revision: { rev_no: number; approved_at: string } }>(`${base(id)}/revision/approve`, "POST", { rev_no: revNo, lang: "ja" }, f);

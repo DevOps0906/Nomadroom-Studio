@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const h = vi.hoisted(() => ({ calls: [] as string[], fail: null as null | "400" | "409" }));
+const h = vi.hoisted(() => ({ calls: [] as string[], fail: null as null | "400" | "409", baseAt: [] as string[] }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/supabase/client", () => ({ createServerSupabase: vi.fn() }));
 
@@ -12,10 +12,11 @@ const maybeFail = () => {
   if (h.fail === "409") throw new ApiError(409, "CONFLICT", "다른 곳에서 먼저 수정되었습니다.", "base_rev_no");
 };
 vi.mock("@/server/api/production", () => ({
-  saveProductionRevision: async () => {
+  saveProductionRevision: async (_id: string, _spec: unknown, _base: number, baseAt: string) => {
     h.calls.push("save");
+    h.baseAt.push(baseAt);
     maybeFail();
-    return { id: "r1", rev_no: 3, spec: { secret: 1 }, origin: "user", validation: { errors: [], warnings: [] }, approved_at: null };
+    return { id: "r1", rev_no: 3, spec: { secret: 1 }, origin: "user", validation: { errors: [], warnings: [] }, approved_at: null, updated_at: "2026-11-20T01:02:03.000001Z" };
   },
   approveProductionRevision: async () => {
     h.calls.push("approve");
@@ -44,17 +45,19 @@ const req = (method: string, body?: unknown, origin: string | null = ORIGIN) => 
   return new Request(`${ORIGIN}/api/production-jobs/x`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
 };
 const ctx = { params: Promise.resolve({ id: ID }) };
+const AT = "2026-11-02T00:00:00.123456Z";
 
 describe("/api/production-jobs/[id]/revision*", () => {
   beforeEach(() => {
     vi.stubEnv("APP_ORIGIN", ORIGIN);
     h.calls = [];
     h.fail = null;
+    h.baseAt = [];
   });
 
   it("상태 변경 핸들러는 Origin이 다르거나 없으면 403, 업스트림을 부르지 않는다", async () => {
     for (const o of ["https://evil.example.com", null]) {
-      expect((await save.PUT(req("PUT", { spec: {}, base_rev_no: 1 }, o), ctx)).status).toBe(403);
+      expect((await save.PUT(req("PUT", { spec: {}, base_rev_no: 1, base_updated_at: AT }, o), ctx)).status).toBe(403);
       expect((await approve.POST(req("POST", { rev_no: 1 }, o), ctx)).status).toBe(403);
       expect((await hook.POST(req("POST", { size_bytes: 1, mime: "audio/wav" }, o), ctx)).status).toBe(403);
     }
@@ -62,17 +65,25 @@ describe("/api/production-jobs/[id]/revision*", () => {
   });
 
   it("저장 성공 응답은 spec을 되돌리지 않는다", async () => {
-    const res = await save.PUT(req("PUT", { spec: { a: 1 }, base_rev_no: 2 }), ctx);
+    const res = await save.PUT(req("PUT", { spec: { a: 1 }, base_rev_no: 2, base_updated_at: AT }), ctx);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.revision).toEqual({ id: "r1", rev_no: 3, validation: { errors: [], warnings: [] }, approved_at: null });
+    expect(body.revision).toEqual({ id: "r1", rev_no: 3, validation: { errors: [], warnings: [] }, approved_at: null, updated_at: "2026-11-20T01:02:03.000001Z" });
+  });
+
+  it("task-059: base_updated_at은 문자열 그대로(마이크로초 포함) 전달한다", async () => {
+    await save.PUT(req("PUT", { spec: {}, base_rev_no: 1, base_updated_at: AT }), ctx);
+    expect(h.baseAt).toEqual([AT]);
   });
 
   it.each([
     ["spec 없음", { base_rev_no: 1 }],
     ["spec 배열", { spec: [], base_rev_no: 1 }],
     ["base 0", { spec: {}, base_rev_no: 0 }],
-    ["base 소수", { spec: {}, base_rev_no: 1.5 }],
+    ["base 소수", { spec: {}, base_rev_no: 1.5, base_updated_at: AT }],
+    ["base_updated_at 없음(task-059)", { spec: {}, base_rev_no: 1 }],
+    ["base_updated_at 숫자", { spec: {}, base_rev_no: 1, base_updated_at: 1 }],
+    ["base_updated_at 빈 문자열", { spec: {}, base_rev_no: 1, base_updated_at: "" }],
   ])("저장 400: %s", async (_n, body) => {
     expect((await save.PUT(req("PUT", body), ctx)).status).toBe(400);
     expect(h.calls).toHaveLength(0);
@@ -86,7 +97,7 @@ describe("/api/production-jobs/[id]/revision*", () => {
     expect(b.errors).toEqual([{ code: "shots.gap", path: "shots.1", message: "공백" }]);
     expect(b.warnings).toHaveLength(1);
     h.fail = "409";
-    const c = await save.PUT(req("PUT", { spec: {}, base_rev_no: 1 }), ctx);
+    const c = await save.PUT(req("PUT", { spec: {}, base_rev_no: 1, base_updated_at: AT }), ctx);
     expect(c.status).toBe(409);
     expect((await c.json()).message).toContain("먼저 수정");
   });

@@ -21,7 +21,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const r = await requestProductionAiDraft(id, key);
     const v = r.revision;
     return json(r.replay ? 200 : 201, {
-      revision: { id: v.id, rev_no: v.rev_no, spec: v.spec, origin: v.origin, validation: v.validation, approved_at: v.approved_at },
+      revision: { id: v.id, rev_no: v.rev_no, spec: v.spec, origin: v.origin, validation: v.validation, approved_at: v.approved_at, updated_at: v.updated_at },
       ai_draft_count: r.ai_draft_count,
       previous_rev_no: r.previous_rev_no,
       variants: r.variants ?? null,

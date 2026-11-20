@@ -514,7 +514,7 @@ async def _replay_without_key(
         job["id"],
         req.get("revision_id"),
         "ja",
-        "id,rev_no,spec,origin,validation,approved_at,derived_from",
+        "id,rev_no,spec,origin,validation,approved_at,derived_from,updated_at",
     )
     if rev is None:
         raise db_error()

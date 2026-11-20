@@ -99,7 +99,7 @@ const spec = {
   cta: { text: "링크 확인" },
   disclosure: { text: "제휴 링크 포함" },
 };
-const rev = (over: Record<string, unknown> = {}) => ({ rev_no: 2, spec, validation: { errors: [], warnings: [] }, approved_at: null, ...over });
+const rev = (over: Record<string, unknown> = {}) => ({ rev_no: 2, spec, validation: { errors: [], warnings: [] }, approved_at: null, updated_at: "2026-11-02T00:00:00.123456Z", ...over });
 const editAssets = [
   { id: "a1", kind: "source_upload", status: "ready" as const, duration_sec: 20 },
   { id: "a2", kind: "image", status: "ready" as const, duration_sec: null },

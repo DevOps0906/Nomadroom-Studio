@@ -125,6 +125,20 @@ def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def same_ts(a: str, b: str) -> bool:
+    """timestamptz 비교(000030 L3): 문자열 표기와 무관하게 같은 시각인지."""
+    return datetime.fromisoformat(a) == datetime.fromisoformat(b)
+
+
+STALE_TS = "2000-01-01T00:00:00Z"
+
+
+def cur_updated_at(api, auth, jid: str, lang: str = "ko") -> str:
+    """웹처럼 A-12 GET으로 읽은 updated_at(task-059). 읽을 수 없으면 낡은 값."""
+    r = api.get(f"{URL}/{jid}/revision", params={"lang": lang}, headers=auth)
+    return r.json()["revision"]["updated_at"] if r.status_code == 200 else STALE_TS
+
+
 def job_row(jid: str | None = None, ws: str = WS, status: str = "draft", **over: Any) -> dict:
     row = {
         "id": jid or str(uuid.uuid4()),
@@ -278,7 +292,9 @@ class FakeDB:
         ):
             return _rpc_error("NR010")
         rev = next(r for r in self.revisions if r["id"] == j["current_revision_id"])
-        if rev["rev_no"] != body["p_base_rev_no"]:
+        if rev["rev_no"] != body["p_base_rev_no"] or not same_ts(
+            rev["updated_at"], body["p_base_updated_at"]
+        ):
             return _rpc_error("NR011")
         if rev["approved_at"] is None:
             rev.update(spec=body["p_spec"], validation=body["p_validation"], updated_at=_now())
@@ -299,7 +315,10 @@ class FakeDB:
             j["current_revision_id"] = rev["id"]
         if j["status"] in ("inspect", "failed"):
             j.update(status="review", failed_stage=None, error_code=None, updated_at=_now())
-        out = {k: rev[k] for k in ("id", "rev_no", "spec", "origin", "validation", "approved_at")}
+        out = {
+            k: rev[k]
+            for k in ("id", "rev_no", "spec", "origin", "validation", "approved_at", "updated_at")
+        }
         return httpx.Response(200, json=out)
 
     def approve_revision(self, body: dict) -> httpx.Response:
@@ -689,7 +708,9 @@ def test_other_workspace_job_is_404_everywhere(api, auth, db):
         api.post(f"{URL}/{jid}/prepare", headers=auth),
         api.get(f"{URL}/{jid}/revision", headers=auth),
         api.put(
-            f"{URL}/{jid}/revision", json={"spec": good_spec(), "base_rev_no": 1}, headers=auth
+            f"{URL}/{jid}/revision",
+            json={"spec": good_spec(), "base_rev_no": 1, "base_updated_at": STALE_TS},
+            headers=auth,
         ),
         api.post(f"{URL}/{jid}/revision/approve", json={"rev_no": 1}, headers=auth),
         api.post(f"{URL}/{jid}/review/approve", headers=auth),
@@ -900,8 +921,10 @@ def test_d8_prepare_409_and_400(api, auth, db):
 # === A-12 리비전(D2·D3) =======================================================
 
 
-def put_rev(api, auth, jid: str, spec: dict, base: int = 1):
-    return api.put(f"{URL}/{jid}/revision", json={"spec": spec, "base_rev_no": base}, headers=auth)
+def put_rev(api, auth, jid: str, spec: dict, base: int = 1, base_updated_at: str | None = None):
+    at = base_updated_at or cur_updated_at(api, auth, jid)
+    body = {"spec": spec, "base_rev_no": base, "base_updated_at": at}
+    return api.put(f"{URL}/{jid}/revision", json=body, headers=auth)
 
 
 def test_get_revision_current_and_by_rev_no(api, auth, db):
@@ -946,6 +969,60 @@ def test_d2_put_base_rev_no_mismatch_409(api, auth, db):
     db.add_revision(job, rev_no=3)
     r = put_rev(api, auth, job["id"], good_spec(), base=2)
     assert r.status_code == 409 and r.json()["field"] == "base_rev_no"
+
+
+# --- task-059 L3·L4·L5: base_updated_at 낙관적 잠금(필수 누락은 이 앱 규약대로 400 VALIDATION) ---
+
+
+def test_l4_put_without_base_updated_at_400(api, auth, db):
+    job = db.add_job(status="review")
+    db.add_revision(job)
+    r = api.put(
+        f"{URL}/{job['id']}/revision", json={"spec": good_spec(), "base_rev_no": 1}, headers=auth
+    )
+    assert r.status_code == 400 and r.json()["field"] == "base_updated_at"
+    assert "save" not in db.rpc_calls
+
+
+def test_l4_put_naive_base_updated_at_400(api, auth, db):
+    job = db.add_job(status="review")
+    db.add_revision(job)
+    r = put_rev(api, auth, job["id"], good_spec(), base_updated_at="2026-11-02T00:00:00.123456")
+    assert r.status_code == 400 and r.json()["field"] == "base_updated_at"
+    assert "save" not in db.rpc_calls
+
+
+def test_l3_microsecond_roundtrip_get_to_put(api, auth, db):
+    job = db.add_job(status="review")
+    db.add_revision(job)  # updated_at 2026-11-02T00:00:00.123456+00:00
+    at = api.get(f"{URL}/{job['id']}/revision", headers=auth).json()["revision"]["updated_at"]
+    assert ".123456" in at
+    stale = put_rev(api, auth, job["id"], good_spec(), base_updated_at=at.replace("456", "457"))
+    assert stale.status_code == 409
+    r = put_rev(api, auth, job["id"], good_spec(), base_updated_at=at)
+    assert r.status_code == 200, r.text
+
+
+def test_l5_consecutive_saves_then_stale_base_409(api, auth, db):
+    job = db.add_job(status="review")
+    rev = db.add_revision(job)
+    first = cur_updated_at(api, auth, job["id"])
+    r1 = put_rev(api, auth, job["id"], bad_spec(), base_updated_at=first)
+    assert r1.status_code == 200
+    r2 = put_rev(
+        api, auth, job["id"], good_spec(), base_updated_at=r1.json()["revision"]["updated_at"]
+    )
+    assert r2.status_code == 200, r2.text
+    # 앞선 화면(첫 GET 값)으로 다시 저장하면 409, 두 번째 편집 유지
+    r3 = put_rev(api, auth, job["id"], bad_spec(), base_updated_at=first)
+    assert r3.status_code == 409 and rev["spec"] == good_spec()
+
+
+def test_l3_approved_revision_stale_base_409(api, auth, db):
+    job = db.add_job(status="inspect")
+    db.add_revision(job, approved=True)
+    r = put_rev(api, auth, job["id"], good_spec(), base_updated_at=STALE_TS)
+    assert r.status_code == 409 and job["status"] == "inspect"
 
 
 def test_d3_put_allowed_states(api, auth, db):

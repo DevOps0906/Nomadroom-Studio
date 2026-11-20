@@ -15,13 +15,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!b) return json(400, INVALID);
   const spec = b.spec;
   const base = b.base_rev_no;
+  const baseAt = b.base_updated_at; // task-059: 서버가 timestamptz로 해석. 여기서는 가공하지 않는다
   if (typeof spec !== "object" || spec === null || Array.isArray(spec)) return json(400, INVALID);
   if (typeof base !== "number" || !Number.isInteger(base) || base < 1) return json(400, INVALID);
+  if (typeof baseAt !== "string" || baseAt.length === 0 || baseAt.length > 64) return json(400, INVALID);
   const lang = b.lang === undefined ? "ko" : b.lang;
   if (lang !== "ko" && lang !== "ja") return json(400, { code: "VALIDATION", message: "언어가 올바르지 않습니다.", field: "lang" });
   try {
-    const r = await saveProductionRevision(id, spec as Record<string, unknown>, base, lang);
-    return json(200, { revision: { id: r.id, rev_no: r.rev_no, validation: r.validation, approved_at: r.approved_at } });
+    const r = await saveProductionRevision(id, spec as Record<string, unknown>, base, baseAt, lang);
+    return json(200, {
+      revision: { id: r.id, rev_no: r.rev_no, validation: r.validation, approved_at: r.approved_at, updated_at: r.updated_at },
+    });
   } catch (e) {
     return fromRevisionError(e, "편집안을 저장하지 못했습니다.");
   }

@@ -33,10 +33,10 @@ export async function call<T>(url: string, method: string, body?: unknown, f: ty
 
 export const base = (id: string) => `/api/production-jobs/${encodeURIComponent(id)}`;
 
-export type SavedRevision = { id: string; rev_no: number; validation: Validation; approved_at: string | null };
+export type SavedRevision = { id: string; rev_no: number; validation: Validation; approved_at: string | null; updated_at: string };
 
 export type AiDraft = {
-  revision: { id: string; rev_no: number; spec: Record<string, unknown>; origin: "user" | "ai_draft"; validation: Validation; approved_at: string | null };
+  revision: { id: string; rev_no: number; spec: Record<string, unknown>; origin: "user" | "ai_draft"; validation: Validation; approved_at: string | null; updated_at: string };
   ai_draft_count: number;
   previous_rev_no: number | null;
   /** 쇼핑만(그 밖은 null·없음). */
@@ -50,8 +50,9 @@ export function requestAiDraft(id: string, key: string, f: typeof fetch = fetch)
   return call<AiDraft>(`${base(id)}/ai-draft`, "POST", undefined, withKey);
 }
 
-export const saveRevision =(id: string, spec: Record<string, unknown>, baseRevNo: number, f?: typeof fetch) =>
-  call<{ revision: SavedRevision }>(`${base(id)}/revision`, "PUT", { spec, base_rev_no: baseRevNo }, f);
+/** A-12 저장. baseUpdatedAt은 읽은 리비전 updated_at 문자열 그대로(Date 변환 금지, task-059 L3). */
+export const saveRevision = (id: string, spec: Record<string, unknown>, baseRevNo: number, baseUpdatedAt: string, f?: typeof fetch) =>
+  call<{ revision: SavedRevision }>(`${base(id)}/revision`, "PUT", { spec, base_rev_no: baseRevNo, base_updated_at: baseUpdatedAt }, f);
 
 export const approveRevision = (id: string, revNo: number, f?: typeof fetch) =>
   call<{ revision: { rev_no: number; approved_at: string } }>(`${base(id)}/revision/approve`, "POST", { rev_no: revNo }, f);

@@ -2,7 +2,7 @@
 -- 근거: tasks/task-022.md#착수-결정 D1·D2·D3
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(35);
+select plan(41);
 
 insert into auth.users (id, email, aud, role) values
   ('55555555-5555-4555-8555-555555555555', 'prod-api@test.local', 'authenticated', 'authenticated');
@@ -22,7 +22,7 @@ insert into public.production_jobs
   ('dddddddd-0000-4000-8000-000000000016', 'dddddddd-0000-4000-8000-000000000001', 'j16', 60, 'category-1080-v1', 'k16', 'review', null, null),
   ('dddddddd-0000-4000-8000-000000000017', 'dddddddd-0000-4000-8000-000000000001', 'j17', 60, 'category-1080-v1', 'k17', 'review', null, null);
 insert into public.edit_revisions (id, workspace_id, job_id, rev_no, approved_at, updated_at) values
-  ('dddddddd-0000-4000-8000-000000000031', 'dddddddd-0000-4000-8000-000000000001', 'dddddddd-0000-4000-8000-000000000011', 1, null, '2026-11-01T00:00:00Z'),
+  ('dddddddd-0000-4000-8000-000000000031', 'dddddddd-0000-4000-8000-000000000001', 'dddddddd-0000-4000-8000-000000000011', 1, null, '2026-11-01T00:00:00.123456Z'),
   ('dddddddd-0000-4000-8000-000000000032', 'dddddddd-0000-4000-8000-000000000001', 'dddddddd-0000-4000-8000-000000000012', 1, now(), '2026-11-01T00:00:00Z'),
   ('dddddddd-0000-4000-8000-000000000033', 'dddddddd-0000-4000-8000-000000000001', 'dddddddd-0000-4000-8000-000000000013', 1, now(), '2026-11-01T00:00:00Z'),
   ('dddddddd-0000-4000-8000-000000000034', 'dddddddd-0000-4000-8000-000000000001', 'dddddddd-0000-4000-8000-000000000014', 1, null, '2026-11-01T00:00:00Z'),
@@ -60,11 +60,11 @@ select throws_ok(
 
 -- 2. 실행 권한: API(service_role)만
 select ok(not has_function_privilege('anon',
-  'public.save_production_revision(uuid, uuid, uuid, integer, jsonb, jsonb)', 'EXECUTE'), 'save: anon 실행 불가');
+  'public.save_production_revision(uuid, uuid, uuid, integer, timestamptz, jsonb, jsonb)', 'EXECUTE'), 'save: anon 실행 불가');
 select ok(not has_function_privilege('authenticated',
-  'public.save_production_revision(uuid, uuid, uuid, integer, jsonb, jsonb)', 'EXECUTE'), 'save: authenticated 실행 불가');
+  'public.save_production_revision(uuid, uuid, uuid, integer, timestamptz, jsonb, jsonb)', 'EXECUTE'), 'save: authenticated 실행 불가');
 select ok(has_function_privilege('service_role',
-  'public.save_production_revision(uuid, uuid, uuid, integer, jsonb, jsonb)', 'EXECUTE'), 'save: service_role 실행');
+  'public.save_production_revision(uuid, uuid, uuid, integer, timestamptz, jsonb, jsonb)', 'EXECUTE'), 'save: service_role 실행');
 select ok(not has_function_privilege('anon',
   'public.approve_production_revision(uuid, uuid, uuid, integer, timestamptz, jsonb)', 'EXECUTE'), 'approve: anon 실행 불가');
 select ok(not has_function_privilege('authenticated',
@@ -75,15 +75,15 @@ select ok(has_function_privilege('service_role',
 -- 3. save(D2·D3)
 select throws_ok(
   $$select public.save_production_revision('dddddddd-0000-4000-8000-000000000002', 'dddddddd-0000-4000-8000-000000000011',
-    '55555555-5555-4555-8555-555555555555', 1, '{"a":1}', '{"errors":[],"warnings":[]}')$$,
+    '55555555-5555-4555-8555-555555555555', 1, '2026-11-01T00:00:00Z', '{"a":1}', '{"errors":[],"warnings":[]}')$$,
   'NR009', null, 'save: 다른 워크스페이스 작업 NR009');
 select throws_ok(
   $$select public.save_production_revision('dddddddd-0000-4000-8000-000000000001', 'dddddddd-0000-4000-8000-000000000011',
-    '55555555-5555-4555-8555-555555555555', 2, '{"a":1}', '{"errors":[],"warnings":[]}')$$,
+    '55555555-5555-4555-8555-555555555555', 2, '2026-11-01T00:00:00.123456Z', '{"a":1}', '{"errors":[],"warnings":[]}')$$,
   'NR011', null, 'save: base_rev_no 불일치 NR011');
 select is(
   (public.save_production_revision('dddddddd-0000-4000-8000-000000000001', 'dddddddd-0000-4000-8000-000000000011',
-    '55555555-5555-4555-8555-555555555555', 1, '{"a":1}', '{"errors":[{"code":"shots.gap"}],"warnings":[]}')->>'rev_no')::int,
+    '55555555-5555-4555-8555-555555555555', 1, '2026-11-01T00:00:00.123456Z', '{"a":1}', '{"errors":[{"code":"shots.gap"}],"warnings":[]}')->>'rev_no')::int,
   1, 'save: 미승인 리비전은 같은 행 갱신');
 select is((select spec from public.edit_revisions where id = 'dddddddd-0000-4000-8000-000000000031'),
   '{"a":1}'::jsonb, 'save: 오류가 있어도 spec 저장');
@@ -92,9 +92,34 @@ select is((select validation->'errors'->0->>'code' from public.edit_revisions wh
 select is((select count(*)::int from public.edit_revisions where job_id = 'dddddddd-0000-4000-8000-000000000011'),
   1, 'save: 새 행 없음');
 
+-- 3-1. task-059 L3: updated_at 잠금(같은 base 두 번 → NR011, 반환 updated_at으로 연속 저장)
+select throws_ok(
+  $$select public.save_production_revision('dddddddd-0000-4000-8000-000000000001', 'dddddddd-0000-4000-8000-000000000011',
+    '55555555-5555-4555-8555-555555555555', 1, '2026-11-01T00:00:00.123456Z', '{"a":2}', '{"errors":[],"warnings":[]}')$$,
+  'NR011', null, 'save: 같은 base_updated_at 두 번째 NR011');
+select is((select spec from public.edit_revisions where id = 'dddddddd-0000-4000-8000-000000000031'),
+  '{"a":1}'::jsonb, 'save: NR011이면 앞선 편집 유지');
+update public.edit_revisions set updated_at = '2026-11-02T00:00:00.654321Z'
+  where id = 'dddddddd-0000-4000-8000-000000000031';
+select throws_ok(
+  $$select public.save_production_revision('dddddddd-0000-4000-8000-000000000001', 'dddddddd-0000-4000-8000-000000000011',
+    '55555555-5555-4555-8555-555555555555', 1, '2026-11-02T00:00:00.654322Z', '{"a":3}', '{"errors":[],"warnings":[]}')$$,
+  'NR011', null, 'save: 마이크로초 1 차이도 NR011');
+select ok(
+  (public.save_production_revision('dddddddd-0000-4000-8000-000000000001', 'dddddddd-0000-4000-8000-000000000011',
+    '55555555-5555-4555-8555-555555555555', 1, '2026-11-02T00:00:00.654321Z', '{"a":3}', '{"errors":[],"warnings":[]}')
+    ->> 'updated_at') is not null, 'save: 마이크로초 일치 저장·updated_at 반환');
+select throws_ok(
+  $$select public.save_production_revision('dddddddd-0000-4000-8000-000000000001', 'dddddddd-0000-4000-8000-000000000012',
+    '55555555-5555-4555-8555-555555555555', 1, '2000-01-01T00:00:00Z', '{"b":2}', '{"errors":[],"warnings":[]}')$$,
+  'NR011', null, 'save: 승인본도 updated_at 불일치 NR011');
+select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.proname in ('save_production_revision', 'save_ja_revision')),
+  2, 'save 함수 오버로드 없음(각 1개)');
+
 select is(
   (public.save_production_revision('dddddddd-0000-4000-8000-000000000001', 'dddddddd-0000-4000-8000-000000000012',
-    '55555555-5555-4555-8555-555555555555', 1, '{"b":2}', '{"errors":[],"warnings":[]}')->>'rev_no')::int,
+    '55555555-5555-4555-8555-555555555555', 1, '2026-11-01T00:00:00Z', '{"b":2}', '{"errors":[],"warnings":[]}')->>'rev_no')::int,
   2, 'save: 승인본이면 새 rev_no');
 select is((select r.rev_no from public.production_jobs j join public.edit_revisions r on r.id = j.current_revision_id
   where j.id = 'dddddddd-0000-4000-8000-000000000012'), 2, 'save: current_revision_id 이동');
@@ -107,22 +132,22 @@ select is((select created_by from public.edit_revisions where job_id = 'dddddddd
 
 select lives_ok(
   $$select public.save_production_revision('dddddddd-0000-4000-8000-000000000001', 'dddddddd-0000-4000-8000-000000000013',
-    '55555555-5555-4555-8555-555555555555', 1, '{"c":3}', '{"errors":[],"warnings":[]}')$$,
+    '55555555-5555-4555-8555-555555555555', 1, '2026-11-01T00:00:00Z', '{"c":3}', '{"errors":[],"warnings":[]}')$$,
   'save: failed(render) 허용');
 select is((select status || ':' || coalesce(failed_stage, '-') || ':' || coalesce(error_code, '-')
   from public.production_jobs where id = 'dddddddd-0000-4000-8000-000000000013'),
   'review:-:-', 'save: failed → review, 실패 칸 비움');
 select throws_ok(
   $$select public.save_production_revision('dddddddd-0000-4000-8000-000000000001', 'dddddddd-0000-4000-8000-000000000014',
-    '55555555-5555-4555-8555-555555555555', 1, '{}', '{"errors":[],"warnings":[]}')$$,
+    '55555555-5555-4555-8555-555555555555', 1, '2026-11-01T00:00:00Z', '{}', '{"errors":[],"warnings":[]}')$$,
   'NR010', null, 'save: failed(prepare) NR010');
 select throws_ok(
   $$select public.save_production_revision('dddddddd-0000-4000-8000-000000000001', 'dddddddd-0000-4000-8000-000000000015',
-    '55555555-5555-4555-8555-555555555555', 1, '{}', '{"errors":[],"warnings":[]}')$$,
+    '55555555-5555-4555-8555-555555555555', 1, '2026-11-01T00:00:00Z', '{}', '{"errors":[],"warnings":[]}')$$,
   'NR010', null, 'save: draft NR010');
 select throws_ok(
   $$select public.save_production_revision('dddddddd-0000-4000-8000-000000000001', 'dddddddd-0000-4000-8000-000000000016',
-    '55555555-5555-4555-8555-555555555555', 1, '{}', '{"errors":[],"warnings":[]}')$$,
+    '55555555-5555-4555-8555-555555555555', 1, '2026-11-01T00:00:00Z', '{}', '{"errors":[],"warnings":[]}')$$,
   'NR010', null, 'save: 리비전 없음 NR010');
 
 -- 4. approve(D2)

@@ -2,7 +2,7 @@
 -- save_ja_revision·approve_ja_revision 테스트. 근거: tasks/task-049.md#착수-결정 J2·J5·J8·J9
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(38);
+select plan(41);
 
 insert into auth.users (id, email, aud, role) values
   ('49494949-4949-4949-8949-494949494949', 'prod-ja@test.local', 'authenticated', 'authenticated');
@@ -30,7 +30,7 @@ select ok(not has_function_privilege('authenticated',
 select ok(not has_function_privilege('anon',
   'public.create_ja_translation(uuid, uuid, uuid, text, jsonb, jsonb)', 'execute'), 'anon create 실행 불가');
 select ok(not has_function_privilege('authenticated',
-  'public.save_ja_revision(uuid, uuid, uuid, integer, jsonb, jsonb)', 'execute'), 'authenticated save 실행 불가');
+  'public.save_ja_revision(uuid, uuid, uuid, integer, timestamptz, jsonb, jsonb)', 'execute'), 'authenticated save 실행 불가');
 select ok(not has_function_privilege('authenticated',
   'public.approve_ja_revision(uuid, uuid, uuid, integer, timestamptz, jsonb)', 'execute'), 'authenticated approve 실행 불가');
 select ok(not has_function_privilege('authenticated',
@@ -99,16 +99,24 @@ select throws_ok(
   'NR010', null, '끝난 요청으로 생성 → NR010');
 
 -- 4. 저장(A-12 ja): 미승인 갱신·잠금 불일치
+update public.edit_revisions set updated_at = '2026-11-01T00:00:00Z'
+  where job_id = '49000000-0000-4000-8000-000000000011' and lang = 'ja';
 select is((public.save_ja_revision('49000000-0000-4000-8000-000000000001', '49000000-0000-4000-8000-000000000011',
-    '49494949-4949-4949-8949-494949494949', 1, '{"lang": "ja", "edit": 1}', '{"errors": [], "warnings": []}')
+    '49494949-4949-4949-8949-494949494949', 1, '2026-11-01T00:00:00Z', '{"lang": "ja", "edit": 1}', '{"errors": [], "warnings": []}')
     ->> 'rev_no')::int, 1, '미승인 ja 제자리 저장');
 select throws_ok(
   $$select public.save_ja_revision('49000000-0000-4000-8000-000000000001', '49000000-0000-4000-8000-000000000011',
-    '49494949-4949-4949-8949-494949494949', 2, '{}', '{}')$$,
+    '49494949-4949-4949-8949-494949494949', 2, '2000-01-01T00:00:00Z', '{}', '{}')$$,
   'NR011', null, 'base_rev_no 불일치 → NR011');
 select throws_ok(
+  $$select public.save_ja_revision('49000000-0000-4000-8000-000000000001', '49000000-0000-4000-8000-000000000011',
+    '49494949-4949-4949-8949-494949494949', 1, '2026-11-01T00:00:00Z', '{"lang": "ja", "edit": 9}', '{}')$$,
+  'NR011', null, '같은 base_updated_at 두 번째 → NR011(task-059)');
+select is((select r.spec ->> 'edit' from public.edit_revisions r join public.production_jobs j on j.current_ja_revision_id = r.id
+  where j.id = '49000000-0000-4000-8000-000000000011'), '1', 'NR011이면 앞선 ja 편집 유지');
+select throws_ok(
   $$select public.save_ja_revision('49000000-0000-4000-8000-000000000001', '49000000-0000-4000-8000-000000000013',
-    '49494949-4949-4949-8949-494949494949', 1, '{}', '{}')$$,
+    '49494949-4949-4949-8949-494949494949', 1, '2000-01-01T00:00:00Z', '{}', '{}')$$,
   'NR010', null, 'ja 리비전 없음 → NR010');
 
 -- 5. 승인(A-13 ja)
@@ -123,8 +131,13 @@ select is((public.approve_ja_revision('49000000-0000-4000-8000-000000000001', '4
     ->> 'rev_no')::int, 1, 'ja 승인');
 select is((select status from public.production_jobs where id = '49000000-0000-4000-8000-000000000011'),
   'review', '승인 후에도 job 상태 불변');
+select throws_ok(
+  $$select public.save_ja_revision('49000000-0000-4000-8000-000000000001', '49000000-0000-4000-8000-000000000011',
+    '49494949-4949-4949-8949-494949494949', 1, '2000-01-01T00:00:00Z', '{}', '{}')$$,
+  'NR011', null, '승인본 ja도 updated_at 불일치 → NR011');
 select is((public.save_ja_revision('49000000-0000-4000-8000-000000000001', '49000000-0000-4000-8000-000000000011',
-    '49494949-4949-4949-8949-494949494949', 1, '{"lang": "ja", "edit": 2}', '{"errors": [], "warnings": []}')
+    '49494949-4949-4949-8949-494949494949', 1, (select r.updated_at from public.edit_revisions r join public.production_jobs j on j.current_ja_revision_id = r.id
+      where j.id = '49000000-0000-4000-8000-000000000011'), '{"lang": "ja", "edit": 2}', '{"errors": [], "warnings": []}')
     ->> 'rev_no')::int, 2, '승인본 저장 → 새 ja rev_no 2');
 select is((select r.derived_from::text from public.edit_revisions r
   join public.production_jobs j on j.current_ja_revision_id = r.id
@@ -139,7 +152,7 @@ insert into public.render_runs (id, workspace_id, job_id, revision_id, lang, att
   where r.job_id = '49000000-0000-4000-8000-000000000011' and r.lang = 'ja' and r.rev_no = 1;
 select throws_ok(
   $$select public.save_ja_revision('49000000-0000-4000-8000-000000000001', '49000000-0000-4000-8000-000000000011',
-    '49494949-4949-4949-8949-494949494949', 2, '{}', '{}')$$,
+    '49494949-4949-4949-8949-494949494949', 2, '2000-01-01T00:00:00Z', '{}', '{}')$$,
   'NR010', null, 'ja 렌더 중 저장 → NR010');
 update public.production_jobs set translate_requests = '[]' where id = '49000000-0000-4000-8000-000000000011';
 select throws_ok(
@@ -162,7 +175,7 @@ update public.production_jobs set current_revision_id = '49000000-0000-4000-8000
   where id = '49000000-0000-4000-8000-000000000011';
 select throws_ok(
   $$select public.save_ja_revision('49000000-0000-4000-8000-000000000001', '49000000-0000-4000-8000-000000000011',
-    '49494949-4949-4949-8949-494949494949', 2, '{}', '{}')$$,
+    '49494949-4949-4949-8949-494949494949', 2, '2000-01-01T00:00:00Z', '{}', '{}')$$,
   'NR010', null, 'ko 미승인 중 ja 저장 → NR010');
 update public.edit_revisions set approved_at = now() where id = '49000000-0000-4000-8000-000000000034';
 select throws_ok(

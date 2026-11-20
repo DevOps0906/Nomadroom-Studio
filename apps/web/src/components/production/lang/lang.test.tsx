@@ -72,7 +72,7 @@ describe("번역 경로·잠금 필드", () => {
     expect(m.isDirty("category", CATEGORY, { "hook.text": "x" })).toBe(true);
   });
   it("ja 리비전 화면: 문구 입력·잠금 안내·음성 안내, 구도 입력은 없음", () => {
-    const ja = { id: "j", rev_no: 1, spec: CATEGORY, origin: "ai_draft" as const, validation: { errors: [], warnings: [] }, approved_at: null };
+    const ja = { id: "j", rev_no: 1, spec: CATEGORY, origin: "ai_draft" as const, validation: { errors: [], warnings: [] }, approved_at: null, updated_at: "t" };
     const html = renderToStaticMarkup(<JaPanel job={{ id: "j", format: "category" }} ko={{ id: "k", rev_no: 1, approved_at: "x" }} ja={ja} />);
     expect(html).toContain("잠금 필드");
     expect(html).toContain(m.LOCKED_NOTE.category);
@@ -91,7 +91,7 @@ describe("원본 변경 안내", () => {
     expect(m.hasSourceChanged([issue])).toBe(true);
     expect(m.approveBlockers({ dirty: false, saving: false, approved: false, errors: [issue] }).join()).toContain("다시 만들기");
     expect(m.approveBlockers({ dirty: false, saving: false, approved: false, errors: [] })).toEqual([]);
-    const ja = { id: "j", rev_no: 1, spec: CATEGORY, origin: "user" as const, validation: { errors: [issue], warnings: [] }, approved_at: null };
+    const ja = { id: "j", rev_no: 1, spec: CATEGORY, origin: "user" as const, validation: { errors: [issue], warnings: [] }, approved_at: null, updated_at: "t" };
     const html = renderToStaticMarkup(<JaPanel job={{ id: "j", format: "category" }} ko={{ id: "k", rev_no: 2, approved_at: "x" }} ja={ja} />);
     expect(html).toContain("다시 만들기");
     expect(html).toContain("보관됩니다");
@@ -152,5 +152,40 @@ describe("탭 전환 확인·대사 순번·고지", () => {
     const html = renderToStaticMarkup(<JaRunView job={{ id: "j", shopping: false }} ja={{ id: "r", rev_no: 1, approved_at: "x" }} reportId={null} />);
     expect(html).toContain("외부 음성 합성(TTS) 서비스로 전송됩니다");
     expect(renderToStaticMarkup(<JaRunView job={{ id: "j", shopping: false }} ja={null} reportId={null} />)).not.toContain("음성 합성");
+  });
+});
+
+describe("task-059 저장 잠금(ja)", () => {
+  const AT = "2026-11-02T00:00:00.123456Z";
+  it("반환 updated_at으로 연속 저장 2회 성공, 낡은 base·승인본 낡은 base는 409", async () => {
+    const { saveJaRevision } = await import("./api");
+    const { lockServer } = await import("../lock-server.test-util");
+    const srv = lockServer({ rev_no: 1, updated_at: AT, approved: false });
+    const r1 = await saveJaRevision("j", {}, 1, AT, srv.f);
+    if (!r1.ok) throw new Error("r1");
+    expect((await saveJaRevision("j", {}, 1, r1.data.revision.updated_at, srv.f)).ok).toBe(true);
+    expect(await saveJaRevision("j", {}, 1, AT, srv.f)).toMatchObject({ ok: false, status: 409 });
+    const approved = lockServer({ rev_no: 1, updated_at: AT, approved: true });
+    expect(await saveJaRevision("j", {}, 1, "2000-01-01T00:00:00Z", approved.f)).toMatchObject({ ok: false, status: 409 });
+  });
+  it("저장 → applySaved 상태로 이어서 입력·저장 연속 성공(새로고침 없음)", async () => {
+    const { saveJaRevision } = await import("./api");
+    const { lockServer } = await import("../lock-server.test-util");
+    const srv = lockServer({ rev_no: 1, updated_at: AT, approved: false });
+    let rev = { id: "j", rev_no: 1, spec: CATEGORY, origin: "ai_draft" as const, validation: { errors: [], warnings: [] }, approved_at: null, updated_at: AT };
+    for (const text of ["一回目", "二回目", "三回目"]) {
+      const spec = m.applyTexts("category", rev.spec, { ...m.textsOf("category", rev.spec), "hook.text": text });
+      const r = await saveJaRevision("j", spec, rev.rev_no, rev.updated_at, srv.f);
+      if (!r.ok) throw new Error(`save ${text}: ${r.status}`);
+      rev = m.applySaved(rev, spec, r.data.revision) as typeof rev;
+      expect(m.isDirty("category", rev.spec, m.textsOf("category", spec))).toBe(false);
+    }
+    expect(rev.updated_at).toBe(srv.state.updated_at);
+    expect(rev.origin).toBe("user");
+  });
+  it("409 안내 문구", async () => {
+    const { SAVE_CONFLICT } = await import("./ja-panel");
+    expect(SAVE_CONFLICT).toContain("다른 곳에서 먼저 수정");
+    expect(SAVE_CONFLICT).toContain("새로고침");
   });
 });

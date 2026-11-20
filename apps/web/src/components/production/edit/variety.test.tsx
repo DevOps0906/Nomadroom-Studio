@@ -21,7 +21,7 @@ const spec = (over: Record<string, unknown> = {}) => ({
   reactions: [{ start: 0.5, end: 2, text: "헉", x: 540, y: 300 }],
   ...over,
 });
-const rev = (over: Record<string, unknown> = {}) => ({ rev_no: 2, spec: spec(), validation: { errors: [], warnings: [] }, approved_at: null, ...over });
+const rev = (over: Record<string, unknown> = {}) => ({ rev_no: 2, spec: spec(), validation: { errors: [], warnings: [] }, approved_at: null, updated_at: "2026-11-02T00:00:00.123456Z", ...over });
 const sheet = { jobId: JOB.id, sheetIds: ["s1"], sourceStart: 5, segmentLen: 30, sourceDuration: 120 };
 const render = (revision: ReturnType<typeof rev> | null, job: typeof JOB | (Omit<typeof JOB, "status"> & { status: never }) = JOB) => renderToStaticMarkup(<EditForm job={job} revision={revision} sheet={sheet} />);
 

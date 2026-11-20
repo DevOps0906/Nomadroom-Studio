@@ -1,4 +1,6 @@
 import type { JobFormat, SpecIssue } from "@/server/api/production";
+import type { SavedRevision } from "../edit/api";
+import type { JaRevision } from "./api";
 
 // 언어 탭(ko·ja) 화면 판단(순수). 서버가 정본이고 여기는 탭 상태·잠금 표시·안내 문구만 정한다.
 // 근거: docs/03_SCREENS_UX.md 일본어판 공통 규칙(F-07), tasks/task-049.md J3(번역 경로)·J7(편집 가드)·J8(원본 변경).
@@ -157,4 +159,9 @@ export function dubOrdinals(subs: { style?: string; start: string | number }[]):
   const out: (number | null)[] = subs.map(() => null);
   order.forEach((s, n) => (out[s.i] = n + 1));
   return out;
+}
+
+/** task-059: A-12(ja) 저장 성공 응답으로 패널 리비전을 갱신한다(새로고침·재마운트 없이 다음 저장의 base가 된다). */
+export function applySaved(rev: JaRevision, spec: Record<string, unknown>, saved: SavedRevision): JaRevision {
+  return { ...rev, id: saved.id, rev_no: saved.rev_no, spec, origin: "user", validation: saved.validation, approved_at: saved.approved_at, updated_at: saved.updated_at };
 }

@@ -13,7 +13,7 @@ vi.mock("@/server/api/production", () => ({
     h.calls.push(`ai:${id}:${key}`);
     if (h.fail) throw new ApiError(h.fail, h.fail === 429 ? "QUOTA_EXCEEDED" : "UPSTREAM_ERROR", h.fail === 429 ? "횟수를 모두 썼습니다." : "upstream detail");
     return {
-      revision: { id: "r2", rev_no: 2, spec: { lang: "ko" }, origin: "ai_draft", validation: { errors: [], warnings: [] }, approved_at: null, secret: "x" },
+      revision: { id: "r2", rev_no: 2, spec: { lang: "ko" }, origin: "ai_draft", validation: { errors: [], warnings: [] }, approved_at: null, updated_at: "2026-11-20T00:00:00.000001Z", secret: "x" },
       ai_draft_count: 1,
       previous_rev_no: 1,
       replay: h.replay,
@@ -77,6 +77,7 @@ describe("A-14 AI 초안 중계", () => {
     expect(h.calls).toEqual([`ai:${ID}:${KEY}`]);
     expect(body.revision.origin).toBe("ai_draft");
     expect(body.revision.approved_at).toBeNull();
+    expect(body.revision.updated_at).toBe("2026-11-20T00:00:00.000001Z"); // task-059 L1
     expect(body.previous_rev_no).toBe(1);
     expect(JSON.stringify(body)).not.toContain("secret");
   });

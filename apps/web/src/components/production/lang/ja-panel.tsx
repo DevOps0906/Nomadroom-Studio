@@ -15,6 +15,7 @@ import {
   TRANSLATE_DIRTY_CONFIRM,
   TRANSLATE_DISCLOSURE,
   VOICE_NOTE,
+  applySaved,
   applyTexts,
   approveBlockers,
   extractTexts,
@@ -49,6 +50,9 @@ function Issues({ list, tone }: { list: SpecIssue[]; tone: "error" | "warn" }) {
     </ul>
   );
 }
+
+/** task-059 L5: 저장 409(낡은 base·상태 불가). 입력은 지우지 않는다. */
+export const SAVE_CONFLICT = "다른 곳에서 먼저 수정되었거나 지금은 저장할 수 없습니다. 입력한 내용은 그대로 두었습니다 — 새로고침해 최신 일본어판을 불러오세요.";
 
 export function JaPanel({ job, ko, ja }: { job: { id: string; format: JobFormat }; ko: JaKo; ja: JaRevision | null }) {
   const router = useRouter();
@@ -97,16 +101,17 @@ export function JaPanel({ job, ko, ja }: { job: { id: string; format: JobFormat 
     setBusy("save");
     setMsg(null);
     const spec = applyTexts(job.format, rev.spec, edits);
-    const r = await saveJaRevision(job.id, spec, rev.rev_no);
+    const r = await saveJaRevision(job.id, spec, rev.rev_no, rev.updated_at);
     setBusy(null);
     if (!r.ok) {
       if (r.errors) setRev({ ...rev, validation: { errors: r.errors, warnings: r.warnings ?? [] } });
+      if (r.status === 409) return setMsg({ tone: "error", text: SAVE_CONFLICT }); // 입력(edits)은 유지
       return fail(r);
     }
     const saved = r.data.revision;
-    setRev({ ...rev, id: saved.id, rev_no: saved.rev_no, spec, origin: "user", validation: saved.validation, approved_at: saved.approved_at });
+    // 새로고침하지 않는다: page key가 바뀌어 재마운트되면 그 사이 입력이 사라진다(task-059 리뷰)
+    setRev(applySaved(rev, spec, saved));
     setMsg({ tone: "ok", text: `저장했습니다. (rev ${saved.rev_no})` });
-    router.refresh();
   }
 
   async function onApprove() {

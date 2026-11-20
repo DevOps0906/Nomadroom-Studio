@@ -38,7 +38,7 @@ import { BasisSelect, CARD, Field, FOCUS, INPUT, IssueList, PRIMARY, SECONDARY }
 // 근거: docs/03_SCREENS_UX.md PROD-02S, tasks/task-046.md. AI 대본·AI 생성 컷(P1·task-054)은 이 화면에 없다.
 
 export type ShoppingEditJob = { id: string; title: string; status: ProductionStatus; failed_stage: "prepare" | "audio" | "render" | null; vertical: ShoppingVertical | null };
-export type ShoppingEditRevision = { rev_no: number; spec: Record<string, unknown>; validation: Validation; approved_at: string | null };
+export type ShoppingEditRevision = { rev_no: number; spec: Record<string, unknown>; validation: Validation; approved_at: string | null; updated_at: string };
 export type EditAsset = { id: string; kind: string; status: "pending" | "ready"; duration_sec: number | null };
 
 type Section = "script" | "cuts" | "voice" | "cta";
@@ -94,6 +94,8 @@ export function ShoppingEditForm({ job, revision, sheet, brief, assets: initialA
   const [draft, setDraft] = useState<ShoppingDraft>(initial);
   const [snapshot, setSnapshot] = useState(() => JSON.stringify(initial));
   const [revNo, setRevNo] = useState<number | null>(revision?.rev_no ?? null);
+  // task-059: 읽은 리비전 updated_at(다음 저장의 base). 저장·AI 초안 성공 때 갱신, 가공하지 않는다
+  const [updatedAt, setUpdatedAt] = useState<string | null>(revision?.updated_at ?? null);
   const [validation, setValidation] = useState<Validation>(revision?.validation ?? { errors: [], warnings: [] });
   const [approvedAt, setApprovedAt] = useState<string | null>(revision?.approved_at ?? null);
   const [localErr, setLocalErr] = useState<{ path: string; message: string } | null>(null);
@@ -155,6 +157,7 @@ export function ShoppingEditForm({ job, revision, sheet, brief, assets: initialA
     setDraft(next);
     setSnapshot(JSON.stringify(next));
     setRevNo(rev.rev_no);
+    setUpdatedAt(rev.updated_at);
     setValidation(rev.validation);
     setApprovedAt(rev.approved_at);
     setRejected(false);
@@ -163,7 +166,7 @@ export function ShoppingEditForm({ job, revision, sheet, brief, assets: initialA
   }
 
   async function save(): Promise<boolean> {
-    if (lock || revNo === null) return false;
+    if (lock || revNo === null || updatedAt === null) return false;
     setMessage(null);
     const built = buildShoppingSpec(draft, imageIds);
     if (!built.ok) {
@@ -173,7 +176,7 @@ export function ShoppingEditForm({ job, revision, sheet, brief, assets: initialA
     }
     setLocalErr(null);
     setPhase("saving");
-    const r = await saveRevision(job.id, built.spec, revNo);
+    const r = await saveRevision(job.id, built.spec, revNo, updatedAt);
     setPhase("idle");
     if (!r.ok) {
       handleFail(r);
@@ -181,6 +184,7 @@ export function ShoppingEditForm({ job, revision, sheet, brief, assets: initialA
     }
     const rev = r.data.revision;
     setRevNo(rev.rev_no);
+    setUpdatedAt(rev.updated_at);
     setValidation(rev.validation);
     setApprovedAt(rev.approved_at);
     setRejected(false);

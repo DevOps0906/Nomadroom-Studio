@@ -456,7 +456,8 @@ def test_put_shopping_spec_validates_with_job_assets(api, auth, db):
     job, rev, _ = review_shop(db)
     spec = copy.deepcopy(rev["spec"])
     spec["cuts"][0]["source_asset_id"] = str(uuid.uuid4())  # 다른(없는) 자산
-    r = api.put(f"{URL}/{job['id']}/revision", json={"spec": spec, "base_rev_no": 1}, headers=auth)
+    body = {"spec": spec, "base_rev_no": 1, "base_updated_at": rev["updated_at"]}
+    r = api.put(f"{URL}/{job['id']}/revision", json=body, headers=auth)
     assert r.status_code == 200
     codes = [e["code"] for e in r.json()["revision"]["validation"]["errors"]]
     assert "cuts.source_invalid" in codes and "assets.required" not in codes

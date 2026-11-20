@@ -22,7 +22,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const r = await requestProductionTranslate(id, b.revision_id as string, key);
     const v = r.revision;
     return json(r.replay ? 200 : 201, {
-      revision: { id: v.id, rev_no: v.rev_no, spec: v.spec, origin: v.origin, validation: v.validation, approved_at: v.approved_at, derived_from: v.derived_from ?? null },
+      revision: { id: v.id, rev_no: v.rev_no, spec: v.spec, origin: v.origin, validation: v.validation, approved_at: v.approved_at, updated_at: v.updated_at, derived_from: v.derived_from ?? null },
       translate_count: r.translate_count,
       replay: r.replay,
     });

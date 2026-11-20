@@ -27,11 +27,11 @@ export default async function ProductionEditPage({ params, searchParams }: { par
     detail = await getProductionJob(id);
     if (detail.current_revision.ko) {
       const r = await getProductionRevision(id);
-      revision = { rev_no: r.rev_no, spec: r.spec, validation: r.validation, approved_at: r.approved_at };
+      revision = { rev_no: r.rev_no, spec: r.spec, validation: r.validation, approved_at: r.approved_at, updated_at: r.updated_at };
     }
     if (lang === "ja" && detail.current_revision.ja) {
       const r = await getProductionRevision(id, undefined, "ja");
-      jaRevision = { id: r.id, rev_no: r.rev_no, spec: r.spec, origin: r.origin, validation: r.validation, approved_at: r.approved_at, derived_from: r.derived_from ?? null };
+      jaRevision = { id: r.id, rev_no: r.rev_no, spec: r.spec, origin: r.origin, validation: r.validation, approved_at: r.approved_at, updated_at: r.updated_at, derived_from: r.derived_from ?? null };
     }
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) notFound();
@@ -80,7 +80,7 @@ export default async function ProductionEditPage({ params, searchParams }: { par
         />
       ) : job.kind === "shopping" ? (
         <ShoppingEditForm
-          key={`${job.id}-${revision?.rev_no ?? 0}`}
+          key={`${job.id}-${revision?.rev_no ?? 0}-${revision?.updated_at ?? ""}`}
           job={{ id: job.id, title: job.title, status: job.status, failed_stage: job.failed_stage, vertical: job.vertical ?? null }}
           revision={revision}
           brief={job.brief ?? null}
@@ -95,7 +95,7 @@ export default async function ProductionEditPage({ params, searchParams }: { par
         />
       ) : (
         <EditForm
-          key={`${job.id}-${revision?.rev_no ?? 0}`}
+          key={`${job.id}-${revision?.rev_no ?? 0}-${revision?.updated_at ?? ""}`}
           job={{ id: job.id, title: job.title, status: job.status, failed_stage: job.failed_stage, format: job.format === "variety" ? "variety" : "category" }}
           revision={revision}
           sheet={{

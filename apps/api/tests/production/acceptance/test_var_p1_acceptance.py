@@ -23,12 +23,18 @@ from tests.production.test_ai_draft_variety import (  # noqa: F401  (fixture 재
     tool_response,
     variety_ready,
 )
-from tests.production.test_jobs_api import URL
+from tests.production.test_jobs_api import URL, cur_updated_at
 
 
 def save(api, auth, job: dict, spec: dict, base: int):
     return api.put(
-        f"{URL}/{job['id']}/revision", json={"spec": spec, "base_rev_no": base}, headers=auth
+        f"{URL}/{job['id']}/revision",
+        json={
+            "spec": spec,
+            "base_rev_no": base,
+            "base_updated_at": cur_updated_at(api, auth, job["id"]),
+        },
+        headers=auth,
     )
 
 

@@ -722,10 +722,10 @@ isOneToOne: false
 { Args: { "p_checks": Json,"p_job": string,"p_run": string,"p_user": string,"p_workspace": string }; Returns: Json
                            },
 "save_ja_revision":
-{ Args: { "p_base_rev_no": number,"p_job": string,"p_spec": Json,"p_user": string,"p_validation": Json,"p_workspace": string }; Returns: Json
+{ Args: { "p_base_rev_no": number,"p_base_updated_at": string,"p_job": string,"p_spec": Json,"p_user": string,"p_validation": Json,"p_workspace": string }; Returns: Json
                            },
 "save_production_revision":
-{ Args: { "p_base_rev_no": number,"p_job": string,"p_spec": Json,"p_user": string,"p_validation": Json,"p_workspace": string }; Returns: Json
+{ Args: { "p_base_rev_no": number,"p_base_updated_at": string,"p_job": string,"p_spec": Json,"p_user": string,"p_validation": Json,"p_workspace": string }; Returns: Json
                            },
 "set_profile_selection":
 { Args: { "p_ids": (string)[],"p_workspace": string }; Returns: (string)[]

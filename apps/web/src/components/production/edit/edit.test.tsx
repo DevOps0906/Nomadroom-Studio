@@ -25,7 +25,7 @@ const spec = (over: Record<string, unknown> = {}) => ({
   overlays: [{ kind: "comment", text: "c", start: 0, end: 1, x: 1, y: 1 }],
   ...over,
 });
-const rev = (over: Record<string, unknown> = {}) => ({ rev_no: 2, spec: spec(), validation: { errors: [], warnings: [] }, approved_at: null, ...over });
+const rev = (over: Record<string, unknown> = {}) => ({ rev_no: 2, spec: spec(), validation: { errors: [], warnings: [] }, approved_at: null, updated_at: "2026-11-02T00:00:00.123456Z", ...over });
 const render = (revision: ReturnType<typeof rev> | null, job = JOB) =>
   renderToStaticMarkup(<EditForm job={job} revision={revision} sheet={{ jobId: job.id, sheetIds: ["s1"], sourceStart: 5, segmentLen: 30, sourceDuration: 120 }} />);
 const ERR = { code: "shots.gap", path: "shots.1", message: "구도는 공백·겹침 없이 이어져야 합니다." };
@@ -116,7 +116,7 @@ describe("api", () => {
   const res = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
   it("400 응답의 errors·warnings를, 409는 상태 코드를 보존한다", async () => {
     const f400 = (async () => res(400, { message: "오류", errors: [ERR], warnings: [] })) as unknown as typeof fetch;
-    const r = await api.saveRevision(JOB.id, {}, 1, f400);
+    const r = await api.saveRevision(JOB.id, {}, 1, "t", f400);
     expect(r).toMatchObject({ ok: false, status: 400, errors: [ERR], warnings: [] });
     const f409 = (async () => res(409, { message: "충돌" })) as unknown as typeof fetch;
     expect(await api.approveRevision(JOB.id, 1, f409)).toMatchObject({ ok: false, status: 409, message: "충돌" });
@@ -142,5 +142,26 @@ describe("openSheetWindow", () => {
     const msg = await openSheetWindow("j", "a", async () => ({ ok: false, status: 404, message: "없음" }), (() => w2) as unknown as typeof window.open);
     expect(msg).toBe("없음");
     expect(w2.close).toHaveBeenCalled();
+  });
+});
+
+describe("task-059 저장 잠금(ko)", () => {
+  const AT = "2026-11-02T00:00:00.123456Z";
+  it("반환 updated_at으로 연속 저장 2회 성공, 낡은 base는 409", async () => {
+    const { lockServer } = await import("../lock-server.test-util");
+    const srv = lockServer({ rev_no: 2, updated_at: AT, approved: false });
+    const r1 = await api.saveRevision(JOB.id, {}, 2, AT, srv.f);
+    if (!r1.ok) throw new Error("r1");
+    const r2 = await api.saveRevision(JOB.id, {}, r1.data.revision.rev_no, r1.data.revision.updated_at, srv.f);
+    expect(r2.ok).toBe(true);
+    expect(await api.saveRevision(JOB.id, {}, 2, AT, srv.f)).toMatchObject({ ok: false, status: 409 });
+    expect(srv.sent[0]).toBe(AT); // 마이크로초 문자열 그대로(Date 변환 없음)
+  });
+  it("승인본 저장도 낡은 base면 409, 맞으면 새 rev", async () => {
+    const { lockServer } = await import("../lock-server.test-util");
+    const srv = lockServer({ rev_no: 2, updated_at: AT, approved: true });
+    expect(await api.saveRevision(JOB.id, {}, 2, "2026-11-02T00:00:00.123457Z", srv.f)).toMatchObject({ ok: false, status: 409 });
+    const ok = await api.saveRevision(JOB.id, {}, 2, AT, srv.f);
+    expect(ok.ok && ok.data.revision.rev_no).toBe(3);
   });
 });

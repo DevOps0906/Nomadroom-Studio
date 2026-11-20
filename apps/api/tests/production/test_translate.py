@@ -24,7 +24,15 @@ from tests.production import test_ai_draft as base
 from tests.production.test_ai_draft import AiDB
 from tests.production.test_ai_draft_variety import META
 from tests.production.test_ai_draft_variety import user_spec as variety_spec
-from tests.production.test_jobs_api import REST, URL, _now, _rpc_error, good_spec
+from tests.production.test_jobs_api import (
+    REST,
+    URL,
+    _now,
+    _rpc_error,
+    cur_updated_at,
+    good_spec,
+    same_ts,
+)
 from tests.production.test_shopping_api import review_shop
 
 auth, claude, key, no_network = base.auth, base.claude, base.key, base.no_network
@@ -52,7 +60,16 @@ class TDB(AiDB):
 
     def _tjson(self, j: dict, req: dict, replay: bool) -> httpx.Response:
         rev = self._rev(req.get("revision_id"))
-        keys = ("id", "rev_no", "spec", "origin", "validation", "approved_at", "derived_from")
+        keys = (
+            "id",
+            "rev_no",
+            "spec",
+            "origin",
+            "validation",
+            "approved_at",
+            "derived_from",
+            "updated_at",
+        )
         return httpx.Response(
             200,
             json={
@@ -155,13 +172,24 @@ class TDB(AiDB):
         rev = self._rev(j.get("current_ja_revision_id")) if j else None
         if rev is None or not self._writable(j):
             return _rpc_error("NR010")
-        if rev["rev_no"] != body["p_base_rev_no"]:
+        if rev["rev_no"] != body["p_base_rev_no"] or not same_ts(
+            rev["updated_at"], body["p_base_updated_at"]
+        ):
             return _rpc_error("NR011")
         if rev["approved_at"] is None:
             rev.update(spec=body["p_spec"], validation=body["p_validation"], updated_at=_now())
         else:
             rev = self._new_ja(j, body, rev["derived_from"], "user")
-        keys = ("id", "rev_no", "spec", "origin", "validation", "approved_at", "derived_from")
+        keys = (
+            "id",
+            "rev_no",
+            "spec",
+            "origin",
+            "validation",
+            "approved_at",
+            "derived_from",
+            "updated_at",
+        )
         return httpx.Response(200, json={k: rev[k] for k in keys})
 
     def ja_approve(self, body: dict) -> httpx.Response:
@@ -274,11 +302,17 @@ def derived(api, auth, db: TDB, claude, fmt: str = "category") -> tuple[dict, di
     return job, ko, ja
 
 
-def put_ja(api, auth, job: dict, spec: dict, base_no: int = 1) -> httpx.Response:
+def put_ja(
+    api, auth, job: dict, spec: dict, base_no: int = 1, base_updated_at: str | None = None
+) -> httpx.Response:
     return api.put(
         f"{URL}/{job['id']}/revision",
         params={"lang": "ja"},
-        json={"spec": spec, "base_rev_no": base_no},
+        json={
+            "spec": spec,
+            "base_rev_no": base_no,
+            "base_updated_at": base_updated_at or cur_updated_at(api, auth, job["id"], "ja"),
+        },
         headers=auth,
     )
 
@@ -608,6 +642,34 @@ def test_put_approved_ja_creates_new_rev(api, auth, db, claude):
     r = put_ja(api, auth, job, copy.deepcopy(ja["spec"]))
     assert r.status_code == 200 and r.json()["revision"]["rev_no"] == 2
     assert r.json()["revision"]["derived_from"] == ja["derived_from"]
+
+
+def test_l1_translate_response_has_updated_at(api, auth, db, claude):
+    job, ko = MAKERS["category"](db)
+    claude.replies = [reply("category", ko["spec"])]
+    r = post(api, auth, job, ko["id"])
+    assert r.status_code == 201, r.text
+    ja = next(x for x in db.revisions if x["id"] == job["current_ja_revision_id"])
+    assert same_ts(r.json()["revision"]["updated_at"], ja["updated_at"])
+
+
+def test_l5_ja_consecutive_saves_then_stale_409(api, auth, db, claude):
+    job, _, ja = derived(api, auth, db, claude)
+    first = cur_updated_at(api, auth, job["id"], "ja")
+    r1 = put_ja(api, auth, job, copy.deepcopy(ja["spec"]), base_updated_at=first)
+    assert r1.status_code == 200, r1.text
+    at = r1.json()["revision"]["updated_at"]
+    r2 = put_ja(api, auth, job, copy.deepcopy(ja["spec"]), base_updated_at=at)
+    assert r2.status_code == 200, r2.text
+    r3 = put_ja(api, auth, job, copy.deepcopy(ja["spec"]), base_updated_at="2000-01-01T00:00:00Z")
+    assert r3.status_code == 409
+
+
+def test_l3_ja_approved_stale_base_409(api, auth, db, claude):
+    job, _, ja = derived(api, auth, db, claude)
+    ja["approved_at"] = _now()
+    r = put_ja(api, auth, job, copy.deepcopy(ja["spec"]), base_updated_at="2000-01-01T00:00:00Z")
+    assert r.status_code == 409 and job["current_ja_revision_id"] == ja["id"]
 
 
 # --- 승인·음성·내용 규칙(J6·J10) --------------------------------------------------------

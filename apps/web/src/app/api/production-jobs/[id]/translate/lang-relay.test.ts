@@ -16,11 +16,11 @@ vi.mock("@/server/api/production", () => ({
   requestProductionTranslate: async (_id: string, rev: string, key: string) => {
     h.calls.push(`translate:${rev}:${key}`);
     maybeFail();
-    return { revision: { id: "j1", rev_no: 1, spec: { lang: "ja" }, origin: "ai_draft", validation: { errors: [], warnings: [] }, approved_at: null, derived_from: "k1", secret: "x" }, translate_count: 1, replay: false };
+    return { revision: { id: "j1", rev_no: 1, spec: { lang: "ja" }, origin: "ai_draft", validation: { errors: [], warnings: [] }, approved_at: null, updated_at: "2026-11-20T00:00:00.000001Z", derived_from: "k1", secret: "x" }, translate_count: 1, replay: false };
   },
-  saveProductionRevision: async (_id: string, _spec: unknown, base: number, lang: string) => {
-    h.calls.push(`save:${base}:${lang}`);
-    return { id: "j1", rev_no: 2, validation: { errors: [], warnings: [] }, approved_at: null };
+  saveProductionRevision: async (_id: string, _spec: unknown, base: number, baseAt: string, lang: string) => {
+    h.calls.push(`save:${base}:${baseAt}:${lang}`);
+    return { id: "j1", rev_no: 2, validation: { errors: [], warnings: [] }, approved_at: null, updated_at: "2026-11-20T00:00:01Z" };
   },
   approveProductionRevision: async (_id: string, rev: number, lang: string) => {
     h.calls.push(`approve:${rev}:${lang}`);
@@ -93,12 +93,12 @@ describe("언어 탭 중계", () => {
   });
 
   it("A-12 PUT·A-13 승인: lang 전달, 기본 ko, 잘못된 값 400", async () => {
-    await save.PUT(req("PUT", { spec: {}, base_rev_no: 1, lang: "ja" }), ctx);
-    await save.PUT(req("PUT", { spec: {}, base_rev_no: 1 }), ctx);
+    await save.PUT(req("PUT", { spec: {}, base_rev_no: 1, base_updated_at: "t1", lang: "ja" }), ctx);
+    await save.PUT(req("PUT", { spec: {}, base_rev_no: 1, base_updated_at: "t1" }), ctx);
     await approve.POST(req("POST", { rev_no: 2, lang: "ja" }), ctx);
     await approve.POST(req("POST", { rev_no: 2 }), ctx);
-    expect(h.calls).toEqual(["save:1:ja", "save:1:ko", "approve:2:ja", "approve:2:ko"]);
-    expect((await save.PUT(req("PUT", { spec: {}, base_rev_no: 1, lang: "en" }), ctx)).status).toBe(400);
+    expect(h.calls).toEqual(["save:1:t1:ja", "save:1:t1:ko", "approve:2:ja", "approve:2:ko"]);
+    expect((await save.PUT(req("PUT", { spec: {}, base_rev_no: 1, base_updated_at: "t1", lang: "en" }), ctx)).status).toBe(400);
     expect((await approve.POST(req("POST", { rev_no: 2, lang: "en" }), ctx)).status).toBe(400);
   });
 

@@ -39,6 +39,7 @@ from tests.production.test_jobs_api import (
     _rpc_error,
     good_spec,
     install,
+    same_ts,
 )
 
 JPEG = b"\xff\xd8\xff\xe0" + b"sheet-bytes"
@@ -99,7 +100,18 @@ class AiDB(FakeDB):
     def _json(self, j: dict, req: dict, replay: bool) -> httpx.Response:
         rev = next((r for r in self.revisions if r["id"] == req.get("revision_id")), None)
         out_rev = (
-            {k: rev[k] for k in ("id", "rev_no", "spec", "origin", "validation", "approved_at")}
+            {
+                k: rev[k]
+                for k in (
+                    "id",
+                    "rev_no",
+                    "spec",
+                    "origin",
+                    "validation",
+                    "approved_at",
+                    "updated_at",
+                )
+            }
             if rev
             else None
         )
@@ -313,6 +325,15 @@ def ready_job(db: AiDB, **over: Any) -> tuple[dict, dict]:
 
 def post(api: TestClient, auth: dict, job: dict, k: str = "ai-key-1") -> httpx.Response:
     return api.post(f"{URL}/{job['id']}/ai-draft", headers={**auth, "Idempotency-Key": k})
+
+
+def test_l1_ai_draft_response_has_updated_at(api, auth, db, claude):
+    """task-059 L1: 응답 리비전 updated_at = 다음 A-12 PUT의 base_updated_at."""
+    job, _ = ready_job(db)
+    r = post(api, auth, job)
+    assert r.status_code == 201, r.text
+    rev = next(x for x in db.revisions if x["id"] == r.json()["revision"]["id"])
+    assert same_ts(r.json()["revision"]["updated_at"], rev["updated_at"])
 
 
 # --- 전송 범위(H7) -----------------------------------------------------------------

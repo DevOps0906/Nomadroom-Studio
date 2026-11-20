@@ -18,7 +18,16 @@ from fastapi.testclient import TestClient
 from app.main import create_app
 from tests.conftest import JWKS_URL, make_settings
 from tests.production import test_render_runs as rr
-from tests.production.test_jobs_api import CAND, REST, URL, WS, _params, _select, job_row
+from tests.production.test_jobs_api import (
+    CAND,
+    REST,
+    URL,
+    WS,
+    _params,
+    _select,
+    cur_updated_at,
+    job_row,
+)
 from tests.production.test_render_runs import ProdDB, ago, install_prod, wauth
 from tests.production.test_worker_production import (
     PREPARE_ITEMS,
@@ -111,7 +120,8 @@ def post(api, auth, path: str, **kw):
 
 
 def put_spec(api, auth, jid: str, s: dict, base: int):
-    return api.put(f"{URL}/{jid}/revision", json={"spec": s, "base_rev_no": base}, headers=auth)
+    body = {"spec": s, "base_rev_no": base, "base_updated_at": cur_updated_at(api, auth, jid)}
+    return api.put(f"{URL}/{jid}/revision", json=body, headers=auth)
 
 
 def make_asset_ready(api, auth, db: ProdDB, jid: str, kind: str, mime: str) -> str:

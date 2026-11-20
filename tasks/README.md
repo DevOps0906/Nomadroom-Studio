@@ -60,6 +60,8 @@
 | task-056 | PROD-02S AI 대본 3안 선택 UI·brief 외부 전송 고지 | W9 | 048 | 보통 | builder | 완료 |
 | task-057 | PROD-02S 컷별 AI 생성 견적·확인·검수 체크 UI | W9 | 054 | 보통 | builder | 완료 |
 | task-058 | 쇼핑 녹음 상한 ko·ja 공용 8개(task-053 결함) | W10 후속 | 049 | 높음 | builder | 완료 |
+| task-059 | A-12 저장 낙관적 잠금 강화(ko·ja) | W11 | 049 | 높음 | builder + tester | 완료 |
+| task-060 | 언어별 진행 상태(A-09 lang) + ja 녹음 업로드 화면 | W11 | 052, 058 | 보통 | builder | 대기 |
 
 상태: 대기 / 진행 / 완료 / 보류
 
