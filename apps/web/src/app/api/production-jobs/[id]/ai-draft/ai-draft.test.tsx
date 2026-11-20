@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 // task-029 AI 초안 중계(A-14) Route Handler + PROD-02 "AI 초안 채우기" 버튼·브라우저 호출.
 
-const h = vi.hoisted(() => ({ calls: [] as string[], fail: null as number | null, replay: false }));
+const h = vi.hoisted(() => ({ calls: [] as string[], fail: null as number | null, replay: false, variants: null as { hook_type: string; sentences: string[]; char_count: number }[] | null }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/server/supabase/client", () => ({ createServerSupabase: vi.fn() }));
 
@@ -17,6 +17,7 @@ vi.mock("@/server/api/production", () => ({
       ai_draft_count: 1,
       previous_rev_no: 1,
       replay: h.replay,
+      ...(h.variants ? { variants: h.variants, facts_to_check: ["가격 확인"] } : {}),
       secret: "x",
     };
   },
@@ -43,6 +44,18 @@ describe("A-14 AI 초안 중계", () => {
     h.calls = [];
     h.fail = null;
     h.replay = false;
+    h.variants = null;
+  });
+
+  it("쇼핑 3안·확인할 사실을 브라우저까지 전달, 그 밖은 null", async () => {
+    h.variants = [{ hook_type: "질문형", sentences: ["a", "b", "c", "d"], char_count: 4 }];
+    const body = await (await route.POST(req(), ctx)).json();
+    expect(body.variants).toEqual(h.variants);
+    expect(body.facts_to_check).toEqual(["가격 확인"]);
+    h.variants = null;
+    const plain = await (await route.POST(req(), ctx)).json();
+    expect(plain.variants).toBeNull();
+    expect(plain.facts_to_check).toBeNull();
   });
 
   it.each([["https://evil.com"], [null]])("Origin이 다르거나 없으면 403, API 호출 없음: %s", async (origin) => {

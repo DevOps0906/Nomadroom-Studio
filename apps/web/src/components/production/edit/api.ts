@@ -39,6 +39,9 @@ export type AiDraft = {
   revision: { id: string; rev_no: number; spec: Record<string, unknown>; origin: "user" | "ai_draft"; validation: Validation; approved_at: string | null };
   ai_draft_count: number;
   previous_rev_no: number | null;
+  /** 쇼핑만(그 밖은 null·없음). */
+  variants?: { hook_type: string; sentences: string[]; char_count: number }[] | null;
+  facts_to_check?: string[] | null;
 };
 
 /** A-14 AI 초안. key는 클릭(의도) 단위로 만든다. */

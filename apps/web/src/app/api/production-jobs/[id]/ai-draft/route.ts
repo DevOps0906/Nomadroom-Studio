@@ -24,6 +24,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       revision: { id: v.id, rev_no: v.rev_no, spec: v.spec, origin: v.origin, validation: v.validation, approved_at: v.approved_at },
       ai_draft_count: r.ai_draft_count,
       previous_rev_no: r.previous_rev_no,
+      variants: r.variants ?? null,
+      facts_to_check: r.facts_to_check ?? null,
     });
   } catch (e) {
     return fromRevisionError(e, "AI 초안을 만들지 못했습니다. 잠시 후 다시 시도하세요.");

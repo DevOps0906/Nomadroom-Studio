@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { EVIDENCE_SESSION_EXPIRED_PATH as SESSION_EXPIRED_PATH } from "@/components/evidence/evidence";
 import type { ProductionStatus, ShoppingBrief, ShoppingVertical, SpecIssue, Validation } from "@/server/api/production";
-import { AUDIO_ACCEPT, MAX_AUDIO_BYTES, approveRevision, audioMime, saveRevision, type EditResult } from "../edit/api";
+import { AUDIO_ACCEPT, MAX_AUDIO_BYTES, approveRevision, audioMime, saveRevision, type AiDraft, type EditResult } from "../edit/api";
+import { AiScriptPanel, applyVariant } from "./ai-script";
 import { approveBlockers, isEditableStatus, issuesAt, voicesFor } from "../edit/model";
 import { SheetPanel, type SheetInfo } from "../edit/sheet-panel";
 import { uploadAsset } from "./api";
@@ -96,7 +97,7 @@ export function ShoppingEditForm({ job, revision, sheet, brief, assets: initialA
   const [localErr, setLocalErr] = useState<{ path: string; message: string } | null>(null);
   const [rejected, setRejected] = useState(false);
   const [conflict, setConflict] = useState(false);
-  const [phase, setPhase] = useState<"idle" | "saving" | "approving" | "uploading">("idle");
+  const [phase, setPhase] = useState<"idle" | "saving" | "approving" | "uploading" | "drafting">("idle");
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [section, setSection] = useState<Section>("script");
   const [assets, setAssets] = useState<EditAsset[]>(initialAssets);
@@ -143,6 +144,19 @@ export function ShoppingEditForm({ job, revision, sheet, brief, assets: initialA
       setValidation({ errors: r.errors, warnings: r.warnings ?? [] });
       setRejected(true);
     }
+  }
+
+  /** A-14가 만든 새 리비전(1안 적용·미승인)을 화면 기준으로 삼는다. */
+  function applyAiDraft(rev: AiDraft["revision"]) {
+    const next = toShoppingDraft(rev.spec);
+    setDraft(next);
+    setSnapshot(JSON.stringify(next));
+    setRevNo(rev.rev_no);
+    setValidation(rev.validation);
+    setApprovedAt(rev.approved_at);
+    setRejected(false);
+    setLocalErr(null);
+    setMessage({ tone: "ok", text: `AI 대본 rev ${rev.rev_no}을 만들었습니다. 3안 중 하나를 골라 검토한 뒤 저장·승인하세요.` });
   }
 
   async function save(): Promise<boolean> {
@@ -255,7 +269,7 @@ export function ShoppingEditForm({ job, revision, sheet, brief, assets: initialA
       )}
       {revNo === null && (
         <p role="status" className="rounded-control bg-neutral-soft px-3 py-2 text-body text-neutral-soft-fg">
-          편집안 초안이 아직 없습니다. 초안이 만들어지면 이 양식으로 고칠 수 있습니다(AI 대본 3안은 후속 작업입니다).
+          편집안 초안이 아직 없습니다. 초안이 만들어지면 이 양식으로 고칠 수 있습니다.
         </p>
       )}
       {approvedAt && (
@@ -301,6 +315,15 @@ export function ShoppingEditForm({ job, revision, sheet, brief, assets: initialA
 
       <div className={cn("flex-col gap-4", vis("script"))}>
         <BriefSummary vertical={job.vertical} brief={brief} />
+        <AiScriptPanel
+          jobId={job.id}
+          disabled={lock || revNo === null || job.status !== "review"}
+          dirty={dirty}
+          onBusy={(b) => setPhase(b ? "drafting" : "idle")}
+          onApplied={applyAiDraft}
+          onUse={(sentences) => setDraft((d) => applyVariant(d, sentences))}
+          onFail={handleFail}
+        />
         <section aria-label="대본 4문장" className={cn(CARD, "flex flex-col gap-3")}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-h2 font-bold">대본 {SENTENCES}문장</h2>

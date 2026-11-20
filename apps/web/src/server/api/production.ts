@@ -236,7 +236,17 @@ export async function retryProductionRender(id: string, runId: string): Promise<
   return res.render_run;
 }
 
-export type AiDraftResult = { revision: Revision; ai_draft_count: number; previous_rev_no: number | null; replay: boolean };
+/** 쇼핑 AI 대본 1안(A-14). 문장 맨 앞 `[확인 필요] `는 서버가 붙인다. */
+export type AiScriptVariant = { hook_type: string; sentences: string[]; char_count: number };
+
+export type AiDraftResult = {
+  revision: Revision;
+  ai_draft_count: number;
+  previous_rev_no: number | null;
+  replay: boolean;
+  variants?: AiScriptVariant[] | null;
+  facts_to_check?: string[] | null;
+};
 
 /** A-14는 Claude 호출(재시도 1회 포함)을 기다리므로 기본 10초보다 길게 둔다(API 설정 타임아웃 90초 × 2 + 여유). */
 export const AI_DRAFT_TIMEOUT_MS = 200_000;
