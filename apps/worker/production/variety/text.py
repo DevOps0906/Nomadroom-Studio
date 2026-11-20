@@ -19,6 +19,7 @@ W, H = 1080, 1920
 FONTS = Path(__file__).resolve().parent.parent.parent / "fonts"
 PRIMARY_FONT = FONTS / "Pretendard-Black.otf"
 FALLBACK_FONT = FONTS / "NotoSansCJKkr-Bold.otf"
+JA_FONTS = (FONTS / "NotoSansCJKjp-Bold.otf",)  # 일본어는 한국어 글꼴로 대체하지 않는다
 
 RED = (232, 32, 42, 255)
 WHITE = (255, 255, 255, 255)
@@ -96,10 +97,11 @@ def _format4(data: bytes, base: int) -> frozenset[int]:
     return frozenset(out)
 
 
-def pick_font(text: str) -> Path:
-    """문구 전체를 그릴 수 있는 첫 글꼴(Pretendard → Noto). 없으면 glyph_missing."""
+def pick_font(text: str, lang: str = "ko") -> Path:
+    """문구 전체를 그릴 수 있는 첫 글꼴(ko: Pretendard → Noto KR, ja: Noto JP만, task-050 K5).
+    없으면 glyph_missing."""
     needed = {ord(ch) for ch in text if not ch.isspace()}
-    for path in (PRIMARY_FONT, FALLBACK_FONT):
+    for path in JA_FONTS if lang == "ja" else (PRIMARY_FONT, FALLBACK_FONT):
         if needed <= _codepoints(path):
             return path
     raise RenderFailed("glyph_missing")

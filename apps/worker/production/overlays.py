@@ -4,15 +4,14 @@
 """
 
 import math
-from pathlib import Path
 from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
 from production.errors import RenderFailed, TextTooLong
+from production.fonts import category_fonts
 
 W, H = 608, 1080
-FONT = Path(__file__).resolve().parent.parent / "fonts" / "NotoSansCJKkr-Bold.otf"
 MAX_UNITS = 80  # 폭 단위(공백·ASCII 구두점 1, 그 밖 2) = 최소 12pt에서 504px 이내
 MAX_COUNT = 20
 NARROW = " .,'!?:;-()"
@@ -60,14 +59,16 @@ def normalize(raw: Any, duration: float) -> list[dict[str, Any]]:
     return out
 
 
-def draw_card(overlay: dict[str, Any]) -> Image.Image:
-    """오버레이 하나를 608×1080 RGBA 레이어로 그린다. 문구가 카드 폭을 넘으면 TextTooLong."""
+def draw_card(overlay: dict[str, Any], lang: str = "ko") -> Image.Image:
+    """오버레이 하나를 608×1080 RGBA 레이어로 그린다. 문구가 카드 폭을 넘으면 TextTooLong.
+    글꼴은 언어별 자막 글꼴(ko: Noto KR, ja: Noto JP, task-050)."""
     kind, text = overlay["kind"], overlay["text"]
+    font_path = category_fonts(lang)[1]
     layer = Image.new("RGBA", (W, H))
     draw = ImageDraw.Draw(layer)
     inner = MAX_CARD_W - 2 * PAD_X
     for size in range(SIZES[kind], 11, -1):
-        font = ImageFont.truetype(str(FONT), size)
+        font = ImageFont.truetype(str(font_path), size)
         b = draw.textbbox((0, 0), text, font=font)
         if b[2] - b[0] <= inner:
             break
@@ -86,5 +87,7 @@ def draw_card(overlay: dict[str, Any]) -> Image.Image:
     return layer
 
 
-def build_layers(items: list[dict[str, Any]]) -> list[tuple[float, float, Image.Image]]:
-    return [(o["start"], o["end"], draw_card(o)) for o in items]
+def build_layers(
+    items: list[dict[str, Any]], lang: str = "ko"
+) -> list[tuple[float, float, Image.Image]]:
+    return [(o["start"], o["end"], draw_card(o, lang)) for o in items]

@@ -2,7 +2,7 @@
 
 변경점: 입력·출력은 작업 폴더 고정 이름, ffmpeg 입력 보안(F3), 문구 폭 초과 → TextTooLong,
 훅 길이 초과 → HookTooLong, 중단(F2) 시 ffmpeg kill, 진행 콜백.
-P0는 ko만(일본어 폰트 없음, task-050).
+언어: ko·ja(task-050). ja는 JP 글꼴, 제목 두 줄 모두 흰색(category-shorts-zip-analysis.md#3).
 """
 
 import math
@@ -14,13 +14,13 @@ from typing import Any
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from production.errors import HookTooLong, RenderFailed, TextTooLong
+from production.fonts import CATEGORY, category_fonts
 from production.media import Cancel, Media, MediaError, file_input
 from production.overlays import build_layers, normalize
 
 W, H, FPS = 608, 1080, 30
-FONTS = Path(__file__).resolve().parent.parent / "fonts"
-TITLE_FONT = FONTS / "Pretendard-Black.otf"
-CAPTION_FONT = FONTS / "NotoSansCJKkr-Bold.otf"
+TITLE_FONT, CAPTION_FONT = CATEGORY["ko"]
+SECOND_LINE = {"ko": "#FFDC00", "ja": "white"}  # 제목 둘째 줄: 한국어 노랑, 일본어 흰색
 Progress = Callable[[str, int], None]
 
 
@@ -32,8 +32,8 @@ def numeric(value: Any, label: str) -> float:
 
 def validate(project: dict, source_meta: dict) -> float:
     """배포본 validate와 같은 규칙(실패는 RenderFailed). 반환: duration."""
-    if project.get("lang") != "ko":
-        raise RenderFailed("lang must be ko (P0).")
+    if project.get("lang") not in CATEGORY:
+        raise RenderFailed("lang must be ko or ja.")
     header = project.get("header")
     if (
         not isinstance(header, list)
@@ -107,13 +107,14 @@ def text_center(draw, text, font_path, size, width, cy, fill, stroke=0, box=Fals
 
 
 def overlays(project: dict) -> tuple[Image.Image, list[Image.Image]]:
+    lang = project["lang"]
+    title_font, caption_font = category_fonts(lang)
     title = Image.new("RGBA", (W, H))
     draw = ImageDraw.Draw(title)
     draw.rectangle((0, 0, W, 279), fill="black")
     for index, text in enumerate(project["header"]):
-        text_center(
-            draw, text, TITLE_FONT, 66, 570, [155, 228][index], "#FFDC00" if index else "white"
-        )
+        fill = SECOND_LINE[lang] if index else "white"
+        text_center(draw, text, title_font, 66, 570, [155, 228][index], fill)
     layers = []
     sizes = {"white": 28, "paren": 34, "emph": 36}
     colors = {"white": "white", "paren": "#FCCC2C", "emph": "#04FC04"}
@@ -126,7 +127,7 @@ def overlays(project: dict) -> tuple[Image.Image, list[Image.Image]]:
         text_center(
             draw,
             text,
-            CAPTION_FONT,
+            caption_font,
             sizes[kind],
             520 if kind == "emph" else 560,
             cy,
@@ -171,7 +172,7 @@ def render(
     """source(작업 폴더의 source.mp4)와 정리된 hook(WAV)로 output을 만들고 측정 결과를 돌려준다."""
     duration = validate(project, source_meta)
     title, captions = overlays(project)
-    cards = build_layers(normalize(project.get("overlays") or [], duration))
+    cards = build_layers(normalize(project.get("overlays") or [], duration), project["lang"])
     hook_end = check_hook(hook_duration, duration, float(project["items"][0][1]))
     frames = math.ceil(duration * FPS - 1e-6)
     encoded_duration = frames / FPS
@@ -326,4 +327,5 @@ def render(
         "has_audio": True,
         "hook_duration": hook_duration,
         "hook_end": hook_end,
+        "fonts": [p.stem for p in category_fonts(project["lang"])],
     }

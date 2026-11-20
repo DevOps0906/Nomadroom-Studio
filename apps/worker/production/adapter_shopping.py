@@ -15,7 +15,7 @@ from production.api import SignedUrl
 from production.errors import AudioMissing, RenderFailed
 
 PRESET_VERSION = "shopping-1080-v1"  # task-044 결정과 같은 값(F9)
-LANGS = ("ko",)  # ja는 W10(task-049)
+LANGS = ("ko", "ja")  # ja는 task-050(별도 MP4·JP 글꼴·글자 단위 줄바꿈)
 FPS = 30
 TOL = 0.001
 SRC_TOL = 0.05  # 파생 source 길이와 구간 끝 차이 허용(초, 예능형과 같음)

@@ -37,7 +37,7 @@ from production.hook_audio import make_hook
 from production.media import Cancel, Media, MediaError, MediaTimeout
 from production.paths import WorkDir
 from production.prepare import prepare
-from production.render import CAPTION_FONT, TITLE_FONT, render
+from production.render import render
 from production.shopping.audio import (
     BGM_GAIN,
     DUCK_GAIN,
@@ -307,7 +307,8 @@ def _render(
         except AudioMissing:
             raise TtsFailed("생성 음성을 읽을 수 없음") from None
 
-    output = work.path("result_ko.mp4")
+    out_name = f"result_{project['lang']}.mp4"  # K7: (작업, 리비전, 언어)별 MP4
+    output = work.path(out_name)
     result = render(
         project, source, source_meta, hook_wav, hook_duration, output, media, cancel, reporter.set
     )
@@ -315,15 +316,15 @@ def _render(
     report.write_text(
         json.dumps(
             {
-                "output": "result_ko.mp4",
-                **result,
+                "output": out_name,
+                "lang": project["lang"],
+                **result,  # fonts: 실제로 쓴 언어별 글꼴(K7)
                 "preset_version": PRESET_VERSION,
                 "source_asset_id": str(src_used.asset_id),
                 # F8: 실제로 쓴 음성(TTS면 입력 자산 없음)
                 "hook_audio_asset_id": str(hook_used.asset_id) if hook_used else None,
                 "spec_hook_audio_asset_id": (task.spec or {}).get("hook", {}).get("audio_asset_id"),
                 "tts": tts_note,  # I3: 실제 경로(voice·rate 또는 supplied recording)
-                "fonts": [TITLE_FONT.stem, CAPTION_FONT.stem],
                 "review_required": "Watch final video and inspect every cut before delivery.",
             },
             ensure_ascii=False,
@@ -475,7 +476,7 @@ def _shopping_report(project, timeline, bounds, durations, result, tts_note, mix
     if project["bgm_id"] is not None:
         used.add(project["bgm_id"])
     return {
-        "output": "result_ko.mp4",
+        "output": f"result_{project['lang']}.mp4",
         "format": "shopping",
         **result,
         "preset_version": SHOPPING_PRESET,
@@ -560,7 +561,7 @@ def _render_shopping(
     if bound["bgm"] is not None:
         bgm_raw = files[str(bound["bgm"].asset_id)]
         bgm_wav = bgm_track(media, bgm_raw, frames, work.path("bgm.wav"), cancel)
-    output = work.path("result_ko.mp4")
+    output = work.path(f"result_{project['lang']}.mp4")
     result = render_shopping(
         project,
         timeline,

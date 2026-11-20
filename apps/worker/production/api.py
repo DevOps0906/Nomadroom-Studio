@@ -29,7 +29,7 @@ CHUNK = 1024 * 1024
 FINISH_BACKOFF = (1.0, 3.0)  # finish 재시도 간격(초) — 시도는 최대 3회
 PARSE_ERRORS = (ValidationError, ValueError, KeyError, TypeError)
 # task-045 R4: 이 워커가 처리할 수 있는 형식(W-05). 서버는 알린 워커에게만 쇼핑 task를 준다
-CAPABILITIES = ["shopping"]
+CAPABILITIES = ["shopping", "ja"]  # task-050 K8: ja 렌더 지원 알림
 
 
 class Task(BaseModel):

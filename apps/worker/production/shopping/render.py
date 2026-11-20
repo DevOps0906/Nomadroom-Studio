@@ -128,12 +128,13 @@ def blur_masks(canvas: Image.Image, masks: list[tuple]) -> None:
 
 def build_layers(project: dict, bounds: list[int]) -> tuple[list, list[str]]:
     fonts: list[str] = []
+    lang = project["lang"]  # task-050: ja는 JP 글꼴·글자 단위 줄바꿈
     layers = [
-        subtitle_layer(text, bounds[i], bounds[i + 1], fonts)
+        subtitle_layer(text, bounds[i], bounds[i + 1], fonts, lang)
         for i, text in enumerate(project["script"])
     ]
-    layers.append(cta_layer(project["cta"], bounds[3], bounds[4], fonts))
-    layers.append(disclosure_layer(project["disclosure"], bounds[4], fonts))
+    layers.append(cta_layer(project["cta"], bounds[3], bounds[4], fonts, lang))
+    layers.append(disclosure_layer(project["disclosure"], bounds[4], fonts, lang))
     events = sorted([(x.fs, x.pixels) for x in layers] + [(x.fe, -x.pixels) for x in layers])
     active = 0
     for _, delta in events:

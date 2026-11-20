@@ -324,7 +324,7 @@ def proj(**over) -> dict:
 
 
 BAD = {
-    "lang": (dict(lang="ja"), "lang must be ko (P0)."),  # 의도된 차이(P0 ko만)
+    "lang": (dict(lang="en"), "lang must be ko or ja."),  # 의도된 차이(ko·ja만, task-050)
     "header_one_line": (dict(header=["하나"]), "header must contain two nonempty strings."),
     "header_three_lines": (
         dict(header=["a", "b", "c"]),

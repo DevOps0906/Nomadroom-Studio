@@ -1,6 +1,8 @@
 """렌더 요청·재시도 A-15·A-16. 근거: docs/04_API.md#A-15·#A-16, tasks/task-023.md(E1·E3·E5·E8).
 
 판정·전이는 RPC(request_render_run·retry_render_run) 한 트랜잭션이 정본이다(job 행 for update).
+ja(task-050, 000028): job inspect·done·현재 승인 ja(파생 원본 = 현재 승인 ko)만, job 상태 불변.
+ja run 재시도는 RPC가 409(A-15로 다시 요청).
 """
 
 import logging
@@ -158,10 +160,10 @@ async def request_render(
 ) -> RenderRunEnvelope:
     if idempotency_key is None or not _KEY_RE.fullmatch(idempotency_key):
         raise ApiError(400, "VALIDATION", "Idempotency-Key 헤더가 필요합니다.", "Idempotency-Key")
-    if body.lang == "ja":
-        # E8: 일본어 렌더는 task-049 전까지 준비 중
-        raise ApiError(400, "VALIDATION", "준비 중인 기능입니다.", "lang")
     fmt = await _require_render_format(request, user, job_id)  # task-035 V2·task-036
+    if body.lang == "ja" and fmt == "variety":
+        # task-050 K1: 예능형 일본어판 렌더는 task-051 전까지 준비 중
+        raise ApiError(409, "CONFLICT", "이 형식의 일본어판 렌더는 아직 준비 중입니다.", "lang")
     if fmt == "shopping" and not await _key_used(request, user, idempotency_key):
         # 리뷰 반영 3: 같은 키 재전송은 RPC가 기존 run을 돌려주게 두고, 새 run 경로만 재확인
         await _require_shopping_assets(request, user, job_id, body.revision_id)

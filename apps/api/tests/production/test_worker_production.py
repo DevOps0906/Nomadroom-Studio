@@ -185,11 +185,13 @@ def test_w06_prepare_inputs_signed_source_upload(api, db):
 
 
 def test_e9_render_inputs_latest_source_analysis_and_user_hook_audio(api, db):
-    job, _, run = rendering(db)
+    job, rev, run = rendering(db)
     db.add_asset(job, "source", created_at=ago(minutes=9))
     new_source = db.add_asset(job, "source", created_at=ago(minutes=8))
     analysis = db.add_asset(job, "analysis", mime="application/json")
     hook = db.add_asset(job, "hook_audio", mime="audio/wav", created_at=ago(minutes=7))
+    rev["spec"]["hook"]["audio_asset_id"] = hook["id"]  # K4: spec이 가리키는 자산만
+    db.add_asset(job, "hook_audio", mime="audio/wav", created_at=ago(minutes=1))  # 더 최신·미참조
     db.add_asset(job, "hook_audio", status="pending", mime="audio/wav")
     db.add_asset(job, "sheet", mime="image/jpeg")
     claim(api)
@@ -198,6 +200,71 @@ def test_e9_render_inputs_latest_source_analysis_and_user_hook_audio(api, db):
     inputs = api.get(f"{W}/render/{run['id']}/inputs", headers=wauth()).json()["inputs"]
     got = {i["kind"]: i["asset_id"] for i in inputs}
     assert got == {"source": new_source["id"], "analysis": analysis["id"], "hook_audio": hook["id"]}
+
+
+def _ja_render_run(db: ProdDB) -> tuple[dict, dict, dict]:
+    job = db.add_job(status="inspect")
+    ko = db.add_revision(job, approved=True)
+    ja = db.add_revision(job, approved=True, lang="ja", derived_from=ko["id"])
+    job.update(current_revision_id=ko["id"], current_ja_revision_id=ja["id"])
+    run = db.add_run(job, ja, lang="ja")
+    return job, ja, run
+
+
+def test_k4_ja_hook_audio_is_spec_reference_not_latest(api, db):
+    job, ja, run = _ja_render_run(db)
+    db.add_asset(job, "source")
+    ja_hook = db.add_asset(job, "hook_audio", mime="audio/wav", created_at=ago(minutes=9))
+    db.add_asset(job, "hook_audio", mime="audio/wav", created_at=ago(minutes=1))  # ko 녹음(최신)
+    ja["spec"]["hook"]["audio_asset_id"] = ja_hook["id"]
+    r = api.post(f"{W}/claim", json={"capabilities": ["ja"]}, headers=wauth())
+    assert r.status_code == 200 and r.json()["task"]["lang"] == "ja"
+    inputs = api.get(f"{W}/render/{run['id']}/inputs", headers=wauth()).json()["inputs"]
+    assert {i["kind"]: i["asset_id"] for i in inputs}["hook_audio"] == ja_hook["id"]
+
+
+@pytest.mark.parametrize("case", ["tts", "other_job", "not_ready", "missing"])
+def test_k4_hook_audio_absent_unless_owned_ready_reference(api, db, case):
+    job, rev, run = rendering(db)
+    db.add_asset(job, "source")
+    db.add_asset(job, "hook_audio", mime="audio/wav")  # 최신 녹음이 있어도 대체하지 않는다
+    if case == "tts":
+        rev["spec"]["hook"] = {"text": "훅", "tts": {"voice": "ko-KR-InJoonNeural"}}
+    else:
+        other = db.add_job(status="review") if case == "other_job" else job
+        ref = db.add_asset(
+            other,
+            "hook_audio",
+            mime="audio/wav",
+            status="pending" if case == "not_ready" else "ready",
+        )
+        rev["spec"]["hook"]["audio_asset_id"] = (
+            str(uuid.uuid4()) if case == "missing" else ref["id"]
+        )
+    claim(api)
+    inputs = api.get(f"{W}/render/{run['id']}/inputs", headers=wauth()).json()["inputs"]
+    assert "hook_audio" not in [i["kind"] for i in inputs]
+
+
+def test_k8_ja_run_only_for_ja_capable_worker(api, db):
+    _, _, run = _ja_render_run(db)
+    assert claim(api).status_code == 204  # 능력 미표시
+    r = api.post(f"{W}/claim", json={"capabilities": ["shopping"]}, headers=wauth())
+    assert r.status_code == 204
+    r = api.post(f"{W}/claim", json={"capabilities": ["shopping", "ja"]}, headers=wauth(WORKER_B))
+    assert r.status_code == 200 and r.json()["task"]["id"] == run["id"]
+    bad = api.post(f"{W}/claim", json={"capabilities": ["ko"]}, headers=wauth())
+    assert bad.status_code == 400
+
+
+def test_k2_ja_finish_keeps_job_status(api, db):
+    job, _, run = _ja_render_run(db)
+    api.post(f"{W}/claim", json={"capabilities": ["ja"]}, headers=wauth())
+    r = finish(
+        api, "render", run["id"], status="failed", error_stage="render", error_code="render_failed"
+    )
+    assert r.status_code == 200
+    assert db.job(job["id"])["status"] == "inspect"
 
 
 def test_e9_variety_render_inputs_have_no_hook_audio(api, db):

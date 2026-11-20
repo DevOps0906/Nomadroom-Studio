@@ -466,10 +466,15 @@ def test_untrusted_spec_rejected(mutate):
         to_shopping_project(spec, "ko")
 
 
-def test_lang_ko_only_and_preset_matches_api():
+def test_lang_ko_ja_and_preset_matches_api():
     spec, _ = _spec_only()
-    with pytest.raises(RenderFailed):
+    with pytest.raises(RenderFailed):  # task-050: ja는 고정 표기 "PR"만
         to_shopping_project(spec, "ja")
+    with pytest.raises(RenderFailed):
+        to_shopping_project(spec, "en")
+    spec["lang"] = "ja"
+    spec["disclosure"] = {"text": "PR"}
+    assert to_shopping_project(spec, "ja")["disclosure"] == "PR"
     assert PRESET_VERSION == "shopping-1080-v1"  # task-044 결정(API 작업 preset)과 같은 값
 
 
@@ -511,7 +516,7 @@ def test_layout_trims_drops_and_extends():
 def test_claim_announces_shopping_capability(api, server):
     assert api.claim() is None
     assert json.loads(server.claim_bodies[-1]) == {"capabilities": api_mod.CAPABILITIES}
-    assert "shopping" in api_mod.CAPABILITIES
+    assert "shopping" in api_mod.CAPABILITIES and "ja" in api_mod.CAPABILITIES  # task-050 K8
 
 
 # --- prepare(R1) --------------------------------------------------------------------

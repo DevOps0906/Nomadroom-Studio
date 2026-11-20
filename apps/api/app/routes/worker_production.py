@@ -95,9 +95,10 @@ class ClaimOut(BaseModel):
 
 
 class ClaimIn(_In):
-    """task-045 R4: 워커가 처리할 수 있는 형식. shopping을 알린 워커에게만 쇼핑 task를 새로 준다."""
+    """task-045 R4: 워커가 처리할 수 있는 형식. shopping을 알린 워커에게만 쇼핑 task를 새로 준다.
+    task-050 K8: ja를 알린 워커에게만 ja render run을 새로 준다."""
 
-    capabilities: Annotated[list[Literal["shopping"]], Field(max_length=5)] = []
+    capabilities: Annotated[list[Literal["shopping", "ja"]], Field(max_length=5)] = []
 
 
 class InputOut(BaseModel):
@@ -391,6 +392,43 @@ async def _shopping_render_inputs(
     return inputs
 
 
+async def _spec_hook_audio(
+    request: Request, worker: CurrentWorker, job: dict, run: dict | None
+) -> dict | None:
+    """task-050 K4: run 리비전 spec의 hook.audio_asset_id가 가리키는 이 작업 소유·ready·사용자
+    hook_audio(ko·ja 공통). spec이 tts거나 참조가 없거나 조건이 맞지 않으면 None(워커가
+    tts면 TTS, 아니면 audio_missing으로 실패 — 다른 음성으로 대체하지 않는다)."""
+    rev = await _one(
+        request,
+        "edit_revisions",
+        {
+            "select": "spec",
+            "id": f"eq.{run['revision_id']}" if run else "is.null",
+            "job_id": f"eq.{job['id']}",
+            "workspace_id": f"eq.{worker.workspace_id}",
+        },
+    )
+    spec = rev.get("spec") if rev else None
+    hook = spec.get("hook") if isinstance(spec, dict) else None
+    aid = hook.get("audio_asset_id") if isinstance(hook, dict) else None
+    aid = _uuid_or_none(aid) if isinstance(aid, str) else None
+    if aid is None:
+        return None
+    return await _one(
+        request,
+        "production_assets",
+        {
+            "select": "id,kind,storage_path",
+            "id": f"eq.{aid}",
+            "job_id": f"eq.{job['id']}",
+            "workspace_id": f"eq.{worker.workspace_id}",
+            "kind": "eq.hook_audio",
+            "status": "eq.ready",
+            "render_run_id": "is.null",
+        },
+    )
+
+
 # --- W-05 수령 --------------------------------------------------------------------
 
 
@@ -452,15 +490,8 @@ async def task_inputs(
     if kind == "prepare":
         wanted: tuple[str, ...] = ("source_upload",)
     else:
-        # E9: 최신 ready source·analysis + render_run_id null인 최신 hook_audio(category만)
-        wanted = (
-            ("source", "analysis", "hook_audio")
-            if job["format"] == "category"
-            else (
-                "source",
-                "analysis",
-            )
-        )
+        # E9: 최신 ready source·analysis. 훅 음성은 아래 spec 참조 자산만(task-050 K4)
+        wanted = ("source", "analysis")
     rows = await _rows(
         request,
         "GET",
@@ -486,6 +517,13 @@ async def task_inputs(
             )
             inputs.append(
                 InputOut(asset_id=latest[k]["id"], kind=k, download_url=url, expires_at=exp)
+            )
+    if kind == "render" and job["format"] == "category":
+        hook = await _spec_hook_audio(request, worker, job, run)
+        if hook is not None:
+            url, exp = await storage.sign_download(_http(request), settings, hook["storage_path"])
+            inputs.append(
+                InputOut(asset_id=hook["id"], kind="hook_audio", download_url=url, expires_at=exp)
             )
     response.headers["Cache-Control"] = "no-store"
     logger.info("제작 입력 서명 발급: kind=%s id=%s n=%d", kind, task_id, len(inputs))

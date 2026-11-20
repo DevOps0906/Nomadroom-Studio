@@ -192,19 +192,29 @@ class ProdDB(FakeDB):
         )
         if hit is not None:
             return _err("NR011") if hit["job_id"] != j["id"] else self._run_json(hit, False)
-        if j["status"] != "review":
+        ja = b["p_lang"] == "ja"  # 000028: ja는 inspect·done, 현재 승인 ja·파생 원본 = 현재 승인 ko
+        if j["status"] not in (("inspect", "done") if ja else ("review",)):
             return _state(j["status"])
         rev = next(
             (r for r in self.revisions if r["id"] == b["p_revision"] and r["job_id"] == j["id"]),
             None,
         )
+        current = j.get("current_ja_revision_id") if ja else j["current_revision_id"]
         if (
             rev is None
             or rev["approved_at"] is None
             or rev["lang"] != b["p_lang"]
-            or rev["id"] != j["current_revision_id"]
+            or rev["id"] != current
         ):
             return _err("NR012")
+        if ja:
+            ko = next((r for r in self.revisions if r["id"] == j["current_revision_id"]), None)
+            if (
+                rev.get("derived_from") != j["current_revision_id"]
+                or ko is None
+                or (ko["approved_at"] is None)
+            ):
+                return _err("NR010", "원본(ko) 편집안이 바뀌었습니다. 일본어판을 다시 만드세요.")
         if any(
             r["workspace_id"] == ws and r["status"] in ("queued", "running") for r in self.runs
         ) or any(
@@ -227,9 +237,10 @@ class ProdDB(FakeDB):
             created_at=iso(datetime.now(UTC)),
             updated_at=iso(datetime.now(UTC)),
         )
-        j.update(
-            status="rendering", failed_stage=None, error_code=None, updated_at=run["created_at"]
-        )
+        if not ja:
+            j.update(
+                status="rendering", failed_stage=None, error_code=None, updated_at=run["created_at"]
+            )
         return self._run_json(run, True)
 
     def retry_run(self, b: dict) -> httpx.Response:
@@ -248,6 +259,8 @@ class ProdDB(FakeDB):
         )
         if old is None:
             return _err("NR009")
+        if old["lang"] != "ko":  # 000028 K3
+            return _err("NR010", "일본어판 렌더는 다시 렌더 요청하세요.")
         if (
             old["status"] != "failed"
             or old["error_code"] in ("hook_too_long", "text_too_long", "tts_failed")
@@ -290,6 +303,7 @@ class ProdDB(FakeDB):
         self.rpc_calls.append("claim")
         ws, worker = b["p_workspace"], b["p_worker"]
         shop_ok = "shopping" in (b.get("p_formats") or [])  # 000024 R4: 지원 워커만 쇼핑
+        ja_ok = "ja" in (b.get("p_formats") or [])  # 000028 K8: ja 알린 워커만 ja run
         now = iso(datetime.now(UTC))
         run = next(
             (
@@ -331,6 +345,7 @@ class ProdDB(FakeDB):
                     for r in self.runs
                     if r["workspace_id"] == ws
                     and r["status"] == "queued"
+                    and (ja_ok or r["lang"] != "ja")
                     and (shop_ok or self.job(r["job_id"]).get("kind") != "shopping")
                 ),
                 key=lambda r: r["created_at"],
@@ -669,11 +684,62 @@ def test_e8_key_used_by_other_job_is_409(api, auth, db):
     assert r.status_code == 409 and r.json()["field"] == "Idempotency-Key"
 
 
-def test_e8_lang_ja_is_400_not_ready(api, auth, db):
-    job, rev = review_job(db)
-    r = render(api, auth, job, rev, lang="ja")
-    assert r.status_code == 400 and r.json()["field"] == "lang"
-    assert db.rpc_calls == []
+def ja_job(db: ProdDB, status: str = "inspect", fmt: str = "category") -> tuple[dict, dict, dict]:
+    """task-050: 승인 ko(현재)와 그 ko에서 파생·승인된 현재 ja."""
+    job = db.add_job(status=status, format=fmt)
+    ko = db.add_revision(job, approved=True)
+    ja = db.add_revision(job, approved=True, lang="ja", derived_from=ko["id"])
+    job["current_ja_revision_id"] = ja["id"]
+    job["current_revision_id"] = ko["id"]
+    return job, ko, ja
+
+
+@pytest.mark.parametrize("status", ["inspect", "done"])
+def test_k2_ja_render_keeps_job_status(api, auth, db, status):
+    job, _, ja = ja_job(db, status)
+    r = render(api, auth, job, ja, lang="ja")
+    assert r.status_code == 202
+    run = r.json()["render_run"]
+    assert run["lang"] == "ja" and run["revision_id"] == ja["id"] and run["status"] == "queued"
+    assert db.job(job["id"])["status"] == status  # ja는 job 상태를 바꾸지 않는다
+
+
+def test_k2_ja_render_in_review_is_409(api, auth, db):
+    job, _, ja = ja_job(db, "review")
+    r = render(api, auth, job, ja, lang="ja")
+    assert r.status_code == 409 and "review" in r.json()["message"]
+    assert db.runs == []
+
+
+def test_k2_ja_render_source_changed_is_409(api, auth, db):
+    job, ko, ja = ja_job(db)
+    newer = db.add_revision(job, approved=True)  # ko가 새로 승인됨 → ja 파생 원본이 현재 아님
+    job["current_revision_id"] = newer["id"]
+    r = render(api, auth, job, ja, lang="ja")
+    assert r.status_code == 409 and "원본(ko)" in r.json()["message"]
+    assert db.runs == [] and ko["id"] != newer["id"]
+
+
+def test_k2_ja_lang_with_ko_revision_is_400(api, auth, db):
+    job, ko, _ = ja_job(db)
+    r = render(api, auth, job, ko, lang="ja")
+    assert r.status_code == 400 and db.runs == []
+
+
+def test_k1_variety_ja_is_409_before_rpc(api, auth, db):
+    job, _, ja = ja_job(db, fmt="variety")
+    r = render(api, auth, job, ja, lang="ja")
+    assert r.status_code == 409 and r.json()["field"] == "lang"
+    assert "request" not in db.rpc_calls
+
+
+def test_k3_ja_retry_is_409(api, auth, db):
+    job, _, ja = ja_job(db)
+    run = db.add_run(job, ja, status="failed", error_stage="render", error_code="render_failed")
+    run["lang"] = "ja"
+    r = retry(api, auth, job, run)
+    assert r.status_code == 409 and "다시 렌더 요청" in r.json()["message"]
+    assert len(db.runs) == 1 and db.job(job["id"])["status"] == "inspect"
 
 
 def test_a15_concurrent_second_render_in_workspace_is_409(api, auth, db):

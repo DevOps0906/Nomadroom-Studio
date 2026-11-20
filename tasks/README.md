@@ -51,7 +51,7 @@
 | task-047 | 쇼핑 P0 인수 SHOP-01~06 | W8 | 045, 046 | 보통 | tester | 완료 |
 | task-048 | AI 대본 3안 + 게시 문구 초안 | W9 | 047, 029 | 높음 | builder + tester | 완료 |
 | task-049 | 일본어판 파생·번역 A-20 | W10 | 047 | 높음 | builder + tester | 완료 |
-| task-050 | 일본어 TTS·렌더 | W10 | 049, 030 | 높음 | builder + tester | 대기 |
+| task-050 | 일본어 TTS·렌더 | W10 | 049, 030 | 높음 | builder + tester | 완료 |
 | task-051 | 예능형 일본어 더빙 | W10 | 050, 038 | 높음 | builder + tester | 대기 |
 | task-052 | 언어 탭 화면 | W10 | 049 | 보통 | builder | 대기 |
 | task-053 | 일본어판·쇼핑 P1 인수 + 회귀 | W10 | 048, 051, 052, 054 | 보통 | tester | 대기 |
@@ -92,3 +92,4 @@
 - 테스트의 가짜 JWT·키는 문자열 리터럴로 두지 말고 런타임에 조립한다(gitleaks pre-commit 차단).
 - 외부 인증 방식(JWT alg 등)은 계획 전에 실제 엔드포인트로 확인한다(모킹 테스트만으로는 거짓 통과). 
 | 2026-11-20 | A-12 저장(ko·ja, task-049) | 낙관적 잠금이 rev_no만 비교 → 미승인본을 같은 rev_no로 두 사람이 동시에 저장하면 앞선 편집 유실(ko 000016·ja 000027 동일 계약) | base_updated_at(또는 저장 버전) 추가 — API·웹 계약 변경(보통) |
+| 2026-11-20 | 배포(W-06 훅 음성, task-050 K4) | W-06이 리비전 spec의 hook.audio_asset_id만 줌 → 참조 없이 승인된 기존 category ko 리비전은 audio_missing 실패 가능(운영 데이터 없음) | 배포 전 해당 리비전 탐지 후 재승인 — 08 배포 체크리스트 |
