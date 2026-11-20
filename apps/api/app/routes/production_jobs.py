@@ -1,5 +1,6 @@
 """제작 작업 API A-09~A-13·A-17·A-18·A-21. 근거: docs/04_API.md#제작-api, tasks/task-022.md(D1~D9),
-쇼핑(kind=shopping)은 tasks/task-044.md#착수-결정(P1~P10).
+쇼핑(kind=shopping)은 tasks/task-044.md#착수-결정(P1~P10),
+일본어판(lang=ja) A-12·A-13은 tasks/task-049.md#착수-결정(J2·J4~J8, RPC 000027).
 
 - 웹·API는 작업 ID·자산 ID만 주고받는다. 경로는 서버가 만든다(production/storage.py).
 - 모든 조회에 workspace_id 조건, 자산은 id·job_id·workspace_id 세 조건(D9). 타 워크스페이스 404.
@@ -20,7 +21,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstr
 from app.auth.user import CurrentUser, get_current_user
 from app.errors import ApiError, db_error, not_found
 from app.jobs.state import OFFLINE_AFTER
-from app.production import shopping, storage
+from app.production import shopping, storage, translate
 from app.production.runs import delete_objects, expire_offline
 from app.production.spec import TOL
 from app.production.url_guard import check_source_url
@@ -49,7 +50,7 @@ LIST_COLUMNS = (
 # task-045: rights·parent_asset_id는 쇼핑 PROD-03 권리 목록·원본 계보용(A-09 상세)
 ASSET_COLUMNS = "id,kind,status,size_bytes,duration_sec,rights,parent_asset_id"
 RUN_COLUMNS = "id,status,progress_pct,progress_stage,error_stage,error_code,attempt,claimed_by"
-REVISION_COLUMNS = "id,rev_no,spec,origin,validation,approved_at"
+REVISION_COLUMNS = "id,rev_no,spec,origin,validation,approved_at,derived_from"
 IDEMPOTENCY_CONSTRAINT = "production_jobs_workspace_id_idempotency_key_key"
 # 원본 개수 트리거(000023): 23505 = 일반 ready 2건째·쇼핑 11건째, NR010 = 상태 불가
 _SOURCE_LIMIT = "23505"
@@ -336,6 +337,7 @@ class RevisionOut(BaseModel):
     origin: str
     validation: dict[str, Any]
     approved_at: datetime | None
+    derived_from: uuid.UUID | None = None  # ja 리비전의 원본 ko 리비전(task-049)
 
 
 class RevisionEnvelope(BaseModel):
@@ -353,6 +355,7 @@ class ApproveIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     rev_no: Annotated[int, Field(strict=True, ge=1)]
+    lang: Literal["ko", "ja"] = "ko"  # task-049 J5
 
 
 class ApprovedRevisionOut(BaseModel):
@@ -519,14 +522,20 @@ async def _shopping_assets(request: Request, ws: uuid.UUID, job_id: uuid.UUID) -
 
 
 def _validate(
-    spec: dict, job: dict, source_duration: float | None, assets: dict | None = None
+    spec: dict,
+    job: dict,
+    source_duration: float | None,
+    assets: dict | None = None,
+    lang: str | None = None,
 ) -> dict:
     """작업 format별 검증(validate_for_format) + 작업 값 비교(source_start_sec·preset_version).
 
     스키마 오류가 있으면 의미 검사(작업 값 비교 포함)를 하지 않는다(task-021 리뷰 🟡2).
     variety: 구간 길이 = min(segment_len_sec, 원본 길이), 원본 크기 = source_meta(task-035 V4).
     shopping: 이 작업 자산 맵(assets)이 없으면 assets.required 오류(fail-closed).
+    lang: 리비전 언어(task-049 J4, 없으면 작업 lang).
     """
+    lang = lang or job.get("lang")
     size = _source_size(job)
     segment_len = float(job["segment_len_sec"]) if job.get("segment_len_sec") is not None else None
     if segment_len is not None and source_duration is not None:
@@ -535,7 +544,7 @@ def _validate(
         result = validate_shopping_spec(
             spec,
             assets=assets,
-            job_lang=job.get("lang"),
+            job_lang=lang,
             product_name=shopping.product_name(job),
         )
     else:
@@ -545,7 +554,7 @@ def _validate(
             source_duration=source_duration,
             segment_len=segment_len,
             source_size=size,
-            job_lang=job.get("lang"),
+            job_lang=lang,
         )
     if any(e["code"].startswith("schema.") for e in result["errors"]):
         return result
@@ -584,6 +593,105 @@ def _rejected(validation: dict) -> bool:
         e["code"].startswith("schema.") or e["code"] == "path.forbidden"
         for e in validation["errors"]
     )
+
+
+# --- 일본어판(ja) 리비전(task-049) ------------------------------------------------
+
+
+async def _revision_row(
+    request: Request, ws: uuid.UUID, job_id: Any, rev_id: Any, lang: str, columns: str
+) -> dict | None:
+    if not rev_id:
+        return None
+    rows = await _rows(
+        request,
+        "GET",
+        "edit_revisions",
+        params={
+            "select": columns,
+            "id": f"eq.{rev_id}",
+            "job_id": f"eq.{job_id}",
+            "workspace_id": f"eq.{ws}",
+            "lang": f"eq.{lang}",
+        },
+    )
+    return rows[0] if rows else None
+
+
+async def _ko_approved(request: Request, ws: uuid.UUID, job: dict) -> bool:
+    """현재 ko 리비전이 승인됐는지(J2)."""
+    ko = await _revision_row(
+        request, ws, job["id"], job.get("current_revision_id"), "ko", "id,approved_at"
+    )
+    return ko is not None and ko.get("approved_at") is not None
+
+
+async def _ja_rendering(request: Request, ws: uuid.UUID, job_id: Any) -> bool:
+    rows = await _rows(
+        request,
+        "GET",
+        "render_runs",
+        params={
+            "select": "id",
+            "job_id": f"eq.{job_id}",
+            "workspace_id": f"eq.{ws}",
+            "lang": "eq.ja",
+            "status": "in.(queued,running)",
+            "limit": "1",
+        },
+    )
+    return bool(rows)
+
+
+async def _ja_writable(request: Request, ws: uuid.UUID, job: dict) -> None:
+    """J2: 현재 ko 승인 + ja 렌더 진행 중 아님 + 현재 ja 리비전 있음. 아니면 409."""
+    if not job.get("current_ja_revision_id") or not await _ko_approved(request, ws, job):
+        raise ApiError(
+            409, "CONFLICT", "원본(ko) 편집안이 승인되고 일본어판이 있을 때만 할 수 있습니다."
+        )
+    if await _ja_rendering(request, ws, job["id"]):
+        raise ApiError(409, "CONFLICT", "일본어판 렌더가 진행 중입니다.")
+
+
+async def _source_errors(request: Request, ws: uuid.UUID, job: dict, rev: dict) -> list[dict]:
+    """J8: 읽는 시점에 derived_from과 현재 ko 승인 리비전을 비교한다."""
+    return translate.source_changed(
+        rev.get("derived_from"),
+        job.get("current_revision_id"),
+        await _ko_approved(request, ws, job),
+    )
+
+
+def _validate_ja(
+    spec: dict,
+    job: dict,
+    ko_spec: Any,
+    source_duration: float | None,
+    assets: dict | None,
+) -> dict:
+    """ja 리비전 검증(J4·J6·J10): 리비전 lang=ja로 형식 검증 + ja 내용 규칙 + ko 녹음 참조."""
+    result = _validate(spec, job, source_duration, assets, lang="ja")
+    if any(e["code"].startswith("schema.") for e in result["errors"]):
+        return result
+    rules = translate.content_rules(job["format"], spec)
+    result["errors"] += rules["errors"] + translate.voice_errors(job["format"], spec, ko_spec)
+    result["warnings"] += rules["warnings"]
+    return result
+
+
+def _with_errors(rev: dict, extra: list[dict]) -> dict:
+    """저장된 validation과 별개로 읽는 시점 오류를 합친 응답용 사본."""
+    if not extra:
+        return rev
+    v = rev.get("validation") or {}
+    return {
+        **rev,
+        "validation": {
+            **v,
+            "errors": [*(v.get("errors") or []), *extra],
+            "warnings": list(v.get("warnings") or []),
+        },
+    }
 
 
 def _is_prepare_state(job: dict) -> bool:
@@ -1205,11 +1313,12 @@ async def get_revision(
     job_id: uuid.UUID,
     request: Request,
     rev_no: Annotated[int | None, Query(ge=1)] = None,
-    lang: Literal["ko"] = "ko",
+    lang: Literal["ko", "ja"] = "ko",
     user: CurrentUser = Depends(get_current_user),
 ) -> RevisionEnvelope:
     ws = user.workspace_id
-    job = await _get_job(request, ws, job_id, "id,current_revision_id")
+    job = await _get_job(request, ws, job_id, "id,current_revision_id,current_ja_revision_id")
+    current = job.get(_LANG_REVISION[lang])
     params = {
         "select": REVISION_COLUMNS,
         "job_id": f"eq.{job_id}",
@@ -1218,14 +1327,17 @@ async def get_revision(
     }
     if rev_no is not None:
         params["rev_no"] = f"eq.{rev_no}"
-    elif job.get("current_revision_id"):
-        params["id"] = f"eq.{job['current_revision_id']}"
+    elif current:
+        params["id"] = f"eq.{current}"
     else:
         raise not_found()
     rows = await _rows(request, "GET", "edit_revisions", params=params)
     if not rows:
         raise not_found()
-    return RevisionEnvelope(revision=RevisionOut.model_validate(rows[0]))
+    rev = rows[0]
+    if lang == "ja":  # J8: 원본 변경은 읽는 시점에 계산해 합친다(저장하지 않음)
+        rev = _with_errors(rev, await _source_errors(request, ws, job, rev))
+    return RevisionEnvelope(revision=RevisionOut.model_validate(rev))
 
 
 @router.put("/{job_id}/revision", response_model=RevisionEnvelope)
@@ -1233,7 +1345,7 @@ async def put_revision(
     job_id: uuid.UUID,
     body: RevisionPutIn,
     request: Request,
-    lang: Literal["ko"] = "ko",
+    lang: Literal["ko", "ja"] = "ko",
     user: CurrentUser = Depends(get_current_user),
 ) -> RevisionEnvelope | JSONResponse:
     ws = user.workspace_id
@@ -1242,8 +1354,10 @@ async def put_revision(
         ws,
         job_id,
         "id,status,failed_stage,format,lang,source_start_sec,segment_len_sec,preset_version,"
-        "source_meta,current_revision_id,kind,vertical,brief",
+        "source_meta,current_revision_id,kind,vertical,brief,current_ja_revision_id",
     )
+    if lang == "ja":
+        return await _put_ja(request, ws, job, body, user)
     # D3: review·inspect·failed(audio·render)만, 리비전 없으면 409
     editable = job["status"] in ("review", "inspect") or (
         job["status"] == "failed" and job.get("failed_stage") in ("audio", "render")
@@ -1277,6 +1391,108 @@ async def put_revision(
     return RevisionEnvelope(revision=RevisionOut.model_validate(saved))
 
 
+async def _put_ja(
+    request: Request, ws: uuid.UUID, job: dict, body: RevisionPutIn, user: CurrentUser
+) -> RevisionEnvelope | JSONResponse:
+    """A-12 PUT(ja): J2 허용 조건 → ja 검증 → 편집 가드(J7, 400 저장 안 함) → save_ja_revision.
+    job 상태는 바꾸지 않는다."""
+    job_id = job["id"]
+    await _ja_writable(request, ws, job)
+    ja = await _revision_row(
+        request, ws, job_id, job["current_ja_revision_id"], "ja", "id,rev_no,derived_from"
+    )
+    if ja is None:
+        raise _state_conflict(job["status"])
+    ko = await _revision_row(request, ws, job_id, ja.get("derived_from"), "ko", "id,spec")
+    ko_spec = ko.get("spec") if ko else None
+    assets = await _shopping_assets(request, ws, job_id) if job["format"] == "shopping" else None
+    duration = await _source_duration(request, ws, job_id)
+    validation = _validate_ja(body.spec, job, ko_spec, duration, assets)
+    if _rejected(validation):
+        return _validation_response("편집안 형식이 올바르지 않습니다.", validation)
+    locked = translate.locked_errors(job["format"], body.spec, ko_spec)
+    if locked:
+        return _validation_response(
+            "일본어판은 문구·음성만 고칠 수 있습니다.", {**validation, "errors": locked}
+        )
+    saved = await _rpc(
+        request,
+        "save_ja_revision",
+        {
+            "p_workspace": str(ws),
+            "p_job": str(job_id),
+            "p_user": str(user.user_id),
+            "p_base_rev_no": body.base_rev_no,
+            "p_spec": body.spec,
+            "p_validation": validation,
+        },
+        "base_rev_no",
+    )
+    logger.info(
+        "일본어판 편집안 저장: job=%s rev=%s errors=%d",
+        job_id,
+        saved.get("rev_no"),
+        len(validation["errors"]),
+    )
+    saved = _with_errors(saved, await _source_errors(request, ws, job, saved))
+    return RevisionEnvelope(revision=RevisionOut.model_validate(saved))
+
+
+async def _approve_ja(
+    request: Request, ws: uuid.UUID, job_id: uuid.UUID, body: ApproveIn, user: CurrentUser
+) -> ApprovedEnvelope | JSONResponse:
+    """A-13(ja): J2 허용 조건 → 서버 재검증(ja 규칙·ko 녹음·편집 가드·원본 변경 J8) →
+    approve_ja_revision(updated_at 일치). job 상태는 바꾸지 않는다."""
+    job = await _get_job(
+        request,
+        ws,
+        job_id,
+        "id,status,format,lang,source_start_sec,segment_len_sec,preset_version,source_meta,"
+        "current_revision_id,current_ja_revision_id,kind,vertical,brief",
+    )
+    await _ja_writable(request, ws, job)
+    rev = await _revision_row(
+        request,
+        ws,
+        job_id,
+        job["current_ja_revision_id"],
+        "ja",
+        "id,rev_no,spec,approved_at,updated_at,derived_from",
+    )
+    if rev is None:
+        raise _state_conflict(job["status"])
+    if rev["rev_no"] != body.rev_no:
+        raise _stale("rev_no")
+    if rev["approved_at"] is not None:
+        raise ApiError(409, "CONFLICT", "이미 승인된 리비전입니다.", "rev_no")
+    ko = await _revision_row(request, ws, job_id, rev.get("derived_from"), "ko", "id,spec")
+    ko_spec = ko.get("spec") if ko else None
+    assets = await _shopping_assets(request, ws, job_id) if job["format"] == "shopping" else None
+    validation = _validate_ja(
+        rev["spec"], job, ko_spec, await _source_duration(request, ws, job_id), assets
+    )
+    if not any(e["code"].startswith("schema.") for e in validation["errors"]):
+        validation["errors"] += translate.locked_errors(job["format"], rev["spec"], ko_spec)
+    validation["errors"] += await _source_errors(request, ws, job, rev)
+    if validation["errors"]:
+        return _validation_response("편집안에 오류가 있어 승인할 수 없습니다.", validation)
+    approved = await _rpc(
+        request,
+        "approve_ja_revision",
+        {
+            "p_workspace": str(ws),
+            "p_job": str(job_id),
+            "p_user": str(user.user_id),
+            "p_rev_no": body.rev_no,
+            "p_updated_at": rev["updated_at"],
+            "p_validation": validation,
+        },
+        "rev_no",
+    )
+    logger.info("일본어판 편집안 승인: job=%s rev=%s", job_id, approved.get("rev_no"))
+    return ApprovedEnvelope(revision=ApprovedRevisionOut.model_validate(approved))
+
+
 # --- A-13 ----------------------------------------------------------------------
 
 
@@ -1288,6 +1504,8 @@ async def approve_revision(
     user: CurrentUser = Depends(get_current_user),
 ) -> ApprovedEnvelope | JSONResponse:
     ws = user.workspace_id
+    if body.lang == "ja":
+        return await _approve_ja(request, ws, job_id, body, user)
     job = await _get_job(
         request,
         ws,

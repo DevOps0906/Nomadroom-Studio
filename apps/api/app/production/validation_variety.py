@@ -113,7 +113,7 @@ class Reaction(_M):
 
 
 class VarietySpec(_M):
-    lang: Literal["ko"] | None = None
+    lang: Literal["ko", "ja"] | None = None  # task-049 J4: ja 리비전 허용
     header: Header
     cuts: Annotated[list[Cut], Field(max_length=MAX_CUTS)]
     subtitles: Annotated[list[Subtitle], Field(max_length=MAX_SUBTITLES)] = []

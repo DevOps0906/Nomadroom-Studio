@@ -2,6 +2,8 @@
 tasks/task-029.md#착수-결정 H1~H8, supabase/migrations/20261119000018_production_ai_draft.sql,
 예능형 분기 tasks/task-040.md#착수-결정 A1~A5(000022: variety·ko만 예약),
 쇼핑 분기 tasks/task-048.md#착수-결정 S1~S6(000025: shopping·ko 예약, 3안은 요청 기록에 저장).
+번역 A-20 `POST /v1/production-jobs/{id}/translate`는 tasks/task-049.md#착수-결정 J1~J10
+(000027: AI 초안과 별도 카운터·멱등 키·60초, 현재 승인 ko만, ja 리비전 새 rev_no).
 
 순서: 키 확인(없으면 503, 계수 없음) → reserve_ai_draft(잠금·상태·형식·상한·60초·멱등, 횟수+1, 커밋)
 → 잠금 없이 입력 수집·Claude 호출(형식 불일치·오류는 1회 재시도) → create_ai_draft_revision
@@ -11,24 +13,26 @@ tasks/task-029.md#착수-결정 H1~H8, supabase/migrations/20261119000018_produc
 
 import logging
 import uuid
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Header, Request, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.auth.user import CurrentUser, get_current_user
 from app.errors import ApiError, db_error
-from app.production import ai_draft, ai_draft_shopping, ai_draft_variety, runs
+from app.production import ai_draft, ai_draft_shopping, ai_draft_variety, runs, translate
 from app.production.validation_variety import MAX_TEXT_CHARS
 from app.routes.production_jobs import (
     RevisionOut,
     _get_job,
     _rejected,
+    _revision_row,
     _rows,
     _shopping_assets,
     _source_duration,
     _source_size,
     _validate,
+    _validate_ja,
 )
 from app.routes.profiles import _send
 from app.routes.verify_runs import _KEY_RE
@@ -378,6 +382,220 @@ async def create_ai_draft(
         job_id,
         out.revision.rev_no,
         out.ai_draft_count,
+        len(validation["errors"]),
+    )
+    return out
+
+
+# --- A-20 번역(task-049) ----------------------------------------------------------
+
+
+class TranslateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    revision_id: uuid.UUID  # 현재 승인된 ko 리비전(J2)
+    target_lang: Literal["ja"]
+
+
+class TranslateOut(BaseModel):
+    revision: RevisionOut  # lang=ja, derived_from=입력 ko 리비전, 미승인
+    translate_count: int
+    replay: bool
+
+
+async def _trpc(request: Request, name: str, payload: dict) -> Any:
+    """000027 번역 RPC. NR012(입력 리비전)·NR016~018은 번역 문구로, 나머지는 runs._map."""
+    path = f"rpc/{name}"
+    resp = await _send(request, "POST", path, json=payload)
+    if 400 <= resp.status_code < 500:
+        code, message = runs._error_body(resp)
+        if code == "NR012":
+            raise ApiError(
+                400,
+                "VALIDATION",
+                "현재 승인된 원본(ko) 리비전만 번역할 수 있습니다.",
+                "revision_id",
+            )
+        if code == "NR016":
+            raise ApiError(429, "QUOTA_EXCEEDED", "이 작업의 번역 횟수를 모두 썼습니다.")
+        if code == "NR017":
+            raise ApiError(
+                429, "RATE_LIMITED", "번역을 너무 자주 요청했습니다. 잠시 후 다시 시도하세요."
+            )
+        if code == "NR018":
+            raise ApiError(409, "CONFLICT", "같은 요청을 처리 중입니다.", "Idempotency-Key")
+        err = runs._map(code, message, "Idempotency-Key")
+        if err is not None:
+            raise err
+    if resp.status_code >= 400:
+        logger.warning("데이터 저장소 오류 %s: POST %s", resp.status_code, path)
+        raise db_error()
+    if not resp.content:
+        return None
+    try:
+        return resp.json()
+    except ValueError as exc:
+        raise db_error() from exc
+
+
+async def _tfail(request: Request, ids: dict) -> None:
+    try:
+        await _trpc(request, "fail_translation", ids)
+    except Exception as exc:  # noqa: BLE001 - 정리 실패가 원래 오류를 가리면 안 된다
+        logger.warning("번역 실패 기록 실패: job=%s err=%s", ids["p_job"], type(exc).__name__)
+
+
+def _tout(result: Any) -> TranslateOut:
+    if not isinstance(result, dict) or not isinstance(result.get("revision"), dict):
+        raise db_error()
+    return TranslateOut(
+        revision=RevisionOut.model_validate(result["revision"]),
+        translate_count=result["translate_count"],
+        replay=bool(result.get("replay")),
+    )
+
+
+async def _translate(
+    request: Request, ws: uuid.UUID, job: dict, ko_id: uuid.UUID
+) -> tuple[dict, dict]:
+    """ko spec의 J3 텍스트만 Claude(최대 2회)로 옮기고 → 파생(J6) → ja 검증·편집 가드.
+    경로·개수 불일치·숫자 추가·스키마 오류는 재시도, 끝내 실패하면 DraftFailed."""
+    settings = request.app.state.settings
+    fmt = job["format"]
+    ko = await _revision_row(request, ws, job["id"], ko_id, "ko", "id,spec")
+    ko_spec = ko.get("spec") if ko else None
+    if not isinstance(ko_spec, dict):
+        raise ai_draft.DraftFailed("no_base")
+    slots = [(p, t) for p, t in translate.text_slots(fmt, ko_spec) if t.strip()]
+    assets = await _shopping_assets(request, ws, job["id"]) if fmt == "shopping" else None
+    duration = await _source_duration(request, ws, job["id"])
+    content = translate.build_content(fmt, slots)
+    tool = translate.tool_schema([p for p, _ in slots])
+    reason = "schema"
+    for _ in range(ATTEMPTS):
+        texts: dict[str, str] = {}
+        if slots:
+            try:
+                out = await ai_draft.call_claude(
+                    settings, content, system=translate.SYSTEM_PROMPT, tool=tool
+                )
+                texts = translate.parse(out, slots)
+            except (ai_draft.DraftFailed, translate.TranslateFailed) as exc:
+                reason = str(exc)
+                continue
+        spec = translate.derive(fmt, ko_spec, texts)
+        validation = _validate_ja(spec, job, ko_spec, duration, assets)
+        if _rejected(validation) or translate.locked_errors(fmt, spec, ko_spec):
+            reason = "schema"
+            continue
+        return spec, validation
+    raise ai_draft.DraftFailed(reason)
+
+
+async def _replay_without_key(
+    request: Request, ws: uuid.UUID, job: dict, key: str
+) -> TranslateOut | None:
+    """같은 키 기록이 done이면 replay 결과, failed면 502. 기록이 없거나 처리 중이면 None."""
+    reqs = job.get("translate_requests")
+    req = next(
+        (e for e in (reqs if isinstance(reqs, list) else []) if isinstance(e, dict)
+         and e.get("key") == key),
+        None,
+    )  # fmt: skip
+    if req is None:
+        return None
+    if req.get("status") == "failed":
+        raise translate.upstream_failed()
+    if req.get("status") != "done":
+        return None
+    rev = await _revision_row(
+        request,
+        ws,
+        job["id"],
+        req.get("revision_id"),
+        "ja",
+        "id,rev_no,spec,origin,validation,approved_at,derived_from",
+    )
+    if rev is None:
+        raise db_error()
+    return TranslateOut(
+        revision=RevisionOut.model_validate(rev),
+        translate_count=int(job.get("translate_count") or 0),
+        replay=True,
+    )
+
+
+@router.post("/{job_id}/translate", response_model=TranslateOut, status_code=201)
+async def translate_revision(
+    job_id: uuid.UUID,
+    body: TranslateIn,
+    request: Request,
+    response: Response,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    user: CurrentUser = Depends(get_current_user),
+) -> TranslateOut:
+    if idempotency_key is None or not _KEY_RE.fullmatch(idempotency_key):
+        raise ApiError(400, "VALIDATION", "Idempotency-Key 헤더가 필요합니다.", "Idempotency-Key")
+    settings = request.app.state.settings
+    ws = user.workspace_id
+    job = await _get_job(
+        request,
+        ws,
+        job_id,
+        "id,status,format,lang,source_start_sec,segment_len_sec,preset_version,source_meta,"
+        "current_revision_id,current_ja_revision_id,kind,vertical,brief,"
+        "translate_count,translate_requests",
+    )
+    if settings.anthropic_api_key is None:
+        # 리뷰 반영(2): 키가 없어도 같은 키의 끝난 요청은 replay. 새 요청은 503(호출·계수 없음)
+        replayed = await _replay_without_key(request, ws, job, idempotency_key)
+        if replayed is None:
+            raise translate.not_configured()
+        response.status_code = 200
+        return replayed
+    ids = {"p_workspace": str(ws), "p_job": str(job_id), "p_key": idempotency_key}
+    reserved = await _trpc(
+        request,
+        "reserve_translation",
+        {
+            **ids,
+            "p_user": str(user.user_id),
+            "p_revision": str(body.revision_id),
+            "p_limit": settings.ai_draft_max_per_job,  # J9: Q7 값 재사용(카운터는 별도)
+        },
+    )
+    if not isinstance(reserved, dict):
+        raise db_error()
+    if reserved.get("replay"):
+        response.status_code = 200
+        if reserved.get("request_status") != "done":
+            raise translate.upstream_failed()
+        return _tout(reserved)
+
+    try:
+        spec, validation = await _translate(request, ws, job, body.revision_id)
+    except ai_draft.DraftFailed as exc:
+        await _tfail(request, ids)
+        logger.warning("번역 실패: job=%s reason=%s", job_id, exc)
+        raise translate.upstream_failed() from None
+    except Exception:
+        await _tfail(request, ids)
+        raise
+    try:
+        created = await _trpc(
+            request,
+            "create_ja_translation",
+            {**ids, "p_user": str(user.user_id), "p_spec": spec, "p_validation": validation},
+        )
+    except ApiError:
+        await _tfail(request, ids)
+        raise
+    out = _tout(created)
+    logger.info(
+        "일본어판 파생: job=%s rev=%s count=%s errors=%d",
+        job_id,
+        out.revision.rev_no,
+        out.translate_count,
         len(validation["errors"]),
     )
     return out

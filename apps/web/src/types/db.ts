@@ -345,14 +345,14 @@ isOneToOne: false
                   ]
                 },"production_jobs": {
                   Row: {
-                    "affiliates": NonNullable<Json>,"ai_draft_count": number,"ai_draft_requests": NonNullable<Json>,"brief": Json | null,"candidate_id": string | null,"claimed_by": string | null,"comment_keyword": string | null,"completed_at": string | null,"created_at": string,"credit": string | null,"current_ja_revision_id": string | null,"current_revision_id": string | null,"error_code": string | null,"failed_stage": string | null,"format": string,"id": string,"idempotency_key": string,"kind": string,"lang": string,"license_cc": boolean | null,"preset_version": string,"requested_by": string | null,"retry_count": number,"rights_confirmed": boolean,"rights_confirmed_at": string | null,"rights_confirmed_by": string | null,"segment_len_sec": number,"source_kind": string,"source_meta": Json | null,"source_start_sec": number,"source_url": string | null,"status": string,"title": string,"transcribe_error": string | null,"transcribe_state": string | null,"transcribe_updated_at": string | null,"updated_at": string,"vertical": string | null,"workspace_id": string
+                    "affiliates": NonNullable<Json>,"ai_draft_count": number,"ai_draft_requests": NonNullable<Json>,"brief": Json | null,"candidate_id": string | null,"claimed_by": string | null,"comment_keyword": string | null,"completed_at": string | null,"created_at": string,"credit": string | null,"current_ja_revision_id": string | null,"current_revision_id": string | null,"error_code": string | null,"failed_stage": string | null,"format": string,"id": string,"idempotency_key": string,"kind": string,"lang": string,"license_cc": boolean | null,"preset_version": string,"requested_by": string | null,"retry_count": number,"rights_confirmed": boolean,"rights_confirmed_at": string | null,"rights_confirmed_by": string | null,"segment_len_sec": number,"source_kind": string,"source_meta": Json | null,"source_start_sec": number,"source_url": string | null,"status": string,"title": string,"transcribe_error": string | null,"transcribe_state": string | null,"transcribe_updated_at": string | null,"translate_count": number,"translate_requests": NonNullable<Json>,"updated_at": string,"vertical": string | null,"workspace_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "affiliates"?: NonNullable<Json>,"ai_draft_count"?: number,"ai_draft_requests"?: NonNullable<Json>,"brief"?: Json | null,"candidate_id"?: string | null,"claimed_by"?: string | null,"comment_keyword"?: string | null,"completed_at"?: string | null,"created_at"?: string,"credit"?: string | null,"current_ja_revision_id"?: string | null,"current_revision_id"?: string | null,"error_code"?: string | null,"failed_stage"?: string | null,"format"?: string,"id"?: string,"idempotency_key": string,"kind"?: string,"lang"?: string,"license_cc"?: boolean | null,"preset_version": string,"requested_by"?: string | null,"retry_count"?: number,"rights_confirmed"?: boolean,"rights_confirmed_at"?: string | null,"rights_confirmed_by"?: string | null,"segment_len_sec": number,"source_kind"?: string,"source_meta"?: Json | null,"source_start_sec"?: number,"source_url"?: string | null,"status"?: string,"title": string,"transcribe_error"?: string | null,"transcribe_state"?: string | null,"transcribe_updated_at"?: string | null,"updated_at"?: string,"vertical"?: string | null,"workspace_id": string
+                    "affiliates"?: NonNullable<Json>,"ai_draft_count"?: number,"ai_draft_requests"?: NonNullable<Json>,"brief"?: Json | null,"candidate_id"?: string | null,"claimed_by"?: string | null,"comment_keyword"?: string | null,"completed_at"?: string | null,"created_at"?: string,"credit"?: string | null,"current_ja_revision_id"?: string | null,"current_revision_id"?: string | null,"error_code"?: string | null,"failed_stage"?: string | null,"format"?: string,"id"?: string,"idempotency_key": string,"kind"?: string,"lang"?: string,"license_cc"?: boolean | null,"preset_version": string,"requested_by"?: string | null,"retry_count"?: number,"rights_confirmed"?: boolean,"rights_confirmed_at"?: string | null,"rights_confirmed_by"?: string | null,"segment_len_sec": number,"source_kind"?: string,"source_meta"?: Json | null,"source_start_sec"?: number,"source_url"?: string | null,"status"?: string,"title": string,"transcribe_error"?: string | null,"transcribe_state"?: string | null,"transcribe_updated_at"?: string | null,"translate_count"?: number,"translate_requests"?: NonNullable<Json>,"updated_at"?: string,"vertical"?: string | null,"workspace_id": string
                   }
                   Update: {
-                    "affiliates"?: NonNullable<Json>,"ai_draft_count"?: number,"ai_draft_requests"?: NonNullable<Json>,"brief"?: Json | null,"candidate_id"?: string | null,"claimed_by"?: string | null,"comment_keyword"?: string | null,"completed_at"?: string | null,"created_at"?: string,"credit"?: string | null,"current_ja_revision_id"?: string | null,"current_revision_id"?: string | null,"error_code"?: string | null,"failed_stage"?: string | null,"format"?: string,"id"?: string,"idempotency_key"?: string,"kind"?: string,"lang"?: string,"license_cc"?: boolean | null,"preset_version"?: string,"requested_by"?: string | null,"retry_count"?: number,"rights_confirmed"?: boolean,"rights_confirmed_at"?: string | null,"rights_confirmed_by"?: string | null,"segment_len_sec"?: number,"source_kind"?: string,"source_meta"?: Json | null,"source_start_sec"?: number,"source_url"?: string | null,"status"?: string,"title"?: string,"transcribe_error"?: string | null,"transcribe_state"?: string | null,"transcribe_updated_at"?: string | null,"updated_at"?: string,"vertical"?: string | null,"workspace_id"?: string
+                    "affiliates"?: NonNullable<Json>,"ai_draft_count"?: number,"ai_draft_requests"?: NonNullable<Json>,"brief"?: Json | null,"candidate_id"?: string | null,"claimed_by"?: string | null,"comment_keyword"?: string | null,"completed_at"?: string | null,"created_at"?: string,"credit"?: string | null,"current_ja_revision_id"?: string | null,"current_revision_id"?: string | null,"error_code"?: string | null,"failed_stage"?: string | null,"format"?: string,"id"?: string,"idempotency_key"?: string,"kind"?: string,"lang"?: string,"license_cc"?: boolean | null,"preset_version"?: string,"requested_by"?: string | null,"retry_count"?: number,"rights_confirmed"?: boolean,"rights_confirmed_at"?: string | null,"rights_confirmed_by"?: string | null,"segment_len_sec"?: number,"source_kind"?: string,"source_meta"?: Json | null,"source_start_sec"?: number,"source_url"?: string | null,"status"?: string,"title"?: string,"transcribe_error"?: string | null,"transcribe_state"?: string | null,"transcribe_updated_at"?: string | null,"translate_count"?: number,"translate_requests"?: NonNullable<Json>,"updated_at"?: string,"vertical"?: string | null,"workspace_id"?: string
                   }
                   Relationships: [
                     {
@@ -614,8 +614,17 @@ isOneToOne: false
 "_gen_run_json":
 { Args: { "p_run": Omit<Database["public"]['Tables']["generation_runs"]['Row'], Database["public"]['Tables']["generation_runs"]['ComputedFields']> }; Returns: Json
                            },
+"_ja_writable":
+{ Args: { "p_job": string,"p_ko": string }; Returns: undefined
+                           },
 "_render_run_json":
 { Args: { "p_created": boolean,"p_run": Omit<Database["public"]['Tables']["render_runs"]['Row'], Database["public"]['Tables']["render_runs"]['ComputedFields']> }; Returns: Json
+                           },
+"_translate_json":
+{ Args: { "p_count": number,"p_replay": boolean,"p_req": Json }; Returns: Json
+                           },
+"_translate_set":
+{ Args: { "p_job": string,"p_key": string,"p_patch": Json }; Returns: Json
                            },
 "apply_collect_batch":
 { Args: { "p_job": string,"p_payload": Json,"p_profile": string,"p_worker": string,"p_workspace": string }; Returns: number
@@ -625,6 +634,9 @@ isOneToOne: false
                            },
 "apply_verify_batch":
 { Args: { "p_job": string,"p_payload": Json,"p_workspace": string }; Returns: number
+                           },
+"approve_ja_revision":
+{ Args: { "p_job": string,"p_rev_no": number,"p_updated_at": string,"p_user": string,"p_validation": Json,"p_workspace": string }; Returns: Json
                            },
 "approve_production_revision":
 { Args: { "p_job": string,"p_rev_no": number,"p_updated_at": string,"p_user": string,"p_validation": Json,"p_workspace": string }; Returns: Json
@@ -646,10 +658,16 @@ isOneToOne: false
 "create_ai_draft_revision":
 { Args: { "p_facts"?: Json,"p_job": string,"p_key": string,"p_spec": Json,"p_user": string,"p_validation": Json,"p_variants"?: Json,"p_workspace": string }; Returns: Json
                            },
+"create_ja_translation":
+{ Args: { "p_job": string,"p_key": string,"p_spec": Json,"p_user": string,"p_validation": Json,"p_workspace": string }; Returns: Json
+                           },
 "expire_production_offline":
 { Args: { "p_workspace": string }; Returns: Json
                            },
 "fail_ai_draft":
+{ Args: { "p_job": string,"p_key": string,"p_workspace": string }; Returns: undefined
+                           },
+"fail_translation":
 { Args: { "p_job": string,"p_key": string,"p_workspace": string }; Returns: undefined
                            },
 "finish_generation_run":
@@ -691,6 +709,9 @@ isOneToOne: false
 "reserve_search_quota":
 { Args: { "p_limit": number,"p_search_limit": number,"p_units": number }; Returns: boolean
                            },
+"reserve_translation":
+{ Args: { "p_job": string,"p_key": string,"p_limit": number,"p_revision": string,"p_user": string,"p_workspace": string }; Returns: Json
+                           },
 "retry_collect_job":
 { Args: { "p_job": string,"p_workspace": string }; Returns: Json
                            },
@@ -699,6 +720,9 @@ isOneToOne: false
                            },
 "review_generation_run":
 { Args: { "p_checks": Json,"p_job": string,"p_run": string,"p_user": string,"p_workspace": string }; Returns: Json
+                           },
+"save_ja_revision":
+{ Args: { "p_base_rev_no": number,"p_job": string,"p_spec": Json,"p_user": string,"p_validation": Json,"p_workspace": string }; Returns: Json
                            },
 "save_production_revision":
 { Args: { "p_base_rev_no": number,"p_job": string,"p_spec": Json,"p_user": string,"p_validation": Json,"p_workspace": string }; Returns: Json

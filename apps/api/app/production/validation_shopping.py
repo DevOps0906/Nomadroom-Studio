@@ -31,7 +31,10 @@ MAX_MASKS = 20
 MAX_SCRIPT_ITEMS = 20  # 4문장이 아닌 입력도 count 오류로 돌려주되 상한은 둔다
 MIN_SOURCES = 3
 CONFIRM_MARK = "[확인 필요]"
+JA_CONFIRM_MARK = "[確認必要]"  # task-049 J10: ja 리비전은 두 표기 모두 승인 차단
 DEFAULT_BANNED_PHRASES = ("강력 추천", "인생템", "지금 바로")  # 가정: 금지어 설정 전 기본값
+# task-049 J10(가정): ja 금지 문구 경고 목록(ko 기본값의 일본어 대응)
+JA_BANNED_PHRASES = ("絶対おすすめ", "神アイテム", "今すぐ")
 MOTION_TYPES = ("pan", "zoom", "none")
 VIDEO_KINDS = ("source", "source_upload")
 CUT_KINDS = (*VIDEO_KINDS, "image")
@@ -109,11 +112,12 @@ def validate_shopping_spec(
     assets: _Assets,
     job_lang: str | None = None,
     product_name: str | None = None,
-    banned_phrases: tuple[str, ...] = DEFAULT_BANNED_PHRASES,
+    banned_phrases: tuple[str, ...] | None = None,
 ) -> dict[str, list[dict[str, str]]]:
     """assets(필수): id -> {kind, status, duration_sec, width, height, rights, reviewed}(이 작업
     소유 자산만. 없는 id·다른 작업 id는 오류). 호출자는 승인·저장 때 반드시 넘긴다.
-    product_name: brief 제품명(여행은 목적지). 없으면 1번 문장 제품명 경고를 생략한다."""
+    product_name: brief 제품명(여행은 목적지). 없으면 1번 문장 제품명 경고를 생략한다.
+    banned_phrases: 없으면 lang별 기본 목록(ja=JA_BANNED_PHRASES, 그 밖=DEFAULT_BANNED_PHRASES)."""
     errors: list[dict[str, str]] = []
     warnings: list[dict[str, str]] = []
     if not isinstance(raw, dict):
@@ -133,6 +137,8 @@ def validate_shopping_spec(
     voice = s.voice.tts.voice if s.voice.tts else None
     if voice is not None and lang is not None and voice.split("-", 1)[0] != lang:
         errors.append(_e("voice.tts_lang", "voice.tts.voice", "voice 언어가 spec lang과 달라요."))
+    if banned_phrases is None:
+        banned_phrases = JA_BANNED_PHRASES if lang == "ja" else DEFAULT_BANNED_PHRASES
     _check_script(s, lang, product_name, banned_phrases, errors, warnings)
     _check_cuts(s, assets, errors, warnings)
     _check_voice(s, assets, errors)
@@ -190,9 +196,11 @@ def _check_script(
             errors.append(_e("script.multi_sentence", f"script.{i}.text", msg))
     marked = [(f"script.{i}.text", t) for i, t in enumerate(texts)]
     marked += [("cta.text", s.cta.text), ("disclosure.text", s.disclosure.text)]
+    marks = (CONFIRM_MARK, JA_CONFIRM_MARK) if lang == "ja" else (CONFIRM_MARK,)
     for path, t in marked:
-        if CONFIRM_MARK in t:
-            msg = f"{CONFIRM_MARK} 표시를 확인하고 지워야 합니다."
+        mark = next((m for m in marks if m in t), None)
+        if mark is not None:
+            msg = f"{mark} 표시를 확인하고 지워야 합니다."
             errors.append(_e("script.unverified", path, msg))
     total = sum(len(t) for t in texts)
     in_range = SCRIPT_MIN_CHARS <= total <= SCRIPT_MAX_CHARS
