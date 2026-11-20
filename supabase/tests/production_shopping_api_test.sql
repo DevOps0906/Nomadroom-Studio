@@ -2,7 +2,7 @@
 -- ready 전환·삭제 상태 조건, 쇼핑 prepare finish(원본마다 한 벌), claim 쇼핑 보류(045 전).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(29);
+select plan(30);
 
 insert into public.workspaces (id, name) values ('f4400000-0000-4000-8000-000000000001', 'shop-api-a');
 insert into public.workers (id, workspace_id, name, token_hash) values
@@ -158,7 +158,7 @@ select ok(
   and not has_function_privilege('authenticated', 'public.production_jobs_prepare_source()', 'execute'),
   '새 트리거 함수: authenticated·anon 실행 불가');
 
--- 7. 리뷰 반영 4: 쇼핑 사진 10·문장별 녹음 4(pending 포함, job 행 잠금 후 kind별)
+-- 7. 리뷰 반영 4: 쇼핑 사진 10·녹음 작업 전체 8(pending 포함, job 행 잠금 후 kind별)
 insert into public.production_assets (id, workspace_id, job_id, kind, storage_path, mime, status)
   select g.id, 'f4400000-0000-4000-8000-000000000001', 'f4400000-0000-4000-8000-000000000012', g.kind,
          'f4400000-0000-4000-8000-000000000001/f4400000-0000-4000-8000-000000000012/' || g.id || '.png', 'image/png', 'pending'
@@ -167,9 +167,16 @@ insert into public.production_assets (id, workspace_id, job_id, kind, storage_pa
 select throws_ok(
   $$select pg_temp.asset('f4400000-0000-4000-8000-000000000131', 'f4400000-0000-4000-8000-000000000012', 'image', 'pending')$$,
   '23505', null, '쇼핑: 사진 11건째 거부');
+-- task-058: 녹음 상한은 작업 전체 8(ko 4 + ja 4). ko 4건 보유 상태에서 ja 4건 추가 허용, 9건째 거부
+select lives_ok(
+  $$insert into public.production_assets (id, workspace_id, job_id, kind, storage_path, mime, status)
+      select g.id, 'f4400000-0000-4000-8000-000000000001', 'f4400000-0000-4000-8000-000000000012', 'narration',
+             'f4400000-0000-4000-8000-000000000001/f4400000-0000-4000-8000-000000000012/' || g.id || '.m4a', 'audio/mp4', 'pending'
+        from (select gen_random_uuid() as id from generate_series(1, 4)) g$$,
+  '쇼핑: 녹음 4건 보유 뒤 4건 더(ja) 허용');
 select throws_ok(
   $$select pg_temp.asset('f4400000-0000-4000-8000-000000000132', 'f4400000-0000-4000-8000-000000000012', 'narration', 'pending')$$,
-  '23505', null, '쇼핑: 문장별 녹음 5건째 거부');
+  '23505', null, '쇼핑: 녹음 9건째 거부');
 select lives_ok(
   $$select pg_temp.asset('f4400000-0000-4000-8000-000000000133', 'f4400000-0000-4000-8000-000000000011', 'narration', 'pending')$$,
   '일반 작업은 업로드 상한 트리거 대상 아님');

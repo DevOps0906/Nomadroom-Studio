@@ -25,7 +25,9 @@ from pydantic import (
 # 쇼핑 원본(source_upload) 작업당 상한, pending 포함(가정, 000023 트리거와 같은 값)
 MAX_SOURCES = 10
 MAX_IMAGES = 10  # 쇼핑 사진(image) 작업당 상한, pending 포함(가정)
-MAX_NARRATIONS = 4  # 문장별 녹음 4개(사용자 결정 2026-11-20, TTS 꺼짐 대체), pending 포함
+# 녹음은 작업 전체 8개(ko 4 + ja 4, task-058 가정 · 000029 트리거와 같은 값), pending 포함.
+# 문장별 4개(리비전당)는 spec 검증이 지킨다.
+MAX_NARRATIONS = 8
 # 쇼핑에서 이전 pending을 지우지 않고 상한에 pending을 포함하는 업로드 kind(P5)
 MULTI_LIMITS = {"source_upload": MAX_SOURCES, "image": MAX_IMAGES, "narration": MAX_NARRATIONS}
 MAX_AFFILIATES = 20  # 000021 production_affiliates_valid와 같은 값

@@ -303,12 +303,17 @@ def test_p5_multiple_source_uploads_keep_pending_cap_10(api, auth, db):
     assert r.status_code == 409 and r.json()["field"] == "kind"
 
 
-def test_narration_per_sentence_cap_4_keeps_pending(api, auth, db):
+def test_narration_job_cap_8_keeps_pending(api, auth, db):
+    # task-058: 자산에 lang이 없어 작업 전체 8(ko 4 + ja 4). ko 4건 보유 뒤 ja 4건 허용, 9건째 409
     job = shop_job(db)
     for _ in range(4):
         assert upload(api, auth, job["id"], "narration", "audio/wav").status_code == 201
     assert sum(a["kind"] == "narration" for a in db.assets) == 4
-    assert upload(api, auth, job["id"], "narration", "audio/wav").status_code == 409
+    for _ in range(4):
+        assert upload(api, auth, job["id"], "narration", "audio/wav").status_code == 201
+    assert sum(a["kind"] == "narration" for a in db.assets) == 8  # 이전 pending 유지
+    r = upload(api, auth, job["id"], "narration", "audio/wav")
+    assert r.status_code == 409 and r.json()["field"] == "kind"
 
 
 def test_bgm_new_upload_replaces_pending(api, auth, db):
