@@ -34,6 +34,7 @@ import {
   type BriefErrors,
   type SourceRowDraft,
 } from "./model";
+import { GenerationPanel } from "./generation";
 import { BTN, BasisSelect, CARD, Field, FOCUS, INPUT, PRIMARY, SECONDARY } from "./ui";
 
 // PROD-01S 원본·브리프(쇼핑). 순서: (생성 | 저장) → 원본별 업로드(권리 포함) → 준비 시작(A-11). 근거: docs/03_SCREENS_UX.md PROD-01S, tasks/task-046.md.
@@ -101,6 +102,7 @@ export function ShoppingSourceForm({
   const [created, setCreated] = useState(false);
   // 새 작업에서 업로드는 끝났지만 준비 시작이 실패한 경우: 서버 목록(props)에 아직 없으므로 종류를 기억해 재시도 때 원본 수에 더한다.
   const [uploaded, setUploaded] = useState<string[]>([]);
+  const [genFor, setGenFor] = useState<string | null>(null); // AI 영상 생성 패널을 펼친 사진 원본
   const intent = useRef(createIntentKey());
   const locked = !!job || created; // 작업 생성 뒤 제목은 바꿀 수 없고, 분야는 원본 준비 시작 후 잠긴다
   const verticalLocked = (!!job && !editable) || busy;
@@ -303,9 +305,17 @@ export function ShoppingSourceForm({
                   원본 {i + 1} · {KIND_TEXT[a.kind] ?? a.kind}
                   {a.size_bytes ? ` · ${formatBytes(a.size_bytes)}` : ""} · {a.status === "ready" ? "올라감" : "확인 대기"}
                 </span>
-                <button type="button" className={SECONDARY} disabled={lock} onClick={() => void removeAsset(a.id)} aria-label={`원본 ${i + 1} 삭제`}>
-                  삭제
-                </button>
+                <span className="flex flex-wrap gap-2">
+                  {job && a.kind === "image" && a.status === "ready" && (
+                    <button type="button" className={SECONDARY} aria-expanded={genFor === a.id} onClick={() => setGenFor((g) => (g === a.id ? null : a.id))} aria-label={`원본 ${i + 1} AI 영상 생성`}>
+                      AI 영상 생성
+                    </button>
+                  )}
+                  <button type="button" className={SECONDARY} disabled={lock} onClick={() => void removeAsset(a.id)} aria-label={`원본 ${i + 1} 삭제`}>
+                    삭제
+                  </button>
+                </span>
+                {job && genFor === a.id && <GenerationPanel jobId={job.id} sourceAssetId={a.id} canCreate={editable} />}
               </li>
             ))}
           </ul>

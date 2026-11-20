@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { EVIDENCE_SESSION_EXPIRED_PATH as SESSION_EXPIRED_PATH } from "@/components/evidence/evidence";
@@ -289,6 +290,14 @@ export function ShoppingEditForm({ job, revision, sheet, brief, assets: initialA
               <li key={`${i.code}-${i.path}-${n}`}>
                 {shoppingIssueLabel(i)}
                 {i.path ? ` (${i.path})` : ""}: {i.message}
+                {i.code === "gen.unreviewed" && (
+                  <>
+                    {" "}
+                    <Link href={`/production/${encodeURIComponent(job.id)}/source`} className="underline">
+                      원본 화면에서 검수하기
+                    </Link>
+                  </>
+                )}
               </li>
             ))}
           </ul>

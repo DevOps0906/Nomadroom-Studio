@@ -65,3 +65,21 @@ export async function uploadAsset(
   if (!c.ok) return c;
   return { ok: true, data: { assetId: t.data.asset.id } };
 }
+
+// PROD-01S AI 영상 생성(A-22) 브라우저 호출. 확인(과금)·진행 확인은 사용자가 누른 때에만 부른다.
+export type GenerationRunView = import("@/server/api/production").GenerationRun;
+export type GenerationEnvelopeView = import("@/server/api/production").GenerationEnvelope;
+const gen = (id: string) => `${base(id)}/generation-runs`;
+const genRun = (id: string, runId: string) => `${gen(id)}/${encodeURIComponent(runId)}`;
+
+export const listGeneration = (id: string, f?: typeof fetch) => call<{ items: GenerationRunView[] }>(gen(id), "GET", undefined, {}, f);
+export const quoteGeneration = (id: string, body: { source_asset_id: string; prompt: string; duration_sec: number }, key: string, f?: typeof fetch) =>
+  call<GenerationEnvelopeView>(gen(id), "POST", body, { "Idempotency-Key": key }, f);
+export const confirmGeneration = (id: string, runId: string, f?: typeof fetch) => call<GenerationEnvelopeView>(`${genRun(id, runId)}/confirm`, "POST", undefined, {}, f);
+export const refreshGeneration = (id: string, runId: string, f?: typeof fetch) => call<GenerationEnvelopeView>(`${genRun(id, runId)}/refresh`, "POST", undefined, {}, f);
+export const reviewGeneration = (id: string, runId: string, checks: { physics: boolean; angle: boolean; compare: boolean }, f?: typeof fetch) =>
+  call<{ run_id: string; reviewed: boolean }>(`${genRun(id, runId)}/review`, "POST", checks, {}, f);
+
+/** 생성 결과 영상(result)·입력 사진(source)의 서명 GET 주소. 사용자가 누른 때에만 부른다. */
+export const generationAssetUrl = (id: string, runId: string, which: "result" | "source", f?: typeof fetch) =>
+  call<{ url: string }>(`${genRun(id, runId)}/asset-url?which=${which}`, "GET", undefined, {}, f);

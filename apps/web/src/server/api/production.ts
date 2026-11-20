@@ -268,3 +268,55 @@ export type PublishTextResult = { text: PublishText; render_run_id: string; lang
 export function getProductionPublishText(id: string, lang: "ko" | "ja", renderRunId?: string): Promise<PublishTextResult> {
   return apiFetch<PublishTextResult>(`${jobPath(id)}/publish-text`, { query: { lang, render_run_id: renderRunId } });
 }
+
+/** A-22 AI 영상 생성 run(견적→확인→진행→결과). 프롬프트는 화면 표시용이며 로그에 남기지 않는다. */
+export type GenerationStatus = "quoted" | "confirmed" | "running" | "finalizing" | "done" | "failed" | "unknown";
+export type GenerationRun = {
+  id: string;
+  job_id: string;
+  source_asset_id: string | null;
+  result_asset_id: string | null;
+  cut_ref: string | null;
+  prompt: string;
+  duration_sec: number;
+  est_cost_krw: number;
+  actual_cost_krw: number | null;
+  status: GenerationStatus;
+  error_code: string | null;
+  created_at: string;
+  confirmed_at: string | null;
+  finished_at: string | null;
+};
+export type GenerationBudget = { monthly_left_krw: number; job_left_krw: number };
+export type GenerationEnvelope = { run: GenerationRun; budget: GenerationBudget | null; replay: boolean };
+export type GenerationReview = { physics: boolean; angle: boolean; compare: boolean };
+export type GenerationReviewResult = { run: GenerationRun; reviewed: boolean; review_checks: Record<string, unknown> };
+
+const genPath = (id: string) => `${jobPath(id)}/generation-runs`;
+/** 제출·진행 확인은 플랫폼·저장소 왕복이 있어 기본 10초보다 길게 둔다. */
+const GEN_TIMEOUT_MS = 60_000;
+
+/** A-22 목록(부작용 없음). */
+export async function listGenerationRuns(id: string): Promise<{ items: GenerationRun[] }> {
+  return apiFetch<{ items: GenerationRun[] }>(genPath(id));
+}
+
+/** A-22 견적(구성원). 과금 없음. 같은 키 재요청은 기존 run(replay). */
+export async function quoteGenerationRun(id: string, body: { source_asset_id: string; prompt: string; duration_sec: number }, idempotencyKey: string): Promise<GenerationEnvelope> {
+  return apiFetch<GenerationEnvelope>(genPath(id), { method: "POST", body, idempotencyKey });
+}
+
+/** A-22 확인(owner만, 여기서 과금 계상 후 플랫폼 제출). */
+export async function confirmGenerationRun(id: string, runId: string): Promise<GenerationEnvelope> {
+  return apiFetch<GenerationEnvelope>(`${genPath(id)}/${encodeURIComponent(runId)}/confirm`, { method: "POST", timeoutMs: GEN_TIMEOUT_MS });
+}
+
+/** A-22 진행 확인(수동 버튼에서만 호출한다). */
+export async function refreshGenerationRun(id: string, runId: string): Promise<GenerationEnvelope> {
+  return apiFetch<GenerationEnvelope>(`${genPath(id)}/${encodeURIComponent(runId)}/refresh`, { method: "POST", timeoutMs: GEN_TIMEOUT_MS });
+}
+
+/** A-22 검수(3항목 모두 true여야 reviewed). */
+export async function reviewGenerationRun(id: string, runId: string, checks: GenerationReview): Promise<GenerationReviewResult> {
+  return apiFetch<GenerationReviewResult>(`${genPath(id)}/${encodeURIComponent(runId)}/review`, { method: "POST", body: checks });
+}
