@@ -32,20 +32,23 @@ th{color:var(--color-text-muted,#5b6270)}.skel{display:inline-block;height:10px;
 <div class="meta"><b>PROD-03</b><span>상세</span><span>/production/[jobId]</span><span>권한: 로그인</span><span>진행을 보고 MP4를 검수·다운로드한다</span><a href="index.html">전체 화면</a></div>
 <div class="shell"><div><header class="hd"><h1>작업·검수</h1><nav></nav><span class="burger" aria-label="메뉴"></span></header><main>
 <div class="lab">홈 › 현재 위치</div>
-<div class="tabs"><span>ko</span><span>ja</span></div>
 
+<div class="tabs"><span>언어(ko</span><span>ja</span></div>
+<div class="dash">탭마다 리비전·렌더·mp4 따로)</div>
 <div class="dash">stepper: 진행 단계</div>
 <div class="grid wide"><div class="box"><b>승인됨</b><p class="muted"><span class="skel"></span></p></div><div class="box"><b>렌더 미시작 안내</b><p class="muted"><span class="skel"></span></p></div><div class="box"><b>button:렌더 요청</b><p class="muted"><span class="skel"></span></p></div></div>
 <div class="grid wide"><div class="box"><b>실패 단계</b><p class="muted"><span class="skel"></span></p></div><div class="box"><b>사유 코드</b><p class="muted"><span class="skel"></span></p></div><div class="box"><b>button:재시도(실패 때만)</b><p class="muted"><span class="skel"></span></p></div><div class="box"><b>link:편집안으로 돌아가 고치기(hook_too_long</b><p class="muted"><span class="skel"></span></p></div><div class="box"><b>text_too_long)</b><p class="muted"><span class="skel"></span></p></div></div>
 <div class="dash">player: MP4</div>
-<div class="grid wide"><div class="box"><b>검수 리포트(쇼핑은 컷 길이 조정 기록·dub_overflow 경고 포함)</b><p class="muted"><span class="skel"></span></p></div></div>
-<div class="box tw"><div class="lab">list: 출처·권리 목록(자산 · 권리 basis · 출처 URL · 저작자 · 사람 등장 · 초상권 동의, 쇼핑은 필수)</div><table><thead><tr><th>자산</th><th>권리 basis</th><th>출처 URL</th><th>저작자</th><th>사람 등장</th><th>초상권 동의</th></tr></thead><tbody><tr><td><span class="skel"></span></td><td><span class="skel"></span></td><td><span class="skel"></span></td><td><span class="skel"></span></td><td><span class="skel"></span></td><td><span class="skel"></span></td></tr></tbody></table></div>
-<div class="box"><div class="lab">card: 게시 문구(쇼핑만 · 설명란 · 고정 댓글 · 대가성 표기 첫 줄 · 댓글 키워드 안내 · 업로드 권장 시각 메모)</div><span class="skel"></span><div class="row" style="margin-top:8px"><span class="btn sec">복사</span></div></div>
+<div class="grid wide"><div class="box"><b>검수 리포트(쇼핑은 컷 길이 조정 기록</b><p class="muted"><span class="skel"></span></p></div><div class="box"><b>dub_overflow 경고 포함)</b><p class="muted"><span class="skel"></span></p></div></div>
+<div class="box"><div class="lab">출처·권리 목록(자산·권리 basis·출처 URL·저작자·사람 등장·초상권 동의</div><div class="card"><span class="skel"></span></div><div class="card"><span class="skel"></span></div><div class="card"><span class="skel"></span></div></div>
+<div class="dash">쇼핑은 필수)</div>
+<div class="grid wide"><div class="box"><b>게시 문구(쇼핑만</b><p class="muted"><span class="skel"></span></p></div></div>
+<div class="dash">설명란·고정 댓글·대가성 표기 첫 줄·댓글 키워드 안내·업로드 권장 시각 메모·button: 복사)</div>
 <div class="row"><span class="btn">검수 승인 → 완료(검수 대기)</span></div>
 <div class="row"><span class="btn">다운로드(MP4·리포트)</span></div>
 <div class="row"><a href="#">편집안으로(새 리비전)</a></div>
 <div class="lab">마지막 갱신: 방금 전 · ↻</div>
 </main></div></div>
 <section class="wf"><h3>상태</h3><div class="st"><div class="box"><b>빈</b><p class="muted">승인됨·렌더 미시작: &quot;승인됨 — 렌더 요청을 눌러 시작&quot; 안내 + &quot;렌더 요청&quot; 버튼</p></div><div class="box"><b>로딩</b><p class="muted">단계별 진행·렌더 중. 특수: 렌더 요청 중·렌더 중 버튼 비활성(리비전·언어당 1건, 중복 클릭은 같은 작업으로 합침)</p></div><div class="box"><b>오류</b><p class="muted">실패 단계·사유 코드 + &quot;재시도&quot;(실패 때만, 완료 파일 덮어쓰지 않음). `hook_too_long`·`text_too_long`: 재시도 대신 &quot;편집안으로 돌아가 고치기&quot;(훅은 필요 길이 안내). 없는 작업(404): 목록으로 돌아가기</p></div><div class="box"><b>성공</b><p class="muted">검수 대기: MP4 재생·리포트·다운로드 표시 + &quot;검수 승인 → 완료&quot; 버튼. 쇼핑: 게시 문구 &quot;복사&quot; 버튼(복사됨 토스트)·출처·권리 목록 표시, 권리 미기록 자산은 노랑 배지. 언어 탭: ja 리비전·렌더가 없으면 &quot;일본어판 만들기&quot; 안내(편집안으로 이동)</p></div></div>
-<h3>필수 구조 검사</h3><div><div class="ok">✅ 필수 구조 충족</div><div class="muted">· 권장: 관련 항목 탭</div><div class="muted">· 권장: 활동·변경 이력</div></div><h3>다음 화면</h3><div><a href="PROD-02.html">PROD-02 편집안</a> · <a href="PROD-02V.html">PROD-02V 편집안(예능형)</a> · <a href="PROD-02S.html">PROD-02S 편집안(쇼핑)</a> ·<a href="PROD-00.html">PROD-00 제작 작업 목록</a></div></section>
+<h3>필수 구조 검사</h3><div><div class="ok">✅ 필수 구조 충족</div><div class="muted">· 권장: 활동·변경 이력</div></div><h3>다음 화면</h3><div><a href="PROD-02.html">PROD-02 편집안</a> · <a href="PROD-02V.html">PROD-02V 편집안(예능형)</a> · <a href="PROD-02S.html">PROD-02S 편집안(쇼핑)</a> · <a href="PROD-00.html">PROD-00 제작 작업 목록</a></div></section>
 </body></html>
