@@ -4,7 +4,7 @@ import type { SpecIssue, Validation } from "@/server/api/production";
 
 export type EditResult<T> =
   | { ok: true; data: T }
-  | { ok: false; status: number; message: string; errors?: SpecIssue[]; warnings?: SpecIssue[] };
+  | { ok: false; status: number; message: string; code?: string; errors?: SpecIssue[]; warnings?: SpecIssue[] };
 
 const FALLBACK = "요청을 처리하지 못했습니다. 잠시 후 다시 시도하세요.";
 
@@ -14,7 +14,7 @@ const isIssue = (i: unknown): i is SpecIssue => {
 };
 const issues = (v: unknown): SpecIssue[] | undefined => (Array.isArray(v) ? v.filter(isIssue) : undefined);
 
-async function call<T>(url: string, method: string, body?: unknown, f: typeof fetch = fetch): Promise<EditResult<T>> {
+export async function call<T>(url: string, method: string, body?: unknown, f: typeof fetch = fetch): Promise<EditResult<T>> {
   try {
     const res = await f(url, {
       method,
@@ -25,13 +25,13 @@ async function call<T>(url: string, method: string, body?: unknown, f: typeof fe
     const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
     if (res.ok) return { ok: true, data: data as T };
     const message = typeof data?.message === "string" && data.message ? data.message : FALLBACK;
-    return { ok: false, status: res.status, message, errors: issues(data?.errors), warnings: issues(data?.warnings) };
+    return { ok: false, status: res.status, message, code: typeof data?.code === "string" ? data.code : undefined, errors: issues(data?.errors), warnings: issues(data?.warnings) };
   } catch {
     return { ok: false, status: 0, message: FALLBACK };
   }
 }
 
-const base = (id: string) => `/api/production-jobs/${encodeURIComponent(id)}`;
+export const base = (id: string) => `/api/production-jobs/${encodeURIComponent(id)}`;
 
 export type SavedRevision = { id: string; rev_no: number; validation: Validation; approved_at: string | null };
 

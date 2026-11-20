@@ -1,5 +1,7 @@
 "use client";
 
+import { dubOrdinals } from "@/components/production/lang/model";
+import { useLangDirty } from "@/components/production/lang/dirty-guard";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -179,6 +181,7 @@ export function VarietyEditForm({ job, revision, sheet }: { job: EditJob; revisi
     window.addEventListener("beforeunload", h);
     return () => window.removeEventListener("beforeunload", h);
   }, [dirty]);
+  useLangDirty(dirty);
 
   // 편집·삭제·순서 이동은 낡은 숫자 오류(밀린 행 인덱스 포함)를 지운다. 저장할 때 다시 검사한다.
   const set = (patch: Partial<VarietyDraft>) => {
@@ -449,7 +452,7 @@ export function VarietyEditForm({ job, revision, sheet }: { job: EditJob; revisi
                 {draft.subtitles.map((s: SubDraft, i) => (
                   <Row
                     key={i}
-                    title={`대사 ${i + 1}`}
+                    title={dubOrdinals(draft.subtitles)[i] !== null ? `대사 ${dubOrdinals(draft.subtitles)[i]}` : `강조 ${i + 1}`}
                     badges={isShortSub(s) ? <Badge tone="warn">1.4초 미만</Badge> : undefined}
                     issues={at(`subtitles.${i}`)}
                     actions={

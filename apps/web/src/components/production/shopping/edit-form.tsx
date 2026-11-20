@@ -1,5 +1,6 @@
 "use client";
 
+import { useLangDirty } from "@/components/production/lang/dirty-guard";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -116,6 +117,7 @@ export function ShoppingEditForm({ job, revision, sheet, brief, assets: initialA
     window.addEventListener("beforeunload", h);
     return () => window.removeEventListener("beforeunload", h);
   }, [dirty]);
+  useLangDirty(dirty);
 
   const set = (patch: Partial<ShoppingDraft>) => setDraft((d) => ({ ...d, ...patch }));
   const setCut = (i: number, p: Partial<CutDraft>) => set({ cuts: draft.cuts.map((c, n) => (n === i ? { ...c, ...p } : c)) });

@@ -25,8 +25,12 @@ const base = (id: string) => `/api/production-jobs/${encodeURIComponent(id)}`;
 
 type RunBody = { run: { id: string; status: string; attempt: number } };
 
-export const requestRender = (id: string, revisionId: string, key: string, f?: typeof fetch) =>
-  call<RunBody>(`${base(id)}/render-runs`, "POST", { revision_id: revisionId, lang: "ko" }, { "Idempotency-Key": key }, f);
+export const requestRender = (id: string, revisionId: string, key: string, f?: typeof fetch, lang: "ko" | "ja" = "ko") =>
+  call<RunBody>(`${base(id)}/render-runs`, "POST", { revision_id: revisionId, lang }, { "Idempotency-Key": key }, f);
+
+export type ReportWarningView = { code: string; line?: number; overflow_sec?: number; message?: string };
+export const fetchReportWarnings = (id: string, assetId: string, f?: typeof fetch) =>
+  call<{ lang: "ko" | "ja" | null; warnings: ReportWarningView[] }>(`${base(id)}/report-warnings`, "POST", { asset_id: assetId }, {}, f);
 
 export const retryRender = (id: string, runId: string, f?: typeof fetch) =>
   call<RunBody>(`${base(id)}/render-runs/${encodeURIComponent(runId)}/retry`, "POST", undefined, {}, f);

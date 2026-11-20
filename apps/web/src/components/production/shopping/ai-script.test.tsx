@@ -59,12 +59,15 @@ describe("AiScriptResult", () => {
 });
 
 describe("멱등 키 유지", () => {
-  it("네트워크(0)·5xx(502 제외)는 같은 키 유지, 성공·4xx·502는 새 키", async () => {
+  it("불명확(0·504·500·503·코드 없는 502)은 같은 키 유지, 성공·4xx·확정 502(UPSTREAM_ERROR)는 새 키", async () => {
     const { retainKey } = await import("./ai-script");
     expect(retainKey("k", { ok: false, status: 0 })).toBe("k");
     expect(retainKey("k", { ok: false, status: 504 })).toBe("k");
     expect(retainKey("k", { ok: false, status: 500 })).toBe("k");
-    expect(retainKey("k", { ok: false, status: 502 })).toBeNull();
+    expect(retainKey("k", { ok: false, status: 503 })).toBe("k");
+    expect(retainKey("k", { ok: false, status: 502, code: "INTERNAL" })).toBe("k");
+    expect(retainKey("k", { ok: false, status: 502 })).toBe("k");
+    expect(retainKey("k", { ok: false, status: 502, code: "UPSTREAM_ERROR" })).toBeNull();
     expect(retainKey("k", { ok: false, status: 429 })).toBeNull();
     expect(retainKey("k", { ok: false, status: 409 })).toBeNull();
     expect(retainKey("k", { ok: true })).toBeNull();

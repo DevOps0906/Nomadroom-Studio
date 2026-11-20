@@ -82,9 +82,15 @@ describe("PROD-03 중계 Route Handler", () => {
     expect(h.calls).toEqual([`render:${RID}:ko:key-12345678`]);
   });
 
+  it("렌더 요청: lang=ja도 그대로 전달(형식·상태 판정은 API 409)", async () => {
+    const res = await render.POST(req("POST", { ...BODY, lang: "ja" }, ORIGIN, KEY), ctx);
+    expect(res.status).toBe(202);
+    expect(h.calls).toEqual([`render:${RID}:ja:key-12345678`]);
+  });
+
   it.each([
     ["키 없음", BODY, {}],
-    ["ja 언어", { ...BODY, lang: "ja" }, KEY],
+    ["지원하지 않는 언어", { ...BODY, lang: "en" }, KEY],
     ["리비전 id 아님", { ...BODY, revision_id: "nope" }, KEY],
   ])("렌더 요청 400: %s", async (_n, body, extra) => {
     expect((await render.POST(req("POST", body, ORIGIN, extra), ctx)).status).toBe(400);

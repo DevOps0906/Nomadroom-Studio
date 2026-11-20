@@ -20,6 +20,9 @@ export function fromApiError(e: unknown, fallback: string) {
     if (e.status === 400 || e.status === 422) return json(400, { code: "VALIDATION", message: e.message || INVALID.message, field: e.field });
     if (e.status === 409) return json(409, { code: e.code, message: e.message });
     if (e.status === 429) return json(429, { code: e.code, message: e.message });
+    // 릴레이→API 통신 실패·타임아웃(결과 불명)은 504 NETWORK, API가 확정한 502는 UPSTREAM_ERROR로 구분한다(멱등 키 유지 규칙).
+    if (e.status === 0) return json(504, { code: "NETWORK", message: fallback });
+    if (e.status === 502) return json(502, { code: "UPSTREAM_ERROR", message: fallback });
   }
   return json(502, { code: "INTERNAL", message: fallback });
 }

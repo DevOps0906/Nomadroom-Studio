@@ -15,8 +15,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!b) return json(400, INVALID);
   const rev = b.rev_no;
   if (typeof rev !== "number" || !Number.isInteger(rev) || rev < 1) return json(400, INVALID);
+  const lang = b.lang === undefined ? "ko" : b.lang;
+  if (lang !== "ko" && lang !== "ja") return json(400, { code: "VALIDATION", message: "언어가 올바르지 않습니다.", field: "lang" });
   try {
-    const r = await approveProductionRevision(id, rev);
+    const r = await approveProductionRevision(id, rev, lang);
     return json(200, { revision: { rev_no: r.rev_no, approved_at: r.approved_at } });
   } catch (e) {
     return fromRevisionError(e, "편집안을 승인하지 못했습니다.");

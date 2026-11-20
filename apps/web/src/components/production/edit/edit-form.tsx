@@ -1,5 +1,6 @@
 "use client";
 
+import { useLangDirty } from "@/components/production/lang/dirty-guard";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -163,6 +164,7 @@ function CategoryEditForm({
     window.addEventListener("beforeunload", h);
     return () => window.removeEventListener("beforeunload", h);
   }, [dirty]);
+  useLangDirty(dirty);
 
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
   const setShot = (i: number, p: Partial<ShotDraft>) => set({ shots: draft.shots.map((s, n) => (n === i ? { ...s, ...p } : s)) });

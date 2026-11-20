@@ -89,12 +89,19 @@ export type Revision = {
   origin: "user" | "ai_draft";
   validation: Validation;
   approved_at: string | null;
+  /** ja 리비전의 원본 ko 리비전(A-12, task-049). */
+  derived_from?: string | null;
 };
+
+export type RevisionLang = "ko" | "ja";
 
 export type ProductionJobDetail = {
   job: ProductionJob;
   assets: ProductionAsset[];
-  current_revision: { ko: Pick<Revision, "id" | "rev_no" | "approved_at" | "validation"> | null; ja: null };
+  current_revision: {
+    ko: Pick<Revision, "id" | "rev_no" | "approved_at" | "validation"> | null;
+    ja?: Pick<Revision, "id" | "rev_no" | "approved_at" | "validation"> | null;
+  };
   latest_run: {
     id: string;
     status: "queued" | "running" | "done" | "failed";
@@ -183,25 +190,28 @@ export async function prepareProductionJob(id: string): Promise<ProductionJob> {
 }
 
 /** A-12 리비전 조회(rev_no 생략 = 현재). */
-export async function getProductionRevision(id: string, revNo?: number): Promise<Revision> {
-  const res = await apiFetch<{ revision: Revision }>(`${jobPath(id)}/revision`, { query: { rev_no: revNo?.toString() } });
+export async function getProductionRevision(id: string, revNo?: number, lang: RevisionLang = "ko"): Promise<Revision> {
+  const res = await apiFetch<{ revision: Revision }>(`${jobPath(id)}/revision`, {
+    query: { rev_no: revNo?.toString(), lang: lang === "ja" ? "ja" : undefined },
+  });
   return res.revision;
 }
 
 /** A-12 저장(낙관적 잠금 base_rev_no). 의미 오류가 있어도 저장되고 validation에 담긴다. */
-export async function saveProductionRevision(id: string, spec: Record<string, unknown>, baseRevNo: number): Promise<Revision> {
+export async function saveProductionRevision(id: string, spec: Record<string, unknown>, baseRevNo: number, lang: RevisionLang = "ko"): Promise<Revision> {
   const res = await apiFetch<{ revision: Revision }>(`${jobPath(id)}/revision`, {
     method: "PUT",
+    query: { lang: lang === "ja" ? "ja" : undefined },
     body: { spec, base_rev_no: baseRevNo },
   });
   return res.revision;
 }
 
 /** A-13 편집안 승인(서버 재검증). */
-export async function approveProductionRevision(id: string, revNo: number) {
+export async function approveProductionRevision(id: string, revNo: number, lang: RevisionLang = "ko") {
   const res = await apiFetch<{ revision: { id: string; rev_no: number; approved_at: string; approved_by: string | null } }>(
     `${jobPath(id)}/revision/approve`,
-    { method: "POST", body: { rev_no: revNo } },
+    { method: "POST", body: lang === "ja" ? { rev_no: revNo, lang } : { rev_no: revNo } },
   );
   return res.revision;
 }
@@ -221,7 +231,7 @@ export function getProductionDownloadUrl(id: string, assetId: string) {
 export type RenderRun = { id: string; status: "queued" | "running" | "done" | "failed"; attempt: number };
 
 /** A-15 렌더 요청(승인본·언어). 같은 키 재요청은 200 + 기존 run. */
-export async function requestProductionRender(id: string, revisionId: string, lang: "ko", idempotencyKey: string): Promise<RenderRun> {
+export async function requestProductionRender(id: string, revisionId: string, lang: RevisionLang, idempotencyKey: string): Promise<RenderRun> {
   const res = await apiFetch<{ render_run: RenderRun }>(`${jobPath(id)}/render-runs`, {
     method: "POST",
     body: { revision_id: revisionId, lang },
@@ -254,6 +264,18 @@ export const AI_DRAFT_TIMEOUT_MS = 200_000;
 /** A-14 AI 초안(새 리비전, origin=ai_draft, 기존 편집 보존). 같은 키 재요청은 기존 결과. 자동 승인 없음. */
 export async function requestProductionAiDraft(id: string, idempotencyKey: string): Promise<AiDraftResult> {
   return apiFetch<AiDraftResult>(`${jobPath(id)}/ai-draft`, { method: "POST", idempotencyKey, timeoutMs: AI_DRAFT_TIMEOUT_MS });
+}
+
+export type TranslateResult = { revision: Revision; translate_count: number; replay: boolean };
+
+/** A-20 일본어판 번역 초안(Claude 호출 포함). 같은 키 재요청은 기존 결과(replay). ko 텍스트만 외부로 나간다. */
+export async function requestProductionTranslate(id: string, revisionId: string, idempotencyKey: string): Promise<TranslateResult> {
+  return apiFetch<TranslateResult>(`${jobPath(id)}/translate`, {
+    method: "POST",
+    body: { revision_id: revisionId, target_lang: "ja" },
+    idempotencyKey,
+    timeoutMs: AI_DRAFT_TIMEOUT_MS,
+  });
 }
 
 /** A-10 자산 삭제(task-044 P9). 204. 현재 리비전이 참조하는 사진·BGM·녹음과 준비 시작 뒤 원본은 409. */

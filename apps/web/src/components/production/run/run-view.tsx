@@ -11,6 +11,7 @@ import { STAGE_LABEL, STATUS_LABEL, STATUS_TONE } from "../format";
 import { approveReview, assetUrl, requestRender, retryRender, type RunResult } from "./api";
 import { PublishTextCard, RightsList } from "./shopping-extras";
 import { VERTICAL_LABEL } from "../shopping/model";
+import { ReportWarnings } from "../lang/report-warnings";
 import { HOOK_NEED_TEXT, REASON_TEXT, STEPS, latestAsset, stageLabel, stepStates, viewOf, type StepState } from "./model";
 
 // PROD-03 작업·검수. 서버(A-09 GET)가 정본이고 렌더 요청·재시도·검수 승인은 Route Handler로 보낸다.
@@ -283,6 +284,11 @@ export function RunView({ detail }: { detail: ProductionJobDetail }) {
               </button>
             ) : (
               <p className="text-text-muted">리포트가 아직 없습니다.</p>
+            )}
+            {report && (
+              <div className="mt-3">
+                <ReportWarnings jobId={job.id} assetId={report} lang="ko" />
+              </div>
             )}
           </section>
           {shopping && <RightsList assets={detail.assets} />}

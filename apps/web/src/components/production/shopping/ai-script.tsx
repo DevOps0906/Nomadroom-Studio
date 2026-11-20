@@ -18,10 +18,19 @@ export type ScriptVariant = { hook_type: string; sentences: string[]; char_count
 
 const newKey = () => `ai-${crypto.randomUUID()}`;
 
-/** 결과가 불명확한 실패(네트워크 0·5xx, 502 제외)면 같은 키로 재시도하고, 확정 응답(성공·4xx·502)이면 다음 요청에 새 키. */
-export const isAmbiguousFailure = (r: { ok: boolean; status?: number }) => !r.ok && (r.status === 0 || ((r.status ?? 0) >= 500 && r.status !== 502));
+type KeyResult = { ok: boolean; status?: number; code?: string };
+/**
+ * 결과가 불명확한 실패면 같은 키로 재시도하고(상태 0·504 NETWORK·500·503·그 밖 5xx, 코드 없는 502),
+ * 확정 응답(성공·4xx·서버가 확정한 502 UPSTREAM_ERROR)이면 다음 요청에 새 키. AI 대본·번역 공통.
+ */
+export const isAmbiguousFailure = (r: KeyResult) => {
+  if (r.ok) return false;
+  const s = r.status ?? 0;
+  if (s === 502) return r.code !== "UPSTREAM_ERROR";
+  return s === 0 || s >= 500;
+};
 /** 요청 뒤 보관할 키: 불명확한 실패면 같은 키 유지, 아니면 null(다음 요청이 새 키를 만든다). */
-export const retainKey = (key: string, r: { ok: boolean; status?: number }): string | null => (isAmbiguousFailure(r) ? key : null);
+export const retainKey = (key: string, r: KeyResult): string | null => (isAmbiguousFailure(r) ? key : null);
 
 /** "이 안 사용": 대본 4문장만 바꾸고 나머지(컷·음성·CTA 등)는 그대로 둔다. */
 export const applyVariant = <T extends { script: string[] }>(draft: T, sentences: string[]): T => ({ ...draft, script: sentences.slice(0, SENTENCES) });
