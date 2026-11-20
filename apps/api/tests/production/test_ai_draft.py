@@ -2,7 +2,8 @@
 
 - SDK `AsyncMessages.create`를 가로채 전송 인자를 검사한다(이미지 image/jpeg 시트만, 영상·음성 0건).
 - 가짜 PostgREST·Storage는 test_jobs_api의 FakeDB를 잇고, RPC(reserve_ai_draft·
-  create_ai_draft_revision·fail_ai_draft)는 supabase/migrations/20261119000018·000022를 본뜬다
+  create_ai_draft_revision·fail_ai_draft)는 supabase/migrations/20261119000018·000022·000025를
+  본뜬다
   (실제 SQL은 supabase/tests/production_ai_draft_test.sql이 검사).
 - SDK는 httpx2를 써서 respx가 못 막으므로 이 파일 전체에서 socket DNS 조회를 막는다(실제 호출 0건).
 """
@@ -109,6 +110,8 @@ class AiDB(FakeDB):
                 "request_status": req["status"],
                 "ai_draft_count": j["ai_draft_count"],
                 "previous_rev_no": req["base_rev_no"],
+                "variants": req.get("variants"),
+                "facts_to_check": req.get("facts_to_check"),
                 "revision": out_rev,
             },
         )
@@ -131,9 +134,10 @@ class AiDB(FakeDB):
             for o in self.jobs
         ):
             return _rpc_error("NR011")
-        if j["status"] != "review" or j["format"] not in ("category", "variety"):
+        if j["status"] != "review" or j["format"] not in ("category", "variety", "shopping"):
             return _rpc_error("NR010")
-        if j["format"] == "variety" and j["lang"] != "ko":  # 000022(task-040 A1)
+        # 000022(task-040 A1)·000025(task-048 S2): variety·shopping은 ko 작업만
+        if j["format"] in ("variety", "shopping") and j["lang"] != "ko":
             return _rpc_error("NR010")
         if j["ai_draft_count"] >= body["p_limit"]:
             return _rpc_error("NR016")
@@ -189,6 +193,9 @@ class AiDB(FakeDB):
         self.revisions.append(rev)
         j["current_revision_id"] = rev["id"]
         req.update(status="done", revision_id=rev["id"])
+        for k, name in (("p_variants", "variants"), ("p_facts", "facts_to_check")):
+            if body.get(k) is not None:  # 000025: 쇼핑 3안은 요청 기록에 저장
+                req[name] = body[k]
         return self._json(j, req, False)
 
     def fail(self, body: dict) -> httpx.Response:
@@ -452,8 +459,9 @@ def test_missing_idempotency_key_400(api, auth, db, claude):
 # --- 형식·상태·권한(H3) ----------------------------------------------------------
 
 
-def test_shopping_format_409_without_call(api, auth, db, claude):
-    job, _ = ready_job(db, format="shopping")
+def test_shopping_ja_format_409_without_call(api, auth, db, claude):
+    # task-048: shopping은 ko 작업만 허용(000025). ja 작업은 계수 없이 409
+    job, _ = ready_job(db, format="shopping", lang="ja")
     r = post(api, auth, job)
     assert r.status_code == 409 and r.json()["code"] == "CONFLICT"
     assert claude.calls == [] and job["ai_draft_count"] == 0

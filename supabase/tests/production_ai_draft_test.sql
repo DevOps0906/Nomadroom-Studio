@@ -2,7 +2,7 @@
 -- 근거: tasks/task-029.md#착수-결정 H1·H2·H3
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(37);
+select plan(45);
 
 insert into auth.users (id, email, aud, role) values
   ('66666666-6666-4666-8666-666666666666', 'prod-ai@test.local', 'authenticated', 'authenticated');
@@ -20,7 +20,8 @@ insert into public.production_jobs
   ('eeeeeeee-0000-4000-8000-000000000015', 'eeeeeeee-0000-4000-8000-000000000001', 'j15', 'category', 60, 'category-1080-v1', 'k15', 'review', 0),
   ('eeeeeeee-0000-4000-8000-000000000016', 'eeeeeeee-0000-4000-8000-000000000001', 'j16', 'category', 60, 'category-1080-v1', 'k16', 'review', 0),
   ('eeeeeeee-0000-4000-8000-000000000017', 'eeeeeeee-0000-4000-8000-000000000001', 'j17', 'category', 60, 'category-1080-v1', 'k17', 'review', 0);
--- task-040 A1: 18 review(shopping) · 19 review(variety·lang ja — 작업 lang check를 이 트랜잭션에서만 풀어 방어 분기 확인)
+-- task-040 A1: 18 review(shopping, task-048부터 ko 허용) · 19 review(variety·lang ja) · 20 review(shopping·lang ja)
+--   (19·20은 작업 lang check를 이 트랜잭션에서만 풀어 방어 분기 확인)
 insert into public.production_jobs
   (id, workspace_id, title, kind, vertical, format, segment_len_sec, preset_version, idempotency_key, status, ai_draft_count) values
   ('eeeeeeee-0000-4000-8000-000000000018', 'eeeeeeee-0000-4000-8000-000000000001', 'j18', 'shopping', 'product', 'shopping', 60, 'shopping-1080-v1', 'k18', 'review', 0);
@@ -28,9 +29,13 @@ alter table public.production_jobs drop constraint production_jobs_lang_check;
 insert into public.production_jobs
   (id, workspace_id, title, format, lang, segment_len_sec, preset_version, idempotency_key, status, ai_draft_count) values
   ('eeeeeeee-0000-4000-8000-000000000019', 'eeeeeeee-0000-4000-8000-000000000001', 'j19', 'variety', 'ja', 60, 'variety-1080-v1', 'k19', 'review', 0);
+insert into public.production_jobs
+  (id, workspace_id, title, kind, vertical, format, lang, segment_len_sec, preset_version, idempotency_key, status, ai_draft_count) values
+  ('eeeeeeee-0000-4000-8000-000000000020', 'eeeeeeee-0000-4000-8000-000000000001', 'j20', 'shopping', 'product', 'shopping', 'ja', 60, 'shopping-1080-v1', 'k20', 'review', 0);
 insert into public.edit_revisions (id, workspace_id, job_id, rev_no, spec, approved_at) values
   ('eeeeeeee-0000-4000-8000-000000000031', 'eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000011', 1, '{"user": "edit"}', null),
-  ('eeeeeeee-0000-4000-8000-000000000037', 'eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000017', 1, '{"user": "edit"}', null);
+  ('eeeeeeee-0000-4000-8000-000000000037', 'eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000017', 1, '{"user": "edit"}', null),
+  ('eeeeeeee-0000-4000-8000-000000000038', 'eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000018', 1, '{"script": []}', null);
 update public.production_jobs j set current_revision_id = r.id
   from public.edit_revisions r where r.job_id = j.id;
 
@@ -39,7 +44,13 @@ select col_not_null('public', 'production_jobs', 'ai_draft_requests', 'ai_draft_
 select ok(not has_function_privilege('authenticated',
   'public.reserve_ai_draft(uuid, uuid, uuid, text, integer)', 'execute'), 'authenticated reserve 실행 불가');
 select ok(not has_function_privilege('anon',
-  'public.create_ai_draft_revision(uuid, uuid, uuid, text, jsonb, jsonb)', 'execute'), 'anon create 실행 불가');
+  'public.create_ai_draft_revision(uuid, uuid, uuid, text, jsonb, jsonb, jsonb, jsonb)', 'execute'), 'anon create 실행 불가');
+select ok(not has_function_privilege('authenticated',
+  'public.create_ai_draft_revision(uuid, uuid, uuid, text, jsonb, jsonb, jsonb, jsonb)', 'execute'), 'authenticated create 실행 불가');
+select ok(has_function_privilege('service_role',
+  'public.create_ai_draft_revision(uuid, uuid, uuid, text, jsonb, jsonb, jsonb, jsonb)', 'execute'), 'service_role create 실행 가능');
+select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.proname = 'create_ai_draft_revision'), 1, 'create 오버로드 없음(000025 교체)');
 select ok(not has_function_privilege('authenticated',
   'public.fail_ai_draft(uuid, uuid, text)', 'execute'), 'authenticated fail 실행 불가');
 select ok(has_function_privilege('service_role',
@@ -101,10 +112,13 @@ select throws_ok(
 select is(
   (public.reserve_ai_draft('eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000013',
     '66666666-6666-4666-8666-666666666666', 'ai-4', 3) ->> 'ai_draft_count')::int, 1, 'variety(ko) 예약 가능(task-040 A1)');
+select is(
+  (public.reserve_ai_draft('eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000018',
+    '66666666-6666-4666-8666-666666666666', 'ai-4s', 3) ->> 'ai_draft_count')::int, 1, 'shopping(ko) 예약 가능(task-048 S2)');
 select throws_ok(
-  $$select public.reserve_ai_draft('eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000018',
-    '66666666-6666-4666-8666-666666666666', 'ai-4s', 3)$$,
-  'NR010', '이 형식(shopping)은 AI 초안을 지원하지 않습니다.', 'shopping → NR010');
+  $$select public.reserve_ai_draft('eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000020',
+    '66666666-6666-4666-8666-666666666666', 'ai-4sj', 3)$$,
+  'NR010', '이 언어(ja)의 쇼핑 작업은 AI 대본을 지원하지 않습니다.', 'shopping lang ja → NR010');
 select throws_ok(
   $$select public.reserve_ai_draft('eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000019',
     '66666666-6666-4666-8666-666666666666', 'ai-4j', 3)$$,
@@ -119,11 +133,26 @@ select throws_ok(
   'NR009', null, '타 워크스페이스 → NR009');
 select is((select sum(jsonb_array_length(ai_draft_requests))::int from public.production_jobs
   where id in ('eeeeeeee-0000-4000-8000-000000000012', 'eeeeeeee-0000-4000-8000-000000000014',
-               'eeeeeeee-0000-4000-8000-000000000018', 'eeeeeeee-0000-4000-8000-000000000019')), 0,
-  '거부된 요청은 기록 없음(shopping·ja 포함, 계수 없음)');
+               'eeeeeeee-0000-4000-8000-000000000020', 'eeeeeeee-0000-4000-8000-000000000019')), 0,
+  '거부된 요청은 기록 없음(ja 포함, 계수 없음)');
 select is((select sum(ai_draft_count)::int from public.production_jobs
-  where id in ('eeeeeeee-0000-4000-8000-000000000018', 'eeeeeeee-0000-4000-8000-000000000019')), 0,
-  'shopping·ja 거부는 횟수 증가 없음');
+  where id in ('eeeeeeee-0000-4000-8000-000000000020', 'eeeeeeee-0000-4000-8000-000000000019')), 0,
+  'ja 거부는 횟수 증가 없음');
+
+-- 5b. 쇼핑 3안(task-048 S5): 요청 기록에 저장, spec 밖, 같은 키 재요청도 같은 값
+select is(
+  public.create_ai_draft_revision('eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000018',
+    '66666666-6666-4666-8666-666666666666', 'ai-4s', '{"script": [{"text": "1안"}]}', '{"errors": [], "warnings": []}',
+    '[{"hook_type": "희소성", "sentences": ["1안"], "char_count": 2}]', '["사실"]') -> 'variants' -> 0 ->> 'hook_type',
+  '희소성', '생성 응답 variants');
+select is((select ai_draft_requests -> 0 -> 'facts_to_check' from public.production_jobs
+  where id = 'eeeeeeee-0000-4000-8000-000000000018'), '["사실"]'::jsonb, '요청 기록에 facts_to_check 저장');
+select is(
+  public.reserve_ai_draft('eeeeeeee-0000-4000-8000-000000000001', 'eeeeeeee-0000-4000-8000-000000000018',
+    '66666666-6666-4666-8666-666666666666', 'ai-4s', 3) -> 'variants',
+  '[{"hook_type": "희소성", "sentences": ["1안"], "char_count": 2}]'::jsonb, '재요청: 같은 variants');
+select is((select r.spec from public.edit_revisions r join public.production_jobs j on j.current_revision_id = r.id
+  where j.id = 'eeeeeeee-0000-4000-8000-000000000018'), '{"script": [{"text": "1안"}]}'::jsonb, 'spec에 variants 없음');
 
 -- 6. 실패 기록: 횟수 유지, 같은 키 재요청은 failed 결과
 select lives_ok(

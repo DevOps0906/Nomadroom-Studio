@@ -49,7 +49,7 @@
 | task-045 | 쇼핑 렌더러 (로컬 워커) | W8 | 044, 030 | 높음 | builder + tester | 완료 |
 | task-046 | 화면: 유형 선택·PROD-01S·PROD-02S·게시 문구 | W8 | 044 | 보통 | builder | 완료 |
 | task-047 | 쇼핑 P0 인수 SHOP-01~06 | W8 | 045, 046 | 보통 | tester | 완료 |
-| task-048 | AI 대본 3안 + 게시 문구 초안 | W9 | 047, 029 | 높음 | builder + tester | 대기 |
+| task-048 | AI 대본 3안 + 게시 문구 초안 | W9 | 047, 029 | 높음 | builder + tester | 완료 |
 | task-049 | 일본어판 파생·번역 A-20 | W10 | 047 | 높음 | builder + tester | 대기 |
 | task-050 | 일본어 TTS·렌더 | W10 | 049, 030 | 높음 | builder + tester | 대기 |
 | task-051 | 예능형 일본어 더빙 | W10 | 050, 038 | 높음 | builder + tester | 대기 |
@@ -57,6 +57,7 @@
 | task-053 | 일본어판·쇼핑 P1 인수 + 회귀 | W10 | 048, 051, 052, 054 | 보통 | tester | 대기 |
 | task-054 | AI 영상 생성 연동 (플랫폼 어댑터 · 비용 상한) | W9 | 047, Q16 | 높음 | builder + tester | 대기 |
 | task-055 | W4·W5 인수 결함 보완(화면 안내·TTS 선택·오버레이) | W5 후속 | 033, 037 | 보통 | builder | 완료 |
+| task-056 | PROD-02S AI 대본 3안 선택 UI·brief 외부 전송 고지 | W9 | 048 | 보통 | builder | 대기 |
 
 상태: 대기 / 진행 / 완료 / 보류
 

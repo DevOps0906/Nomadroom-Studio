@@ -1,7 +1,7 @@
 """task-040 예능형 AI 초안(A-14 variety 분기) 테스트. Claude는 목 전용(실제 네트워크 없음).
 
 가짜 DB·Storage·SDK 가로채기·네트워크 차단 fixture는 test_ai_draft를 그대로 쓴다
-(예약 RPC 모의는 000022: variety·ko만 허용, shopping 거부).
+(예약 RPC 모의는 000022·000025: variety·shopping은 ko만 허용).
 """
 
 import base64
@@ -376,8 +376,8 @@ def test_lang_ja_variety_409_without_call(api, auth, db, claude):
     assert claude.calls == [] and job["ai_draft_count"] == 0
 
 
-def test_shopping_409_without_call(api, auth, db, claude):
-    job, _ = variety_ready(db, format="shopping")
+def test_shopping_ja_409_without_call(api, auth, db, claude):
+    job, _ = variety_ready(db, format="shopping", lang="ja")
     r = post(api, auth, job)
     assert r.status_code == 409
     assert claude.calls == [] and job["ai_draft_count"] == 0

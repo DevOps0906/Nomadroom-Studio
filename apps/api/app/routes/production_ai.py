@@ -1,6 +1,7 @@
 """AI 초안 A-14 `POST /v1/production-jobs/{id}/ai-draft`. 근거: docs/04_API.md#A-14,
 tasks/task-029.md#착수-결정 H1~H8, supabase/migrations/20261119000018_production_ai_draft.sql,
-예능형 분기 tasks/task-040.md#착수-결정 A1~A5(000022: variety·ko만 예약).
+예능형 분기 tasks/task-040.md#착수-결정 A1~A5(000022: variety·ko만 예약),
+쇼핑 분기 tasks/task-048.md#착수-결정 S1~S6(000025: shopping·ko 예약, 3안은 요청 기록에 저장).
 
 순서: 키 확인(없으면 503, 계수 없음) → reserve_ai_draft(잠금·상태·형식·상한·60초·멱등, 횟수+1, 커밋)
 → 잠금 없이 입력 수집·Claude 호출(형식 불일치·오류는 1회 재시도) → create_ai_draft_revision
@@ -17,13 +18,14 @@ from pydantic import BaseModel
 
 from app.auth.user import CurrentUser, get_current_user
 from app.errors import ApiError, db_error
-from app.production import ai_draft, ai_draft_variety, runs
+from app.production import ai_draft, ai_draft_shopping, ai_draft_variety, runs
 from app.production.validation_variety import MAX_TEXT_CHARS
 from app.routes.production_jobs import (
     RevisionOut,
     _get_job,
     _rejected,
     _rows,
+    _shopping_assets,
     _source_duration,
     _source_size,
     _validate,
@@ -40,11 +42,20 @@ ATTEMPTS = 2  # 첫 호출 + 재시도 1회(H4)
 MAX_TITLE_CHARS = MAX_TEXT_CHARS  # 후보 제목 프롬프트 상한(자막 문구 상한과 같은 값)
 
 
+class ShoppingVariantOut(BaseModel):
+    hook_type: str
+    sentences: list[str]
+    char_count: int  # 서버가 센 공백 포함 글자 수 합([확인 필요] 표기 제외)
+
+
 class AiDraftOut(BaseModel):
     revision: RevisionOut
     ai_draft_count: int
     previous_rev_no: int | None
     replay: bool  # 같은 키 재요청(200)이면 true. 웹 중계가 상태 코드를 그대로 옮기는 데 쓴다
+    # 쇼핑(task-048 S5): 대본 3안·확인할 사실. spec 밖(요청 기록)에 저장, replay 때도 같은 값
+    variants: list[ShoppingVariantOut] | None = None
+    facts_to_check: list[str] | None = None
 
 
 async def _fail(request: Request, ids: dict) -> None:
@@ -91,6 +102,8 @@ def _out(result: Any) -> AiDraftOut:
         ai_draft_count=result["ai_draft_count"],
         previous_rev_no=result.get("previous_rev_no"),
         replay=bool(result.get("replay")),
+        variants=result.get("variants"),
+        facts_to_check=result.get("facts_to_check"),
     )
 
 
@@ -256,6 +269,40 @@ async def _draft_variety(request: Request, ws: uuid.UUID, job: dict) -> tuple[di
     raise ai_draft.DraftFailed(reason)
 
 
+async def _draft_shopping(request: Request, ws: uuid.UUID, job: dict) -> tuple[dict, dict, dict]:
+    """쇼핑(task-048): brief·target·comment_keyword·vertical → Claude(최대 2회) → 3안 검증 →
+    직전 spec의 script만 1안으로 교체 → (spec, validation, {variants, facts_to_check}).
+    이미지·시트·analysis·원본·음성은 읽지 않는다. 실패는 DraftFailed."""
+    settings = request.app.state.settings
+    base_spec = await _base_spec(request, ws, job)
+    if base_spec is None:
+        raise ai_draft.DraftFailed("no_base")
+    assets = await _shopping_assets(request, ws, job["id"])
+    content = ai_draft_shopping.build_content(job)
+    tool = ai_draft_shopping.tool_schema()
+    reason = "schema"
+    for _ in range(ATTEMPTS):
+        try:
+            out = await ai_draft.call_claude(
+                settings, content, system=ai_draft_shopping.SYSTEM_PROMPT, tool=tool
+            )
+        except ai_draft.DraftFailed as exc:
+            reason = str(exc)
+            continue
+        draft = ai_draft_shopping.parse(out, job)
+        if draft is None:
+            reason = "schema"
+            continue
+        spec, notes = ai_draft_shopping.assemble_spec(draft, base_spec)
+        validation = _validate(spec, job, None, assets)
+        if _rejected(validation):
+            reason = "schema"
+            continue
+        validation["warnings"].extend(notes)  # 문장별 녹음 안내(S5)
+        return spec, validation, draft
+    raise ai_draft.DraftFailed(reason)
+
+
 @router.post("/{job_id}/ai-draft", response_model=AiDraftOut, status_code=201)
 async def create_ai_draft(
     job_id: uuid.UUID,
@@ -274,7 +321,7 @@ async def create_ai_draft(
         ws,
         job_id,
         "id,status,format,lang,source_start_sec,segment_len_sec,preset_version,source_meta,"
-        "candidate_id,current_revision_id",
+        "candidate_id,current_revision_id,vertical,brief,comment_keyword",
     )
     ids = {"p_workspace": str(ws), "p_job": str(job_id), "p_key": idempotency_key}
     reserved = await _rpc(
@@ -294,9 +341,14 @@ async def create_ai_draft(
             raise ai_draft.upstream_failed()
         return _out(reserved)
 
+    extra: dict[str, Any] = {}
     try:
-        draft = _draft_variety if job["format"] == "variety" else _draft
-        spec, validation = await draft(request, ws, job)
+        if job["format"] == "shopping":
+            spec, validation, draft = await _draft_shopping(request, ws, job)
+            extra = {"p_variants": draft["variants"], "p_facts": draft["facts_to_check"]}
+        else:
+            make = _draft_variety if job["format"] == "variety" else _draft
+            spec, validation = await make(request, ws, job)
     except ai_draft.DraftFailed as exc:
         await _fail(request, ids)
         logger.warning("AI 초안 실패: job=%s reason=%s", job_id, exc)
@@ -308,7 +360,13 @@ async def create_ai_draft(
         created = await _rpc(
             request,
             "create_ai_draft_revision",
-            {**ids, "p_user": str(user.user_id), "p_spec": spec, "p_validation": validation},
+            {
+                **ids,
+                "p_user": str(user.user_id),
+                "p_spec": spec,
+                "p_validation": validation,
+                **extra,
+            },
         )
     except ApiError:
         # 호출 사이에 상태가 바뀐 경우 등: 요청을 pending으로 남기지 않는다
