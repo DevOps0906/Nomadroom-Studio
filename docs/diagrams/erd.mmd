@@ -175,6 +175,21 @@ erDiagram
     text status
     string more_11_cols
   }
+  generation_runs {
+    uuid id PK
+    uuid workspace_id FK
+    uuid requested_by FK
+    uuid confirmed_by FK
+    uuid job_id
+    uuid source_asset_id
+    uuid result_asset_id
+    text cut_ref
+    text prompt
+    text platform
+    text model
+    integer duration_sec
+    string more_12_cols
+  }
   workspaces ||--o{ workspace_members : "workspace_id"
   workspaces ||--o{ profiles : "workspace_id"
   workspaces ||--o{ broadcaster_channels : "workspace_id"
@@ -205,6 +220,10 @@ erDiagram
   workspaces ||--o{ production_assets : "workspace_id"
   workspaces ||--o{ render_runs : "workspace_id"
   workers ||--o{ render_runs : "claimed_by"
+  workspaces ||--o{ generation_runs : "workspace_id"
+  production_jobs ||--o{ generation_runs : "job_id"
+  production_assets ||--o{ generation_runs : "source_asset_id"
+  production_assets ||--o{ generation_runs : "result_asset_id"
   production_jobs ||--o{ edit_revisions : "job_id"
   production_jobs ||--o{ production_assets : "job_id"
   production_jobs ||--o{ render_runs : "job_id"

@@ -509,7 +509,7 @@ async def _shopping_assets(request: Request, ws: uuid.UUID, job_id: uuid.UUID) -
         "GET",
         "production_assets",
         params={
-            "select": "id,kind,status,duration_sec,rights,parent_asset_id",
+            "select": "id,kind,status,duration_sec,rights,reviewed,parent_asset_id",
             "job_id": f"eq.{job_id}",
             "workspace_id": f"eq.{ws}",
             "render_run_id": "is.null",

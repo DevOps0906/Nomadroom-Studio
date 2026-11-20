@@ -171,6 +171,44 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"generation_runs": {
+                  Row: {
+                    "actual_cost_krw": number | null,"billable": boolean,"confirmed_at": string | null,"confirmed_by": string | null,"created_at": string,"cut_ref": string | null,"duration_sec": number,"error_code": string | null,"est_cost_krw": number,"finalize_token": string | null,"finished_at": string | null,"id": string,"idempotency_key": string,"job_id": string | null,"model": string,"platform": string,"prompt": string,"request_id": string | null,"requested_by": string | null,"result_asset_id": string | null,"source_asset_id": string | null,"status": string,"updated_at": string,"workspace_id": string,"_gen_run_json": Json | null
+                  }
+                  ComputedFields: "_gen_run_json"
+                  Insert: {
+                    "actual_cost_krw"?: number | null,"billable"?: boolean,"confirmed_at"?: string | null,"confirmed_by"?: string | null,"created_at"?: string,"cut_ref"?: string | null,"duration_sec": number,"error_code"?: string | null,"est_cost_krw": number,"finalize_token"?: string | null,"finished_at"?: string | null,"id"?: string,"idempotency_key": string,"job_id"?: string | null,"model": string,"platform": string,"prompt": string,"request_id"?: string | null,"requested_by"?: string | null,"result_asset_id"?: string | null,"source_asset_id"?: string | null,"status"?: string,"updated_at"?: string,"workspace_id": string
+                  }
+                  Update: {
+                    "actual_cost_krw"?: number | null,"billable"?: boolean,"confirmed_at"?: string | null,"confirmed_by"?: string | null,"created_at"?: string,"cut_ref"?: string | null,"duration_sec"?: number,"error_code"?: string | null,"est_cost_krw"?: number,"finalize_token"?: string | null,"finished_at"?: string | null,"id"?: string,"idempotency_key"?: string,"job_id"?: string | null,"model"?: string,"platform"?: string,"prompt"?: string,"request_id"?: string | null,"requested_by"?: string | null,"result_asset_id"?: string | null,"source_asset_id"?: string | null,"status"?: string,"updated_at"?: string,"workspace_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "generation_runs_job_fk"
+      columns: ["job_id","workspace_id"]
+isOneToOne: false
+      referencedRelation: "production_jobs"
+      referencedColumns: ["id","workspace_id"]
+    },{
+      foreignKeyName: "generation_runs_result_fk"
+      columns: ["result_asset_id","job_id"]
+isOneToOne: false
+      referencedRelation: "production_assets"
+      referencedColumns: ["id","job_id"]
+    },{
+      foreignKeyName: "generation_runs_source_fk"
+      columns: ["source_asset_id","job_id"]
+isOneToOne: false
+      referencedRelation: "production_assets"
+      referencedColumns: ["id","job_id"]
+    },{
+      foreignKeyName: "generation_runs_workspace_id_fkey"
+      columns: ["workspace_id"]
+isOneToOne: false
+      referencedRelation: "workspaces"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"job_profile_runs": {
                   Row: {
                     "chrome_state": string | null,"collected_count": number,"detail": string | null,"id": string,"job_id": string,"position": number,"profile_id": string,"status": string,"updated_at": string,"workspace_id": string
@@ -269,14 +307,14 @@ isOneToOne: false
                   ]
                 },"production_assets": {
                   Row: {
-                    "created_at": string,"created_by": string | null,"duration_sec": number | null,"id": string,"job_id": string,"kind": string,"mime": string,"parent_asset_id": string | null,"render_run_id": string | null,"rights": Json | null,"size_bytes": number | null,"status": string,"storage_path": string,"workspace_id": string
+                    "created_at": string,"created_by": string | null,"duration_sec": number | null,"id": string,"job_id": string,"kind": string,"mime": string,"parent_asset_id": string | null,"render_run_id": string | null,"review_checks": Json | null,"reviewed": boolean,"rights": Json | null,"size_bytes": number | null,"status": string,"storage_path": string,"workspace_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"created_by"?: string | null,"duration_sec"?: number | null,"id"?: string,"job_id": string,"kind": string,"mime": string,"parent_asset_id"?: string | null,"render_run_id"?: string | null,"rights"?: Json | null,"size_bytes"?: number | null,"status"?: string,"storage_path": string,"workspace_id": string
+                    "created_at"?: string,"created_by"?: string | null,"duration_sec"?: number | null,"id"?: string,"job_id": string,"kind": string,"mime": string,"parent_asset_id"?: string | null,"render_run_id"?: string | null,"review_checks"?: Json | null,"reviewed"?: boolean,"rights"?: Json | null,"size_bytes"?: number | null,"status"?: string,"storage_path": string,"workspace_id": string
                   }
                   Update: {
-                    "created_at"?: string,"created_by"?: string | null,"duration_sec"?: number | null,"id"?: string,"job_id"?: string,"kind"?: string,"mime"?: string,"parent_asset_id"?: string | null,"render_run_id"?: string | null,"rights"?: Json | null,"size_bytes"?: number | null,"status"?: string,"storage_path"?: string,"workspace_id"?: string
+                    "created_at"?: string,"created_by"?: string | null,"duration_sec"?: number | null,"id"?: string,"job_id"?: string,"kind"?: string,"mime"?: string,"parent_asset_id"?: string | null,"render_run_id"?: string | null,"review_checks"?: Json | null,"reviewed"?: boolean,"rights"?: Json | null,"size_bytes"?: number | null,"status"?: string,"storage_path"?: string,"workspace_id"?: string
                   }
                   Relationships: [
                     {
@@ -511,14 +549,14 @@ isOneToOne: false
                   ]
                 },"workspaces": {
                   Row: {
-                    "created_at": string,"id": string,"name": string
+                    "created_at": string,"gen_job_cap_krw": number,"gen_monthly_budget_krw": number,"id": string,"name": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"id"?: string,"name": string
+                    "created_at"?: string,"gen_job_cap_krw"?: number,"gen_monthly_budget_krw"?: number,"id"?: string,"name": string
                   }
                   Update: {
-                    "created_at"?: string,"id"?: string,"name"?: string
+                    "created_at"?: string,"gen_job_cap_krw"?: number,"gen_monthly_budget_krw"?: number,"id"?: string,"name"?: string
                   }
                   Relationships: [
                     
@@ -561,6 +599,21 @@ isOneToOne: false
 "_ai_draft_set":
 { Args: { "p_job": string,"p_key": string,"p_patch": Json }; Returns: Json
                            },
+"_gen_budget":
+{ Args: { "p_job": string,"p_workspace": string }; Returns: Json
+                           },
+"_gen_check_source":
+{ Args: { "p_asset": string,"p_job": string,"p_workspace": string }; Returns: undefined
+                           },
+"_gen_expire_stalled":
+{ Args: { "p_run": string }; Returns: undefined
+                           },
+"_gen_require_budget":
+{ Args: { "p_est": number,"p_job": string,"p_workspace": string }; Returns: Json
+                           },
+"_gen_run_json":
+{ Args: { "p_run": Omit<Database["public"]['Tables']["generation_runs"]['Row'], Database["public"]['Tables']["generation_runs"]['ComputedFields']> }; Returns: Json
+                           },
 "_render_run_json":
 { Args: { "p_created": boolean,"p_run": Omit<Database["public"]['Tables']["render_runs"]['Row'], Database["public"]['Tables']["render_runs"]['ComputedFields']> }; Returns: Json
                            },
@@ -576,13 +629,22 @@ isOneToOne: false
 "approve_production_revision":
 { Args: { "p_job": string,"p_rev_no": number,"p_updated_at": string,"p_user": string,"p_validation": Json,"p_workspace": string }; Returns: Json
                            },
+"begin_generation_refresh":
+{ Args: { "p_job": string,"p_run": string,"p_workspace": string }; Returns: Json
+                           },
+"claim_generation_finalize":
+{ Args: { "p_run": string,"p_workspace": string }; Returns: Json
+                           },
 "claim_production_task":
 { Args: { "p_worker": string,"p_workspace": string }; Returns: Json
                            } |
 { Args: { "p_formats": (string)[],"p_worker": string,"p_workspace": string }; Returns: Json
                            },
+"confirm_generation_run":
+{ Args: { "p_job": string,"p_run": string,"p_user": string,"p_workspace": string }; Returns: Json
+                           },
 "create_ai_draft_revision":
-{ Args: { "p_job": string,"p_key": string,"p_spec": Json,"p_user": string,"p_validation": Json,"p_workspace": string }; Returns: Json
+{ Args: { "p_facts"?: Json,"p_job": string,"p_key": string,"p_spec": Json,"p_user": string,"p_validation": Json,"p_variants"?: Json,"p_workspace": string }; Returns: Json
                            },
 "expire_production_offline":
 { Args: { "p_workspace": string }; Returns: Json
@@ -590,17 +652,26 @@ isOneToOne: false
 "fail_ai_draft":
 { Args: { "p_job": string,"p_key": string,"p_workspace": string }; Returns: undefined
                            },
+"finish_generation_run":
+{ Args: { "p_actual_cost": number,"p_asset": string,"p_error": string,"p_path": string,"p_run": string,"p_size": number,"p_status": string,"p_token": string,"p_workspace": string }; Returns: Json
+                           },
 "finish_production_task":
 { Args: { "p_asset_ids": (string)[],"p_error_code": string,"p_error_stage": string,"p_kind": string,"p_meta": Json,"p_spec": Json,"p_status": string,"p_task": string,"p_validation": Json,"p_worker": string,"p_workspace": string }; Returns: Json
                            },
 "is_workspace_member":
 { Args: { "ws": string }; Returns: boolean
                            },
+"mark_generation_submitted":
+{ Args: { "p_error": string,"p_outcome": string,"p_request_id": string,"p_run": string,"p_workspace": string }; Returns: Json
+                           },
 "production_affiliates_valid":
 { Args: { "p": Json }; Returns: boolean
                            },
 "quota_day":
 { Args: { "p_ts": string }; Returns: string
+                           },
+"quote_generation_run":
+{ Args: { "p_cut_ref": string,"p_duration": number,"p_est_cost": number,"p_job": string,"p_key": string,"p_model": string,"p_platform": string,"p_prompt": string,"p_source_asset": string,"p_user": string,"p_workspace": string }; Returns: Json
                            },
 "release_search_quota":
 { Args: { "p_units": number }; Returns: undefined
@@ -625,6 +696,9 @@ isOneToOne: false
                            },
 "retry_render_run":
 { Args: { "p_job": string,"p_run": string,"p_user": string,"p_workspace": string }; Returns: Json
+                           },
+"review_generation_run":
+{ Args: { "p_checks": Json,"p_job": string,"p_run": string,"p_user": string,"p_workspace": string }; Returns: Json
                            },
 "save_production_revision":
 { Args: { "p_base_rev_no": number,"p_job": string,"p_spec": Json,"p_user": string,"p_validation": Json,"p_workspace": string }; Returns: Json

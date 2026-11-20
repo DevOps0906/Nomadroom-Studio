@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     ai_draft_max_items: int = 80
     ai_draft_max_shots: int = 40
     ai_draft_timeout_sec: float = 90.0
+    # AI 영상 생성(A-22, task-054 G0): 기본 꺼짐. VIDEOGEN_ENABLED=1이고 xAI 키가 있어야
+    # 견적부터 동작(아니면 503, 기록 없음). 키는 서버 환경변수로만.
+    videogen_enabled: bool = False
+    videogen_xai_api_key: SecretStr | None = None
+    videogen_krw_per_usd: int = 1450  # 견적 환율(정수 원, 가정 — Q16). 견적은 올림
+    videogen_timeout_sec: float = 60.0  # 플랫폼 호출·결과 다운로드 타임아웃
     # /docs·/redoc·/openapi.json 노출. 기본은 끈다.
     api_docs_enabled: bool = False
 
@@ -77,6 +83,14 @@ class Settings(BaseSettings):
     @classmethod
     def _blank_anthropic_key(cls, v: SecretStr | None) -> SecretStr | None:
         # 빈 값은 미설정(A-14 503). 형식 검사는 하지 않는다(값을 메시지에 넣지 않음).
+        if v is None or not v.get_secret_value().strip():
+            return None
+        return v
+
+    @field_validator("videogen_xai_api_key")
+    @classmethod
+    def _blank_videogen_key(cls, v: SecretStr | None) -> SecretStr | None:
+        # 빈 값은 미설정(A-22 503). 값을 메시지에 넣지 않는다.
         if v is None or not v.get_secret_value().strip():
             return None
         return v

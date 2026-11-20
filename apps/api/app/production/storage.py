@@ -136,3 +136,28 @@ async def delete_object(client: httpx.AsyncClient, settings: Settings, path: str
     if resp.status_code >= 400 and resp.status_code not in (400, 404):
         logger.warning("파일 저장소 오류 %s: object/delete", resp.status_code)
         raise storage_error()
+
+
+async def upload_object(
+    client: httpx.AsyncClient,
+    settings: Settings,
+    path: str,
+    data: bytes,
+    mime: str,
+    timeout: float = 60.0,
+) -> None:
+    """서버가 받은 바이트를 서비스 키로 올린다(덮어쓰기 끔, task-054 G6 AI 생성 결과)."""
+    headers = {**service_headers(settings), "content-type": mime, "x-upsert": "false"}
+    try:
+        resp = await client.post(
+            f"{_base(settings)}/object/{BUCKET}/{path}",
+            content=data,
+            headers=headers,
+            timeout=timeout,
+        )
+    except httpx.HTTPError as exc:
+        logger.warning("파일 저장소 연결 실패: object/upload")
+        raise storage_error() from exc
+    if resp.status_code >= 400:
+        logger.warning("파일 저장소 오류 %s: object/upload", resp.status_code)
+        raise storage_error()

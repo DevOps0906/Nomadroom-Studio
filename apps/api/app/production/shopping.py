@@ -208,7 +208,7 @@ def assets_map(rows: list[dict]) -> dict[str, dict[str, Any]]:
 
     rights·reviewed는 사용자 입력 자산(파생 source는 부모 source_upload) 값,
     duration은 파생 source 값.
-    reviewed는 사용자 jsonb에서 읽지 않는다(AI 생성 검수는 task-054 칼럼).
+    reviewed는 사용자 jsonb가 아니라 production_assets.reviewed 칼럼(task-054 G4)에서 읽는다.
     """
     by_id = {str(r["id"]): r for r in rows}
     child_duration: dict[str, float | None] = {}
@@ -221,10 +221,12 @@ def assets_map(rows: list[dict]) -> dict[str, dict[str, Any]]:
         if kind not in MAP_KINDS:
             continue
         rights = r.get("rights")
+        reviewed = r.get("reviewed") is True
         duration = _num(r.get("duration_sec"))
         if kind == "source":
             parent = by_id.get(str(r.get("parent_asset_id")))
             rights = parent.get("rights") if parent else None
+            reviewed = bool(parent) and parent.get("reviewed") is True
         elif kind == "source_upload":
             duration = child_duration.get(str(r["id"]))
         out[str(r["id"])] = {
@@ -234,7 +236,7 @@ def assets_map(rows: list[dict]) -> dict[str, dict[str, Any]]:
             "width": None,
             "height": None,
             "rights": rights if isinstance(rights, Mapping) else None,
-            "reviewed": False,
+            "reviewed": reviewed,
         }
     return out
 
